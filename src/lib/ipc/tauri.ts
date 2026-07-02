@@ -103,16 +103,17 @@ export async function pickFolder(): Promise<string | null> {
   return typeof result === 'string' ? result : result[0] ?? null
 }
 
-/** Recursively collect all .txt file paths under a directory. */
+/** Recursively collect all .txt file paths under a directory, skipping macOS metadata files. */
 export async function listTxtFiles(dirPath: string): Promise<string[]> {
   const paths: string[] = []
   async function walk(dir: string) {
     const entries = await readDir(dir)
     for (const entry of entries) {
+      if (!entry.name || entry.name.startsWith('._') || entry.name.startsWith('.')) continue
       const fullPath = `${dir}/${entry.name}`
       if (entry.isDirectory) {
         await walk(fullPath)
-      } else if (entry.name?.toLowerCase().endsWith('.txt')) {
+      } else if (entry.name.toLowerCase().endsWith('.txt')) {
         paths.push(fullPath)
       }
     }

@@ -10,6 +10,10 @@ export interface SongSource {
   /** For local-folder: the directory path */
   path?: string
   enabled: boolean
+  /** Last known song count — persisted so it shows even when disabled */
+  lastCount?: number
+  /** Whether the source path is currently reachable */
+  available?: boolean
 }
 
 export interface AppSettings {
@@ -57,6 +61,16 @@ export const appSettings = {
   renameSource(id: string, label: string) {
     settings.sources = settings.sources.map(s =>
       s.id === id ? { ...s, label } : s
+    )
+  },
+  updateSourceCount(id: string, count: number) {
+    settings.sources = settings.sources.map(s =>
+      s.id === id ? { ...s, lastCount: count } : s
+    )
+  },
+  updateSourceAvailability(id: string, available: boolean) {
+    settings.sources = settings.sources.map(s =>
+      s.id === id ? { ...s, available } : s
     )
   },
   set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {

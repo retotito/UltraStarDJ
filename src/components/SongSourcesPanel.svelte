@@ -58,12 +58,7 @@
 <div class="sources-panel">
   <div class="section-header">
     <span class="section-title">Song Sources</span>
-    {#if songLibrary.scanning}
-      <span class="scan-status">
-        <span class="icon icon-sm spinning">sync</span>
-        Scanning…
-      </span>
-    {:else if songLibrary.scanStatus === 'error'}
+    {#if songLibrary.scanStatus === 'error'}
       <span class="scan-status error">
         <span class="icon icon-sm">error</span>
         {songLibrary.scanError}
@@ -76,7 +71,7 @@
   {:else}
     <ul class="source-list">
       {#each appSettings.sources as source (source.id)}
-        <li class="source-row">
+        <li class="source-row" class:unavailable={source.available === false}>
           <label class="toggle-switch" title={source.enabled ? 'Enabled' : 'Disabled'}>
             <input
               type="checkbox"
@@ -104,8 +99,15 @@
             <span class="source-path text-xs">{source.path ?? source.type}</span>
           </div>
 
-          {#if songLibrary.countBySource[source.id] !== undefined}
-            <span class="song-count text-xs">{songLibrary.countBySource[source.id]}</span>
+          {#if songLibrary.scanningSourceId === source.id}
+            <span class="icon icon-sm spinning">sync</span>
+          {:else if source.available === false}
+            <span class="icon icon-sm unavailable-icon" title="Source not found">wifi_off</span>
+          {:else}
+            {@const count = songLibrary.countBySource[source.id] ?? source.lastCount}
+            {#if count !== undefined}
+              <span class="song-count text-xs">{count}</span>
+            {/if}
           {/if}
 
           <button
@@ -120,10 +122,20 @@
     </ul>
   {/if}
 
-  <button class="btn btn-tonal add-btn" onclick={addFolder}>
-    <span class="icon icon-sm">create_new_folder</span>
-    Add folder
-  </button>
+  <div class="actions-row">
+    <button class="btn btn-tonal add-btn" onclick={addFolder}>
+      <span class="icon icon-sm">create_new_folder</span>
+      Add folder
+    </button>
+    <button
+      class="btn btn-outlined add-btn"
+      onclick={() => songLibrary.scanSources(appSettings.sources)}
+      disabled={songLibrary.scanning}
+    >
+      <span class="icon icon-sm">refresh</span>
+      Rescan
+    </button>
+  </div>
 </div>
 
 <style>
@@ -228,8 +240,22 @@
     flex-shrink: 0;
   }
 
+  .source-row.unavailable {
+    opacity: 0.5;
+  }
+
+  .unavailable-icon {
+    color: var(--md-sys-color-error);
+    flex-shrink: 0;
+  }
+
   .add-btn {
-    align-self: flex-start;
     gap: var(--space-2);
+  }
+
+  .actions-row {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
   }
 </style>

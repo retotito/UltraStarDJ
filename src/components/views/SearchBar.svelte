@@ -7,6 +7,7 @@
     languages = [] as string[],
     genres = [] as string[],
     sources = [] as SongSource[],
+    sourceOptions = [] as { value: string; label: string }[],
     selectedLanguage = $bindable(''),
     selectedGenre = $bindable(''),
     selectedSource = $bindable('')
@@ -15,6 +16,7 @@
     languages?: string[]
     genres?: string[]
     sources?: SongSource[]
+    sourceOptions?: { value: string; label: string }[]
     selectedLanguage?: string
     selectedGenre?: string
     selectedSource?: string
@@ -56,7 +58,7 @@
       <Select
         class="filter-select"
         value={selectedSource}
-        options={[{ value: '', label: 'All sources' }, ...sources.map(s => ({ value: s.id, label: s.label }))]}
+        options={sourceOptions}
         onchange={(v) => selectedSource = v}
       />
     {/if}
