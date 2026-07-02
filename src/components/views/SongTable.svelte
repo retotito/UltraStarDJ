@@ -27,11 +27,21 @@
     else { sortKey = key; sortAsc = true }
   }
 
+  const MENU_W = 180
+  const MENU_H = 120 // approximate — enough to clamp bottom overflow
+
   function openMenu(e: MouseEvent, song: Song) {
     e.stopPropagation()
     menuSongId = song.id
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    menuPos = { x: rect.left - 160, y: rect.bottom + 4 }
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    let x = e.clientX
+    let y = e.clientY
+    if (x + MENU_W > vw) x = vw - MENU_W - 8
+    if (y + MENU_H > vh) y = vh - MENU_H - 8
+    if (x < 8) x = 8
+    if (y < 8) y = 8
+    menuPos = { x, y }
   }
 
   function closeMenu() { menuSongId = null }
