@@ -1,5 +1,6 @@
 <script lang="ts">
   import { appSettings } from '$lib/stores/settings.svelte'
+  import Select from '$components/ui/Select.svelte'
 </script>
 
 <div class="settings-dialog">
@@ -7,14 +8,11 @@
     <h3 class="section-title">Appearance</h3>
     <div class="setting-row">
       <span>Theme</span>
-      <select
-        class="select"
+      <Select
         value={appSettings.theme}
-        onchange={(e) => appSettings.setTheme((e.target as HTMLSelectElement).value as 'dark' | 'light')}
-      >
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
-      </select>
+        options={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]}
+        onchange={(v) => appSettings.setTheme(v as 'dark' | 'light')}
+      />
     </div>
   </section>
 

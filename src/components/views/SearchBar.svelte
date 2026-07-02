@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Select from '$components/ui/Select.svelte'
+
   let {
     query = $bindable(''),
     languages = [] as string[],
@@ -31,19 +33,19 @@
   </div>
 
   <div class="filter-row">
-    <select class="select filter-select" bind:value={selectedLanguage} aria-label="Filter by language">
-      <option value="">Language</option>
-      {#each languages as lang}
-        <option value={lang}>{lang}</option>
-      {/each}
-    </select>
+    <Select
+      class="filter-select"
+      value={selectedLanguage}
+      options={[{ value: '', label: 'Language' }, ...languages.map(l => ({ value: l, label: l }))]}
+      onchange={(v) => selectedLanguage = v}
+    />
 
-    <select class="select filter-select" bind:value={selectedGenre} aria-label="Filter by genre">
-      <option value="">Genre</option>
-      {#each genres as genre}
-        <option value={genre}>{genre}</option>
-      {/each}
-    </select>
+    <Select
+      class="filter-select"
+      value={selectedGenre}
+      options={[{ value: '', label: 'Genre' }, ...genres.map(g => ({ value: g, label: g }))]}
+      onchange={(v) => selectedGenre = v}
+    />
 
     {#if selectedLanguage || selectedGenre}
       <button class="btn btn-text" onclick={() => { selectedLanguage = ''; selectedGenre = '' }}>
