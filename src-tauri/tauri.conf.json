@@ -24,6 +24,13 @@
       "csp": null
     }
   },
+  "plugins": {
+    "fs": {
+      "scope": {
+        "allow": ["$HOME/**", "$DESKTOP/**", "$DOCUMENT/**", "$DOWNLOAD/**", "$AUDIO/**", "$VIDEO/**", "$PICTURE/**", "$PUBLIC/**", "$RUNTIME/**", "$TEMP/**", "$APPCONFIG/**", "$APPDATA/**", "$APPLOCALDATA/**", "$APPCACHE/**", "$APPLOG/**"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

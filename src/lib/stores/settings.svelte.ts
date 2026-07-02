@@ -54,6 +54,11 @@ export const appSettings = {
       s.id === id ? { ...s, enabled: !s.enabled } : s
     )
   },
+  renameSource(id: string, label: string) {
+    settings.sources = settings.sources.map(s =>
+      s.id === id ? { ...s, label } : s
+    )
+  },
   set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     settings[key] = value
   },

@@ -3,6 +3,7 @@
   import { layout } from '$lib/stores/layout.svelte'
   import { songQueue } from '$lib/stores/queue.svelte'
   import { player } from '$lib/stores/player.svelte'
+  import { appSettings } from '$lib/stores/settings.svelte'
 
   let { songs }: { songs: Song[] } = $props()
 
@@ -122,6 +123,8 @@
               <td class="col-narrow text-muted">{song.bpm}</td>
             {:else if col.key === 'genre'}
               <td class="text-muted">{song.genre ?? '—'}</td>
+            {:else if col.key === 'source'}
+              <td class="text-muted">{appSettings.sources.find(s => s.id === song.sourceId)?.label ?? song.sourceId}</td>
             {/if}
           {/each}
           <td class="col-actions">

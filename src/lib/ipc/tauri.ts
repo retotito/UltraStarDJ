@@ -7,6 +7,8 @@
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { readDir, readTextFile, exists } from '@tauri-apps/plugin-fs'
 import type { PlaySongPayload } from '$lib/ultrastar/types'
 
 // ── Event names ────────────────────────────────────────────────
@@ -90,4 +92,41 @@ export function onPauseSong(handler: () => void): Promise<UnlistenFn> {
 
 export function onResumeSong(handler: () => void): Promise<UnlistenFn> {
   return listen(IPC_EVENTS.RESUME_SONG, () => handler())
+}
+
+// ── File system ────────────────────────────────────────────────
+
+/** Open a native folder picker. Returns the selected path or null. */
+export async function pickFolder(): Promise<string | null> {
+  const result = await openDialog({ directory: true, multiple: false })
+  if (!result) return null
+  return typeof result === 'string' ? result : result[0] ?? null
+}
+
+/** Recursively collect all .txt file paths under a directory. */
+export async function listTxtFiles(dirPath: string): Promise<string[]> {
+  const paths: string[] = []
+  async function walk(dir: string) {
+    const entries = await readDir(dir)
+    for (const entry of entries) {
+      const fullPath = `${dir}/${entry.name}`
+      if (entry.isDirectory) {
+        await walk(fullPath)
+      } else if (entry.name?.toLowerCase().endsWith('.txt')) {
+        paths.push(fullPath)
+      }
+    }
+  }
+  await walk(dirPath)
+  return paths
+}
+
+/** Read a text file as a string. */
+export async function readFile(path: string): Promise<string> {
+  return readTextFile(path)
+}
+
+/** Check if a path exists. */
+export async function pathExists(path: string): Promise<boolean> {
+  return exists(path)
 }

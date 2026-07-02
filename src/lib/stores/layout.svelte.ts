@@ -25,6 +25,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: 'language', label: 'Language', visible: true },
   { key: 'bpm',      label: 'BPM',      visible: false },
   { key: 'genre',    label: 'Genre',    visible: false },
+  { key: 'source',   label: 'Source',   visible: false },
 ]
 
 const DEFAULTS: LayoutState = {

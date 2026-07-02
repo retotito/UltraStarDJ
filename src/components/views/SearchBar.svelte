@@ -1,18 +1,23 @@
 <script lang="ts">
   import Select from '$components/ui/Select.svelte'
+  import type { SongSource } from '$lib/stores/settings.svelte'
 
   let {
     query = $bindable(''),
     languages = [] as string[],
     genres = [] as string[],
+    sources = [] as SongSource[],
     selectedLanguage = $bindable(''),
-    selectedGenre = $bindable('')
+    selectedGenre = $bindable(''),
+    selectedSource = $bindable('')
   }: {
     query?: string
     languages?: string[]
     genres?: string[]
+    sources?: SongSource[]
     selectedLanguage?: string
     selectedGenre?: string
+    selectedSource?: string
   } = $props()
 </script>
 
@@ -46,6 +51,15 @@
       options={[{ value: '', label: 'Genre' }, ...genres.map(g => ({ value: g, label: g }))]}
       onchange={(v) => selectedGenre = v}
     />
+
+    {#if sources.length >= 2}
+      <Select
+        class="filter-select"
+        value={selectedSource}
+        options={[{ value: '', label: 'All sources' }, ...sources.map(s => ({ value: s.id, label: s.label }))]}
+        onchange={(v) => selectedSource = v}
+      />
+    {/if}
 
     {#if selectedLanguage || selectedGenre}
       <button class="btn btn-text" onclick={() => { selectedLanguage = ''; selectedGenre = '' }}>
