@@ -57,17 +57,17 @@
 
     <label class="toggle-row">
       <span>Player</span>
-      <label class="switch">
+      <label class="toggle-switch">
         <input type="checkbox" checked={layout.showPlayer} onchange={() => layout.togglePlayer()} />
-        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="toggle-slider"></span>
       </label>
     </label>
 
     <label class="toggle-row">
       <span>Queue</span>
-      <label class="switch">
+      <label class="toggle-switch">
         <input type="checkbox" checked={layout.showQueue} onchange={() => layout.toggleQueue()} />
-        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="toggle-slider"></span>
       </label>
     </label>
 
@@ -75,9 +75,9 @@
     {#each layout.columns.filter(c => c.key !== 'index') as col (col.key)}
       <label class="toggle-row">
         <span>{col.label}</span>
-        <label class="switch">
+        <label class="toggle-switch">
           <input type="checkbox" checked={col.visible} onchange={() => layout.toggleColumn(col.key)} />
-          <span class="switch-track"><span class="switch-thumb"></span></span>
+          <span class="toggle-slider"></span>
         </label>
       </label>
     {/each}

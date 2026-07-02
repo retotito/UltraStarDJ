@@ -29,13 +29,13 @@
         <div class="source-row">
           <span class="source-label truncate text-sm">{source.label}</span>
           <span class="source-type text-xs text-muted">{source.type}</span>
-          <label class="switch">
+          <label class="toggle-switch">
             <input
               type="checkbox"
               checked={source.enabled}
               onchange={() => appSettings.toggleSource(source.id)}
             />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="toggle-slider"></span>
           </label>
           <button
             class="btn btn-icon-sm"

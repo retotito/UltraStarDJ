@@ -55,6 +55,7 @@
 
   .panel {
     background: var(--md-sys-color-surface-container-high);
+    border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-xl);
     min-width: 400px;
     max-width: 560px;
@@ -64,6 +65,7 @@
     flex-direction: column;
     box-shadow: var(--elevation-3);
     overflow: hidden;
+    animation: slideUp 0.25s ease-out;
   }
 
   .modal-header {

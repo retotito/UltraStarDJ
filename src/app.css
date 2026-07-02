@@ -355,8 +355,19 @@ a {
 
 /* ============================================================
    Component Style Library
+   Inspired by fibertracker UI, adapted for UltrastarDJ dark theme.
    Use these classes on plain HTML elements in every component.
    ============================================================ */
+
+/* --- Animations --- */
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
 
 /* --- Material Symbols icon --- */
 .icon {
@@ -374,8 +385,11 @@ a {
 .icon-sm { font-size: 16px; }
 .icon-lg { font-size: 24px; }
 
-/* --- Buttons --- */
-/* Base: apply to every <button> together with a variant class */
+/* --- Buttons ---
+   Base + one variant class on every <button>.
+   Regular buttons: --radius-lg (8px), not pill.
+   Icon buttons: --radius-full (circle).
+*/
 .btn {
   display: inline-flex;
   align-items: center;
@@ -383,7 +397,7 @@ a {
   gap: var(--space-2);
   height: 36px;
   padding: 0 var(--space-4);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-lg);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
@@ -392,10 +406,10 @@ a {
   background: none;
   outline: none;
   white-space: nowrap;
-  transition: background var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast), box-shadow var(--transition-fast);
 }
 .btn:focus-visible {
-  outline: 2px solid var(--md-sys-color-primary);
+  outline: 3px solid var(--md-sys-color-primary);
   outline-offset: 2px;
 }
 .btn:disabled {
@@ -408,23 +422,29 @@ a {
 .btn-filled {
   background: var(--md-sys-color-primary);
   color: var(--md-sys-color-on-primary);
+  box-shadow: var(--elevation-1);
 }
-.btn-filled:hover { opacity: 0.9; }
+.btn-filled:hover { opacity: 0.88; }
+.btn-filled:active { box-shadow: none; }
 
 /* Tonal — secondary action */
 .btn-tonal {
   background: var(--md-sys-color-primary-container);
   color: var(--md-sys-color-on-primary-container);
 }
-.btn-tonal:hover { opacity: 0.9; }
+.btn-tonal:hover { opacity: 0.88; }
 
 /* Outlined — low emphasis with border */
 .btn-outlined {
   background: transparent;
-  color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-surface);
   border: 1px solid var(--md-sys-color-outline-variant);
 }
-.btn-outlined:hover { background: rgba(200, 168, 250, 0.08); }
+.btn-outlined:hover { background: var(--md-sys-color-surface-container-high); }
+.btn-outlined:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+}
 
 /* Text — lowest emphasis */
 .btn-text {
@@ -432,20 +452,21 @@ a {
   color: var(--md-sys-color-primary);
   padding: 0 var(--space-3);
 }
-.btn-text:hover { background: rgba(200, 168, 250, 0.08); }
+.btn-text:hover { background: rgba(207, 188, 255, 0.08); }
 
 /* Ghost — neutral, no color emphasis */
 .btn-ghost {
   background: transparent;
   color: var(--md-sys-color-on-surface-variant);
   padding: 0 var(--space-3);
+  border: 1px solid transparent;
 }
 .btn-ghost:hover {
-  background: rgba(200, 168, 250, 0.08);
+  background: var(--md-sys-color-surface-container-high);
   color: var(--md-sys-color-on-surface);
 }
 
-/* Icon-only button (round, 40×40) */
+/* Icon-only button (circle, 40×40) */
 .btn-icon {
   width: 40px;
   height: 40px;
@@ -454,16 +475,15 @@ a {
   color: var(--md-sys-color-on-surface-variant);
 }
 .btn-icon:hover {
-  background: rgba(200, 168, 250, 0.1);
+  background: var(--md-sys-color-surface-container-high);
   color: var(--md-sys-color-on-surface);
 }
-/* Active/selected state for nav icons */
 .btn-icon.is-active {
   color: var(--md-sys-color-primary);
   background: rgba(207, 188, 255, 0.12);
 }
 
-/* Small icon button (28×28) */
+/* Small icon button (circle, 28×28) */
 .btn-icon-sm {
   width: 28px;
   height: 28px;
@@ -472,7 +492,7 @@ a {
   color: var(--md-sys-color-on-surface-variant);
 }
 .btn-icon-sm:hover {
-  background: rgba(200, 168, 250, 0.1);
+  background: var(--md-sys-color-surface-container-high);
   color: var(--md-sys-color-on-surface);
 }
 
@@ -482,14 +502,18 @@ a {
   padding: 0 var(--space-3);
   background: var(--md-sys-color-surface-container);
   border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-lg);
   color: var(--md-sys-color-on-surface);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   outline: none;
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.input:focus { border-color: var(--md-sys-color-primary); }
+.input:focus {
+  border-color: var(--md-sys-color-primary);
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: -1px;
+}
 .input::placeholder { color: var(--md-sys-color-on-surface-variant); }
 
 /* Input with a leading icon inside */
@@ -520,63 +544,74 @@ a {
   padding: 0 var(--space-3);
   background: var(--md-sys-color-surface-container);
   border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-lg);
   color: var(--md-sys-color-on-surface);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   outline: none;
   cursor: pointer;
   transition: border-color var(--transition-fast);
-  /* Remove default arrow in some browsers */
   appearance: auto;
 }
-.select:focus { border-color: var(--md-sys-color-primary); }
+.select:focus {
+  border-color: var(--md-sys-color-primary);
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: -1px;
+}
 .select option {
   background: var(--md-sys-color-surface-container-high);
   color: var(--md-sys-color-on-surface);
 }
 
-/* --- Switch (CSS-only toggle, no JS required) --- */
-.switch {
+/* --- Toggle Switch (iOS-style, from fibertracker) ---
+   Usage: <label class="toggle-switch">
+            <input type="checkbox" checked={val} onchange={fn} />
+            <span class="toggle-slider"></span>
+          </label>
+*/
+.toggle-switch {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
+  display: inline-block;
+  width: 51px;
+  height: 31px;
   flex-shrink: 0;
+  cursor: pointer;
 }
-.switch input[type="checkbox"] {
-  position: absolute;
+.toggle-switch input {
   opacity: 0;
   width: 0;
   height: 0;
-}
-.switch-track {
-  width: 52px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  border: 2px solid var(--md-sys-color-outline);
-  background: var(--md-sys-color-surface-container-highest);
-  position: relative;
-  transition: background var(--transition-base), border-color var(--transition-base);
-  flex-shrink: 0;
-}
-.switch-thumb {
   position: absolute;
-  top: 50%;
-  left: 5px;
-  transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-full);
-  background: var(--md-sys-color-outline);
-  transition: left var(--transition-base), width var(--transition-base), background var(--transition-base);
 }
-.switch input:checked + .switch-track {
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--md-sys-color-outline-variant);
+  border-radius: 34px;
+  transition: background var(--transition-base);
+}
+.toggle-slider::before {
+  position: absolute;
+  content: '';
+  height: 27px;
+  width: 27px;
+  left: 2px;
+  bottom: 2px;
+  background: var(--md-sys-color-on-surface-variant);
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  transition: transform var(--transition-base), background var(--transition-base);
+}
+.toggle-switch input:checked + .toggle-slider {
   background: var(--md-sys-color-primary);
-  border-color: var(--md-sys-color-primary);
 }
-.switch input:checked + .switch-track .switch-thumb {
-  left: calc(100% - 5px - 24px);
-  width: 24px;
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
   background: var(--md-sys-color-on-primary);
 }
+.toggle-switch input:focus-visible + .toggle-slider {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
