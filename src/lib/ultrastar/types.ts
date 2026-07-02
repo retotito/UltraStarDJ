@@ -27,6 +27,8 @@ export interface Song {
   videoPath?: string
   coverPath?: string
   backgroundPath?: string
+  /** YouTube video ID extracted from #VIDEO tag (e.g. "dQw4w9WgXcQ") */
+  youtubeId?: string
 
   /* --- Video timing --- */
   videoGap?: number    // ms offset for video vs audio

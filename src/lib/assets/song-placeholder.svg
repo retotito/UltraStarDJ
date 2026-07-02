@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9" width="1600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1b2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2a1f3d;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="16" height="9" fill="url(#bg)" />
+  <!-- Music note -->
+  <g transform="translate(8,4.5)" fill="#4a3f6b" opacity="0.6">
+    <!-- Note head -->
+    <ellipse cx="0" cy="1.4" rx="1.1" ry="0.75" transform="rotate(-20)" />
+    <!-- Stem -->
+    <rect x="0.95" y="-1.2" width="0.22" height="2.5" />
+    <!-- Flag -->
+    <path d="M1.17,-1.2 Q2.4,-0.6 1.17,0.4" fill="none" stroke="#4a3f6b" stroke-width="0.22" stroke-opacity="0.6" />
+  </g>
+</svg>

@@ -627,3 +627,28 @@ a {
   outline-offset: 2px;
 }
 
+/* ============================================================
+   Plyr player theme — MD3 dark tokens
+   ========================================================== */
+:root {
+  --plyr-color-main: var(--md-sys-color-primary);
+  --plyr-audio-controls-background: transparent;
+  --plyr-audio-control-color: var(--md-sys-color-on-surface);
+  --plyr-audio-control-color-hover: var(--md-sys-color-primary);
+  --plyr-video-control-color: #fff;
+  --plyr-video-control-color-hover: var(--md-sys-color-primary);
+  --plyr-control-radius: var(--radius-sm);
+  --plyr-font-family: var(--font-sans);
+  --plyr-font-size-base: var(--text-xs);
+  --plyr-range-thumb-height: 12px;
+  --plyr-range-track-height: 3px;
+  --plyr-range-fill-background: var(--md-sys-color-primary);
+  --plyr-video-background: #000;
+  --plyr-menu-background: var(--md-sys-color-surface-container-high);
+  --plyr-menu-color: var(--md-sys-color-on-surface);
+  --plyr-tooltip-background: var(--md-sys-color-surface-container-high);
+  --plyr-tooltip-color: var(--md-sys-color-on-surface);
+  --plyr-tooltip-radius: var(--radius-sm);
+}
+
+

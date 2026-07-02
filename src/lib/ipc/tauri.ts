@@ -7,6 +7,7 @@
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { convertFileSrc } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readDir, readTextFile, exists } from '@tauri-apps/plugin-fs'
 import type { PlaySongPayload } from '$lib/ultrastar/types'
@@ -130,4 +131,12 @@ export async function readFile(path: string): Promise<string> {
 /** Check if a path exists. */
 export async function pathExists(path: string): Promise<boolean> {
   return exists(path)
+}
+
+/**
+ * Convert an absolute local file path to a Tauri asset URL.
+ * Required because webviews cannot load file:// URLs directly.
+ */
+export function toAssetUrl(path: string): string {
+  return convertFileSrc(path)
 }

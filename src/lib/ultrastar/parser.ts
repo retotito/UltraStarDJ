@@ -17,6 +17,7 @@ interface ParsedHeader {
   video?: string
   videogap?: number
   year?: number
+  youtubeId?: string
   language?: string
   genre?: string
   edition?: string
@@ -42,7 +43,14 @@ function parseHeader(text: string): ParsedHeader {
       case 'audio':      header.mp3 = value; break
       case 'cover':      header.cover = value; break
       case 'background': header.background = value; break
-      case 'video':      header.video = value; break
+      case 'video':
+        // Could be a local file or a YouTube URL/ID
+        if (extractYoutubeId(value)) {
+          header.youtubeId = extractYoutubeId(value)!
+        } else {
+          header.video = value
+        }
+        break
       case 'videogap':   header.videogap = parseFloat(value.replace(',', '.')); break
       case 'year':       header.year = parseInt(value, 10); break
       case 'language':   header.language = value; break
@@ -56,7 +64,23 @@ function parseHeader(text: string): ParsedHeader {
   return header
 }
 
-/** Resolve a relative file path from the song's directory. */
+/** Extract a YouTube video ID from a URL or bare ID, or return null. */
+function extractYoutubeId(value: string): string | null {
+  // Full URL: https://www.youtube.com/watch?v=XXXXXXXXXXX
+  const watchMatch = value.match(/[?&]v=([a-zA-Z0-9_-]{11})/)
+  if (watchMatch) return watchMatch[1]
+  // Short URL: https://youtu.be/XXXXXXXXXXX
+  const shortMatch = value.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/)
+  if (shortMatch) return shortMatch[1]
+  // Embed URL: https://www.youtube.com/embed/XXXXXXXXXXX
+  const embedMatch = value.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/)
+  if (embedMatch) return embedMatch[1]
+  // Bare 11-char video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(value)) return value
+  return null
+}
+
+
 function resolveSibling(txtPath: string, filename: string): string {
   const dir = txtPath.substring(0, txtPath.lastIndexOf('/'))
   return `${dir}/${filename}`
@@ -94,5 +118,6 @@ export function parseSongHeader(txtPath: string, sourceId: string, text: string)
     backgroundPath: header.background ? resolveSibling(txtPath, header.background) : undefined,
     videoPath:      header.video      ? resolveSibling(txtPath, header.video)      : undefined,
     videoGap:       header.videogap,
+    youtubeId:      header.youtubeId,
   }
 }
