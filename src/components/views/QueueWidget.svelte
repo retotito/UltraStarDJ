@@ -1,8 +1,4 @@
 <script lang="ts">
-  import '@material/web/iconbutton/icon-button.js'
-  import '@material/web/icon/icon.js'
-  import '@material/web/button/filled-button.js'
-  import '@material/web/button/text-button.js'
   import { songQueue } from '$lib/stores/queue.svelte'
   import { sendPlaySong } from '$lib/ipc/tauri'
 
@@ -18,7 +14,7 @@
   <header class="queue-header">
     <span class="queue-label">Queue ({songQueue.items.length})</span>
     {#if songQueue.items.length > 0}
-      <md-text-button onclick={() => songQueue.clear()}>Clear</md-text-button>
+      <button class="btn btn-text" onclick={() => songQueue.clear()}>Clear</button>
     {/if}
   </header>
 
@@ -37,26 +33,15 @@
             <p class="truncate text-xs text-muted">{song.artist}</p>
           </div>
           <div class="q-actions">
-            <md-icon-button
-              onclick={() => songQueue.moveUp(song.id)}
-              disabled={i === 0}
-              aria-label="Move up"
-            >
-              <md-icon>keyboard_arrow_up</md-icon>
-            </md-icon-button>
-            <md-icon-button
-              onclick={() => songQueue.moveDown(song.id)}
-              disabled={i === songQueue.items.length - 1}
-              aria-label="Move down"
-            >
-              <md-icon>keyboard_arrow_down</md-icon>
-            </md-icon-button>
-            <md-icon-button
-              onclick={() => songQueue.remove(song.id)}
-              aria-label="Remove"
-            >
-              <md-icon>close</md-icon>
-            </md-icon-button>
+            <button class="btn btn-icon-sm" onclick={() => songQueue.moveUp(song.id)} disabled={i === 0} aria-label="Move up">
+              <span class="icon icon-sm">keyboard_arrow_up</span>
+            </button>
+            <button class="btn btn-icon-sm" onclick={() => songQueue.moveDown(song.id)} disabled={i === songQueue.items.length - 1} aria-label="Move down">
+              <span class="icon icon-sm">keyboard_arrow_down</span>
+            </button>
+            <button class="btn btn-icon-sm" onclick={() => songQueue.remove(song.id)} aria-label="Remove">
+              <span class="icon icon-sm">close</span>
+            </button>
           </div>
         </div>
       {/each}
@@ -65,10 +50,10 @@
 
   {#if songQueue.items.length > 0}
     <div class="queue-footer">
-      <md-filled-button onclick={startNext} style="width: 100%">
-        <md-icon slot="icon">play_arrow</md-icon>
+      <button class="btn btn-filled" style="width: 100%" onclick={startNext}>
+        <span class="icon icon-sm">play_arrow</span>
         Start next song
-      </md-filled-button>
+      </button>
     </div>
   {/if}
 </div>
@@ -79,10 +64,6 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    /* token overrides */
-    --md-icon-button-icon-size: 18px;
-    --md-icon-button-icon-color: var(--md-sys-color-on-surface-variant);
-    --md-text-button-label-text-color: var(--md-sys-color-primary);
   }
 
   .queue-header {
@@ -136,10 +117,7 @@
     flex-shrink: 0;
   }
 
-  .q-info {
-    flex: 1;
-    min-width: 0;
-  }
+  .q-info { flex: 1; min-width: 0; }
 
   .q-actions {
     display: flex;

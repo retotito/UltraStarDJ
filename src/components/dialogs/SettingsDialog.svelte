@@ -1,30 +1,24 @@
 <script lang="ts">
-  import '@material/web/select/filled-select.js'
-  import '@material/web/select/select-option.js'
-  import '@material/web/switch/switch.js'
-  import '@material/web/iconbutton/icon-button.js'
-  import '@material/web/icon/icon.js'
-  import '@material/web/divider/divider.js'
   import { appSettings } from '$lib/stores/settings.svelte'
 </script>
 
 <div class="settings-dialog">
   <section class="section">
     <h3 class="section-title">Appearance</h3>
-    <label class="setting-row">
+    <div class="setting-row">
       <span>Theme</span>
-      <md-filled-select
+      <select
+        class="select"
         value={appSettings.theme}
-        onchange={(e: Event) => appSettings.setTheme((e.target as HTMLElement & { value: string }).value as 'dark' | 'light')}
-        aria-label="Theme"
+        onchange={(e) => appSettings.setTheme((e.target as HTMLSelectElement).value as 'dark' | 'light')}
       >
-        <md-select-option value="dark">Dark</md-select-option>
-        <md-select-option value="light">Light</md-select-option>
-      </md-filled-select>
-    </label>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+    </div>
   </section>
 
-  <md-divider></md-divider>
+  <div class="divider"></div>
 
   <section class="section">
     <h3 class="section-title">Song Sources</h3>
@@ -35,21 +29,24 @@
         <div class="source-row">
           <span class="source-label truncate text-sm">{source.label}</span>
           <span class="source-type text-xs text-muted">{source.type}</span>
-          <md-switch
-            selected={source.enabled}
-            onchange={() => appSettings.toggleSource(source.id)}
-            aria-label={`Enable ${source.label}`}
-          ></md-switch>
-          <md-icon-button
+          <label class="switch">
+            <input
+              type="checkbox"
+              checked={source.enabled}
+              onchange={() => appSettings.toggleSource(source.id)}
+            />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+          <button
+            class="btn btn-icon-sm"
             onclick={() => appSettings.removeSource(source.id)}
             aria-label={`Remove ${source.label}`}
           >
-            <md-icon>delete</md-icon>
-          </md-icon-button>
+            <span class="icon icon-sm">delete</span>
+          </button>
         </div>
       {/each}
     {/if}
-
     <p class="text-xs text-muted" style="margin-top: var(--space-3)">
       Adding local folders and USDB support coming in Sprint 1.
     </p>
@@ -61,12 +58,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    /* Remove extra padding around the divider */
-    --md-divider-color: var(--md-sys-color-outline-variant);
-    /* Size the theme select */
-    --md-filled-select-text-field-container-shape: var(--radius-md);
-    /* Icon button color for remove */
-    --md-icon-button-icon-color: var(--md-sys-color-on-surface-variant);
   }
 
   .section {

@@ -1,7 +1,4 @@
 <script lang="ts">
-  import '@material/web/iconbutton/icon-button.js'
-  import '@material/web/icon/icon.js'
-  import '@material/web/switch/switch.js'
   import { layout } from '$lib/stores/layout.svelte'
   import { openBeamerWindow } from '$lib/ipc/tauri'
   import Modal from '$components/ui/Modal.svelte'
@@ -17,83 +14,71 @@
 
 <aside class="sidebar">
   <nav class="sidebar-nav">
-    <!-- Library (always active) -->
-    <md-icon-button
-      toggle
-      selected={true}
-      aria-label="Library"
-      data-tooltip="Library"
-    >
-      <md-icon>library_music</md-icon>
-    </md-icon-button>
+    <button class="btn btn-icon is-active" data-tooltip="Library" aria-label="Library">
+      <span class="icon">library_music</span>
+    </button>
 
-    <!-- Layout toggle -->
-    <md-icon-button
-      toggle
-      selected={showLayoutMenu}
-      aria-label="Toggle layout options"
+    <button
+      class="btn btn-icon"
+      class:is-active={showLayoutMenu}
       data-tooltip="Layout"
+      aria-label="Toggle layout options"
       onclick={() => showLayoutMenu = !showLayoutMenu}
     >
-      <md-icon>dashboard</md-icon>
-    </md-icon-button>
+      <span class="icon">dashboard</span>
+    </button>
   </nav>
 
   <div class="sidebar-bottom">
-    <!-- Settings -->
-    <md-icon-button
-      aria-label="Settings"
+    <button
+      class="btn btn-icon"
       data-tooltip="Settings"
+      aria-label="Settings"
       onclick={() => showSettings = true}
     >
-      <md-icon>settings</md-icon>
-    </md-icon-button>
+      <span class="icon">settings</span>
+    </button>
 
-    <!-- Open Beamer -->
-    <md-icon-button
-      aria-label="Open Beamer window"
+    <button
+      class="btn btn-icon"
       data-tooltip="Open Beamer"
+      aria-label="Open Beamer window"
       onclick={handleBeamer}
     >
-      <md-icon>cast</md-icon>
-    </md-icon-button>
+      <span class="icon">cast</span>
+    </button>
   </div>
 </aside>
 
-<!-- Layout popover — anchored to sidebar -->
 {#if showLayoutMenu}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="layout-popover"
-    onmouseleave={() => showLayoutMenu = false}
-  >
+  <div class="layout-popover" onmouseleave={() => showLayoutMenu = false}>
     <p class="popover-label">Panels</p>
+
     <label class="toggle-row">
-      Player
-      <md-switch
-        selected={layout.showPlayer}
-        onchange={() => layout.togglePlayer()}
-        aria-label="Toggle player panel"
-      ></md-switch>
+      <span>Player</span>
+      <label class="switch">
+        <input type="checkbox" checked={layout.showPlayer} onchange={() => layout.togglePlayer()} />
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+      </label>
     </label>
+
     <label class="toggle-row">
-      Queue
-      <md-switch
-        selected={layout.showQueue}
-        onchange={() => layout.toggleQueue()}
-        aria-label="Toggle queue panel"
-      ></md-switch>
+      <span>Queue</span>
+      <label class="switch">
+        <input type="checkbox" checked={layout.showQueue} onchange={() => layout.toggleQueue()} />
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+      </label>
     </label>
 
     <p class="popover-label" style="margin-top: var(--space-3)">Columns</p>
     {#each layout.columns.filter(c => c.key !== 'index') as col (col.key)}
       <label class="toggle-row">
-        {col.label}
-        <md-switch
-          selected={col.visible}
-          onchange={() => layout.toggleColumn(col.key)}
-          aria-label={`Toggle ${col.label} column`}
-        ></md-switch>
+        <span>{col.label}</span>
+        <label class="switch">
+          <input type="checkbox" checked={col.visible} onchange={() => layout.toggleColumn(col.key)} />
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
       </label>
     {/each}
   </div>
@@ -115,23 +100,9 @@
     align-items: center;
     padding: var(--space-2) 0;
     z-index: var(--z-overlay);
-    /* MD3 icon button token overrides for all buttons in this sidebar */
-    --md-icon-button-icon-color: var(--md-sys-color-on-surface-variant);
-    --md-icon-button-hover-icon-color: var(--md-sys-color-on-surface);
-    --md-icon-button-hover-state-layer-color: var(--md-sys-color-on-surface);
-    --md-icon-button-selected-icon-color: var(--md-sys-color-primary);
-    --md-icon-button-toggle-selected-focus-icon-color: var(--md-sys-color-primary);
-    --md-icon-button-toggle-selected-hover-icon-color: var(--md-sys-color-primary);
-    --md-icon-button-toggle-selected-pressed-icon-color: var(--md-sys-color-primary);
   }
 
-  .sidebar-nav {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
-  }
-
+  .sidebar-nav,
   .sidebar-bottom {
     display: flex;
     flex-direction: column;
@@ -139,11 +110,9 @@
     gap: var(--space-1);
   }
 
-  /* CSS tooltip on md-icon-button host element */
-  :global(md-icon-button[data-tooltip]) {
-    position: relative;
-  }
-  :global(md-icon-button[data-tooltip]::after) {
+  /* CSS tooltip */
+  .btn-icon[data-tooltip] { position: relative; }
+  .btn-icon[data-tooltip]::after {
     content: attr(data-tooltip);
     position: absolute;
     left: calc(100% + 10px);
@@ -152,7 +121,6 @@
     background: var(--md-sys-color-surface-container-highest);
     color: var(--md-sys-color-on-surface);
     font-size: var(--text-xs);
-    font-family: var(--font-sans);
     white-space: nowrap;
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
@@ -162,11 +130,8 @@
     z-index: var(--z-toast);
     box-shadow: var(--elevation-1);
   }
-  :global(md-icon-button[data-tooltip]:hover::after) {
-    opacity: 1;
-  }
+  .btn-icon[data-tooltip]:hover::after { opacity: 1; }
 
-  /* Layout popover */
   .layout-popover {
     position: fixed;
     left: 64px;
@@ -199,7 +164,7 @@
     gap: var(--space-4);
     font-size: var(--text-sm);
     color: var(--md-sys-color-on-surface);
-    cursor: pointer;
     padding: var(--space-1) 0;
+    cursor: pointer;
   }
 </style>

@@ -1,6 +1,4 @@
 <script lang="ts">
-  import '@material/web/iconbutton/icon-button.js'
-  import '@material/web/icon/icon.js'
   import type { Snippet } from 'svelte'
 
   let {
@@ -31,9 +29,9 @@
       {#if title}
         <header class="modal-header">
           <span class="modal-title">{title}</span>
-          <md-icon-button onclick={onclose} aria-label="Close">
-            <md-icon>close</md-icon>
-          </md-icon-button>
+          <button class="btn btn-icon" onclick={onclose} aria-label="Close">
+            <span class="icon">close</span>
+          </button>
         </header>
       {/if}
       <div class="modal-body">

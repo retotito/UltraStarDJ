@@ -1,9 +1,4 @@
 <script lang="ts">
-  import '@material/web/iconbutton/icon-button.js'
-  import '@material/web/icon/icon.js'
-  import '@material/web/menu/menu.js'
-  import '@material/web/menu/menu-item.js'
-  import '@material/web/divider/divider.js'
   import type { Song } from '$lib/ultrastar/types'
   import { layout } from '$lib/stores/layout.svelte'
   import { songQueue } from '$lib/stores/queue.svelte'
@@ -16,6 +11,7 @@
   let sortAsc = $state(true)
   let hoveredId = $state<string | null>(null)
   let menuSongId = $state<string | null>(null)
+  let menuPos = $state({ x: 0, y: 0 })
 
   const sorted = $derived(
     [...songs].sort((a, b) => {
@@ -34,6 +30,8 @@
   function openMenu(e: MouseEvent, song: Song) {
     e.stopPropagation()
     menuSongId = song.id
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    menuPos = { x: rect.left - 160, y: rect.bottom + 4 }
   }
 
   function closeMenu() { menuSongId = null }
@@ -118,35 +116,14 @@
           {/each}
           <td class="col-actions">
             <div class="more-wrap" class:visible={hoveredId === song.id || menuSongId === song.id}>
-              <md-icon-button
-                id={`more-${song.id}`}
+              <button
+                class="btn btn-icon-sm more-btn"
                 aria-label="More options"
                 onclick={(e: MouseEvent) => { e.stopPropagation(); openMenu(e, song) }}
               >
-                <md-icon>more_horiz</md-icon>
-              </md-icon-button>
+                <span class="icon icon-sm">more_horiz</span>
+              </button>
             </div>
-            {#if menuSongId === song.id}
-              <md-menu
-                anchor={`more-${song.id}`}
-                open
-                onclose={closeMenu}
-              >
-                <md-menu-item onclick={() => { player.load(song); closeMenu() }}>
-                  <md-icon slot="start">play_arrow</md-icon>
-                  <span slot="headline">Preview</span>
-                </md-menu-item>
-                <md-menu-item onclick={() => addToQueue(song)}>
-                  <md-icon slot="start">queue_music</md-icon>
-                  <span slot="headline">Add to queue</span>
-                </md-menu-item>
-                <md-divider></md-divider>
-                <md-menu-item onclick={closeMenu}>
-                  <md-icon slot="start">info</md-icon>
-                  <span slot="headline">Details</span>
-                </md-menu-item>
-              </md-menu>
-            {/if}
           </td>
         </tr>
       {/each}
@@ -154,6 +131,28 @@
   </table>
 </div>
 
+
+<!-- Row context menu -->
+{#if menuSongId}
+  {@const menuSong = sorted.find(s => s.id === menuSongId)!}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="row-menu"
+    style="left: {menuPos.x}px; top: {menuPos.y}px"
+    role="menu"
+  >
+    <button class="menu-item" role="menuitem" onclick={() => { player.load(menuSong); closeMenu() }}>
+      <span class="icon icon-sm">play_arrow</span> Preview
+    </button>
+    <button class="menu-item" role="menuitem" onclick={() => addToQueue(menuSong)}>
+      <span class="icon icon-sm">queue_music</span> Add to queue
+    </button>
+    <div class="menu-divider"></div>
+    <button class="menu-item text-muted" role="menuitem" onclick={closeMenu}>
+      <span class="icon icon-sm">info</span> Details
+    </button>
+  </div>
+{/if}
 
 <style>
   .table-wrap {
@@ -240,10 +239,48 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    --md-icon-button-icon-color: var(--md-sys-color-on-surface-variant);
-    --md-icon-button-icon-size: 20px;
   }
   .more-wrap.visible {
     opacity: 1;
+  }
+
+  .more-btn {
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  /* Context menu */
+  .row-menu {
+    position: fixed;
+    background: var(--md-sys-color-surface-container-high);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elevation-2);
+    padding: var(--space-1) 0;
+    min-width: 160px;
+    z-index: var(--z-overlay);
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    text-align: left;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    color: var(--md-sys-color-on-surface);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .menu-item:hover { background: var(--color-table-row-hover); }
+  .menu-item.text-muted { color: var(--md-sys-color-on-surface-variant); }
+
+  .menu-divider {
+    height: 1px;
+    background: var(--md-sys-color-outline-variant);
+    margin: var(--space-1) 0;
   }
 </style>
