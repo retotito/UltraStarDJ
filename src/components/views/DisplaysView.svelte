@@ -1,6 +1,7 @@
 <script lang="ts">
   import { displaysStore } from '$lib/stores/displays.svelte'
   import { playersStore } from '$lib/stores/players.svelte'
+
   import {
     openBeamerWindow,
     openBeamer2Window,
@@ -20,22 +21,28 @@
 
   const activePlayers = $derived(playersStore.all.filter(p => p.active))
   const allPlayers = $derived(playersStore.all)
-  const canHaveSecond = $derived(activePlayers.length >= 3)
 
   async function toggleDisplay(id: 1 | 2) {
+    console.log('[DisplaysView] toggleDisplay', id)
     const display = id === 1 ? displaysStore.display1 : displaysStore.display2
+    console.log('[DisplaysView] display state', display)
     if (display.open) {
+      console.log('[DisplaysView] closing', display.label)
       await closeDisplayWindow(display.label)
       displaysStore.setOpen(id, false)
     } else {
-      if (id === 1) await openBeamerWindow()
-      else await openBeamer2Window()
-      displaysStore.setOpen(id, true)
-      // send current config after a short delay so the window has time to load
-      setTimeout(() => sendScreenConfig({
-        windowLabel: display.label,
-        playerIds: display.playerIds,
-      }), 800)
+      console.log('[DisplaysView] opening', id)
+      try {
+        if (id === 1) await openBeamerWindow()
+        else await openBeamer2Window()
+        displaysStore.setOpen(id, true)
+        setTimeout(() => sendScreenConfig({
+          windowLabel: display.label,
+          playerIds: display.playerIds,
+        }), 800)
+      } catch (e) {
+        console.error('[DisplaysView] open failed', e)
+      }
     }
   }
 
@@ -94,8 +101,7 @@
     </div>
   </div>
 
-  <!-- Display 2 — only shown when ≥3 active players -->
-  {#if canHaveSecond}
+  <!-- Display 2 -->
     <div class="display-card">
       <div class="display-header">
         <span class="icon display-icon">tv</span>
@@ -124,7 +130,6 @@
         {/each}
       </div>
     </div>
-  {/if}
   </div><!-- /displays-cards -->
 </div>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { playersStore, type PlayerConfig, type MicChannel } from '$lib/stores/players.svelte'
+  import { displaysStore } from '$lib/stores/displays.svelte'
   import type { AudioInputDevice } from '$lib/ipc/tauri'
   import { startMicMonitor, stopMicMonitor } from '$lib/ipc/tauri'
   import Select from '$components/ui/Select.svelte'
@@ -96,6 +97,7 @@
             playersStore.setMonitoring(player.id, false)
             playersStore.setLevel(player.id, 0)
           }
+          if (!active) displaysStore.removePlayer(player.id)
           playersStore.setActive(player.id, active)
         }}
       />

@@ -60,17 +60,23 @@ export const displaysStore = {
 
   /** Toggle a player on/off for a given display, ensuring no player appears on both. */
   togglePlayer(displayId: 1 | 2, playerId: number) {
-    displays = displays.map(d => {
-      if (d.id === displayId) {
-        const has = d.playerIds.includes(playerId)
-        return { ...d, playerIds: has
-          ? d.playerIds.filter(p => p !== playerId)
-          : [...d.playerIds, playerId]
-        }
-      }
-      // remove from the other display if moving
-      return { ...d, playerIds: d.playerIds.filter(p => p !== playerId) }
-    })
+    const current = displays.map(d => ({ ...d }))
+    const target = current.find(d => d.id === displayId)!
+    const other  = current.find(d => d.id !== displayId)!
+    const alreadyOnTarget = target.playerIds.includes(playerId)
+    if (alreadyOnTarget) {
+      target.playerIds = target.playerIds.filter(p => p !== playerId)
+    } else {
+      target.playerIds = [...target.playerIds, playerId]
+      other.playerIds  = other.playerIds.filter(p => p !== playerId)
+    }
+    displays = current
+    save(displays)
+  },
+
+  /** Remove a player from all displays (e.g. when deactivated). */
+  removePlayer(playerId: number) {
+    displays = displays.map(d => ({ ...d, playerIds: d.playerIds.filter(p => p !== playerId) }))
     save(displays)
   },
 }
