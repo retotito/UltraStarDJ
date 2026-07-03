@@ -175,7 +175,7 @@
     left: 50%;
     translate: -50% 0;
     z-index: 200;
-    background: rgba(var(--md-sys-color-surface-container-high-rgb, 40,40,46), 0.88);
+    background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 88%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--md-sys-color-outline-variant);
@@ -201,7 +201,7 @@
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     position: relative;
   }
-  .drag-handle:hover { background: rgba(255,255,255,0.04); }
+  .drag-handle:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent); }
   .is-dragging .drag-handle { cursor: grabbing; }
   .handle-dots { font-size: 14px; letter-spacing: 2px; opacity: 0.3; }
 
@@ -220,7 +220,7 @@
     align-items: center;
     border-radius: var(--radius-sm);
   }
-  .btn-dismiss:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+  .btn-dismiss:hover { opacity: 1; background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent); }
 
   /* ── Status bar ── */
   .status-bar {
@@ -231,8 +231,8 @@
     font-size: var(--text-xs);
     font-weight: 600;
     letter-spacing: 0.04em;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
   }
   .status-warn    { color: #ffb300; background: rgba(255,179,0,0.15); }
   .status-playing { color: #4ecb71; background: rgba(78,203,113,0.12); }
@@ -293,7 +293,7 @@
     display: flex;
     gap: var(--space-3);
     padding: var(--space-4) var(--space-5);
-    border-top: 1px solid rgba(255,255,255,0.06);
+    border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
     justify-content: center;
   }
 
@@ -336,9 +336,9 @@
   .ctrl-stop:hover { background: rgba(247, 95, 95, 0.25); }
 
   .ctrl-clear {
-    background: rgba(255,255,255,0.06);
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
     color: var(--md-sys-color-on-surface-variant);
-    border: 2px solid rgba(255,255,255,0.12);
+    border: 2px solid color-mix(in srgb, var(--md-sys-color-outline) 30%, transparent);
   }
-  .ctrl-clear:hover { background: rgba(255,255,255,0.12); }
+  .ctrl-clear:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); }
 </style>
