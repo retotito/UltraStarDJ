@@ -39,6 +39,16 @@
 
     <button
       class="btn btn-icon"
+      class:is-active={layout.showQueue}
+      data-tooltip="Queue"
+      aria-label="Toggle queue"
+      onclick={() => layout.toggleQueue()}
+    >
+      <span class="icon">queue_music</span>
+    </button>
+
+    <button
+      class="btn btn-icon"
       class:is-active={showDisplays}
       data-tooltip="Displays"
       aria-label="Open Displays"

@@ -64,4 +64,6 @@ export interface PlaySongPayload {
   song: Song
   /** Base URL prefix Tauri uses to serve local assets */
   assetBase: string
+  /** Player IDs assigned to the display receiving this event */
+  playerIds: number[]
 }

@@ -5,6 +5,7 @@
   import LibraryPanel from '$components/views/LibraryPanel.svelte'
   import RightPanel from '$components/views/RightPanel.svelte'
   import MicDisconnectedToast from '$components/ui/MicDisconnectedToast.svelte'
+  import NowPlayingBar from '$components/ui/NowPlayingBar.svelte'
 
   playersStore.load()
 
@@ -54,6 +55,7 @@
 </div>
 
 <MicDisconnectedToast />
+<NowPlayingBar />
 
 <style>
   .shell {

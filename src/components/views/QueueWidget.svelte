@@ -1,12 +1,12 @@
 <script lang="ts">
   import { songQueue } from '$lib/stores/queue.svelte'
-  import { sendPlaySong } from '$lib/ipc/tauri'
+  import { playback } from '$lib/stores/playback.svelte'
 
-  async function startNext() {
-    const song = songQueue.activeSong ?? songQueue.items[0]
-    if (!song) return
-    songQueue.setActive(song.id)
-    await sendPlaySong({ song, assetBase: 'asset://localhost/' })
+  async function playSong(songId: string) {
+    const song = songQueue.items.find(s => s.id === songId)
+    if (!song || playback.isActive) return
+    songQueue.setActive(songId)
+    await playback.play(song)
   }
 </script>
 
@@ -33,6 +33,15 @@
             <p class="truncate text-xs text-muted">{song.artist}</p>
           </div>
           <div class="q-actions">
+            <button
+              class="btn btn-icon-sm"
+              disabled={playback.isActive}
+              title={playback.isActive ? 'Stop current song first' : 'Play'}
+              onclick={() => playSong(song.id)}
+              aria-label="Play"
+            >
+              <span class="icon icon-sm">play_arrow</span>
+            </button>
             <button class="btn btn-icon-sm" onclick={() => songQueue.moveUp(song.id)} disabled={i === 0} aria-label="Move up">
               <span class="icon icon-sm">keyboard_arrow_up</span>
             </button>
@@ -48,9 +57,9 @@
     {/if}
   </div>
 
-  {#if songQueue.items.length > 0}
+  {#if songQueue.items.length > 0 && !playback.isActive}
     <div class="queue-footer">
-      <button class="btn btn-filled" style="width: 100%" onclick={startNext}>
+      <button class="btn btn-filled" style="width: 100%" onclick={() => playSong(songQueue.items[0].id)}>
         <span class="icon icon-sm">play_arrow</span>
         Start next song
       </button>
