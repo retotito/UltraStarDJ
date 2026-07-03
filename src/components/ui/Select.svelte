@@ -17,14 +17,25 @@
 
   let isOpen = $state(false)
   let triggerEl = $state<HTMLButtonElement | null>(null)
-  let menuPos = $state({ top: 0, left: 0, width: 0 })
+  let menuPos = $state({ top: 0, left: 0, width: 0, openUp: false })
 
   const selectedLabel = $derived(options.find(o => o.value === value)?.label ?? options[0]?.label ?? '')
+
+  const MAX_MENU_HEIGHT = 320
+  const MENU_GAP = 4
 
   function openMenu() {
     if (!triggerEl) return
     const r = triggerEl.getBoundingClientRect()
-    menuPos = { top: r.bottom + 4, left: r.left, width: r.width }
+    const spaceBelow = window.innerHeight - r.bottom - MENU_GAP
+    const spaceAbove = r.top - MENU_GAP
+    const openUp = spaceBelow < Math.min(MAX_MENU_HEIGHT, options.length * 40) && spaceAbove > spaceBelow
+    menuPos = {
+      top: openUp ? r.top - MENU_GAP : r.bottom + MENU_GAP,
+      left: r.left,
+      width: r.width,
+      openUp,
+    }
     isOpen = true
   }
 
@@ -51,6 +62,7 @@
   <div class="select-backdrop" onclick={close}></div>
   <div
     class="select-menu"
+    class:open-up={menuPos.openUp}
     style="top: {menuPos.top}px; left: {menuPos.left}px; width: {menuPos.width}px;"
   >
     {#each options as opt}
@@ -147,6 +159,10 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     overflow-y: auto;
     max-height: 320px;
+  }
+
+  .select-menu.open-up {
+    transform: translateY(-100%);
   }
 
   .select-item {

@@ -86,7 +86,15 @@
       <input
         type="checkbox"
         checked={player.active}
-        onchange={e => playersStore.setActive(player.id, (e.target as HTMLInputElement).checked)}
+        onchange={async e => {
+          const active = (e.target as HTMLInputElement).checked
+          if (!active && isMonitoring) {
+            await stopMicMonitor(player.id).catch(() => {})
+            playersStore.setMonitoring(player.id, false)
+            playersStore.setLevel(player.id, 0)
+          }
+          playersStore.setActive(player.id, active)
+        }}
       />
       <span class="toggle-slider"></span>
     </label>
