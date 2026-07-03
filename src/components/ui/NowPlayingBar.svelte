@@ -127,6 +127,13 @@
         >
           <span class="icon">play_arrow</span>
         </button>
+        <button
+          class="ctrl-btn ctrl-clear"
+          title="Clear beamer screens — back to home"
+          onclick={() => playback.clearBeamers()}
+        >
+          <span class="icon">tv</span>
+        </button>
       {:else if playback.status === 'playing'}
         <button class="ctrl-btn ctrl-pause" title="Pause" onclick={() => playback.pause()}>
           <span class="icon">pause</span>
@@ -210,9 +217,9 @@
     border-top: 1px solid rgba(255,255,255,0.06);
     border-bottom: 1px solid rgba(255,255,255,0.06);
   }
-  .status-warn    { color: #f7c84f; background: rgba(247,200,79,0.08); }
-  .status-playing { color: #4ecb71; background: rgba(78,203,113,0.08); }
-  .status-paused  { color: #f7c84f; background: rgba(247,200,79,0.08); }
+  .status-warn    { color: #ffb300; background: rgba(255,179,0,0.15); }
+  .status-playing { color: #4ecb71; background: rgba(78,203,113,0.12); }
+  .status-paused  { color: #ffb300; background: rgba(255,179,0,0.15); }
   .status-ready   { color: var(--md-sys-color-on-surface-variant); }
 
   /* ── Song info + badges ── */
@@ -301,4 +308,11 @@
     border: 2px solid rgba(247, 95, 95, 0.4);
   }
   .ctrl-stop:hover { background: rgba(247, 95, 95, 0.25); }
+
+  .ctrl-clear {
+    background: rgba(255,255,255,0.06);
+    color: var(--md-sys-color-on-surface-variant);
+    border: 2px solid rgba(255,255,255,0.12);
+  }
+  .ctrl-clear:hover { background: rgba(255,255,255,0.12); }
 </style>

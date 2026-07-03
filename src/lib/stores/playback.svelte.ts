@@ -71,8 +71,18 @@ export const playback = {
     await sendStopSong()
   },
 
-  /** Fully dismiss the now-playing bar */
+  /** Send a second stop to clear the score screen and return beamers to idle */
+  async clearBeamers() {
+    await sendStopSong()
+  },
+
+  /** Dismiss the now-playing bar entirely */
   dismiss() {
     state = { status: 'idle', song: null }
+  },
+
+  /** Send a second stop to clear the score screen and return beamers to idle */
+  async clearBeamers() {
+    await sendStopSong()
   },
 }
