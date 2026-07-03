@@ -1,17 +1,14 @@
 <script lang="ts">
   import { layout } from '$lib/stores/layout.svelte'
-  import { openBeamerWindow } from '$lib/ipc/tauri'
   import Modal from '$components/ui/Modal.svelte'
   import SettingsDialog from '$components/dialogs/SettingsDialog.svelte'
   import PlayersView from '$components/views/PlayersView.svelte'
+  import DisplaysView from '$components/views/DisplaysView.svelte'
 
   let showSettings = $state(false)
   let showLayoutMenu = $state(false)
   let showPlayers = $state(false)
-
-  async function handleBeamer() {
-    await openBeamerWindow()
-  }
+  let showDisplays = $state(false)
 </script>
 
 <aside class="sidebar">
@@ -53,11 +50,12 @@
 
     <button
       class="btn btn-icon"
-      data-tooltip="Open Beamer"
-      aria-label="Open Beamer window"
-      onclick={handleBeamer}
+      class:is-active={showDisplays}
+      data-tooltip="Displays"
+      aria-label="Open Displays"
+      onclick={() => showDisplays = !showDisplays}
     >
-      <span class="icon">cast</span>
+      <span class="icon">tv_displays</span>
     </button>
   </div>
 </aside>
@@ -112,6 +110,15 @@
   </div>
 {/if}
 
+{#if showDisplays}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="popover-backdrop" onclick={() => showDisplays = false}></div>
+  <div class="displays-popover">
+    <DisplaysView onclose={() => showDisplays = false} />
+  </div>
+{/if}
+
 <Modal open={showSettings} title="Settings" onclose={() => showSettings = false}>
   <SettingsDialog />
 </Modal>
@@ -135,7 +142,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-1);
+    gap: 20px;
+  }
+
+  .sidebar-nav :global(.icon),
+  .sidebar-bottom :global(.icon) {
+    font-size: 36px;
   }
 
   /* CSS tooltip */
@@ -185,6 +197,21 @@
     border-radius: var(--radius-lg);
     width: 500px;
     max-height: calc(100vh - 124px);
+    display: flex;
+    flex-direction: column;
+    z-index: var(--z-overlay);
+    box-shadow: var(--elevation-2);
+    overflow: hidden;
+  }
+
+  .displays-popover {
+    position: fixed;
+    left: 64px;
+    bottom: 16px;
+    background: var(--md-sys-color-surface-container-high);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--radius-lg);
+    width: 280px;
     display: flex;
     flex-direction: column;
     z-index: var(--z-overlay);

@@ -14,16 +14,18 @@ import type { PlaySongPayload } from '$lib/ultrastar/types'
 
 // ── Event names ────────────────────────────────────────────────
 export const IPC_EVENTS = {
-  PLAY_SONG: 'ultrastar:play-song',
-  STOP_SONG: 'ultrastar:stop-song',
-  PAUSE_SONG: 'ultrastar:pause-song',
-  RESUME_SONG: 'ultrastar:resume-song'
+  PLAY_SONG:     'ultrastar:play-song',
+  STOP_SONG:     'ultrastar:stop-song',
+  PAUSE_SONG:    'ultrastar:pause-song',
+  RESUME_SONG:   'ultrastar:resume-song',
+  SCREEN_CONFIG: 'ultrastar:screen-config',
 } as const
 
 // ── Window labels ──────────────────────────────────────────────
 export const WINDOW_LABELS = {
-  MAIN: 'main',
-  BEAMER: 'beamer'
+  MAIN:    'main',
+  BEAMER:  'beamer',
+  BEAMER2: 'beamer2',
 } as const
 
 // ── Current window ─────────────────────────────────────────────
@@ -36,27 +38,56 @@ export function getWindowLabel(): string {
 }
 
 export function isBeamerWindow(): boolean {
-  return getWindowLabel() === WINDOW_LABELS.BEAMER
+  return getWindowLabel() === WINDOW_LABELS.BEAMER ||
+         getWindowLabel() === WINDOW_LABELS.BEAMER2
 }
 
-// ── Open beamer window ─────────────────────────────────────────
-export async function openBeamerWindow(): Promise<void> {
-  const existing = await WebviewWindow.getByLabel(WINDOW_LABELS.BEAMER)
+export interface ScreenConfigPayload {
+  windowLabel: string
+  playerIds: number[]
+}
+
+// ── Open / close display windows ───────────────────────────────
+async function openDisplayWindow(label: string, title: string, url: string): Promise<void> {
+  const existing = await WebviewWindow.getByLabel(label)
   if (existing) {
     await existing.show()
     await existing.setFocus()
     return
   }
-
-  new WebviewWindow(WINDOW_LABELS.BEAMER, {
-    url: '/beamer',
-    title: 'UltrastarDJ — Stage',
+  new WebviewWindow(label, {
+    url,
+    title,
     fullscreen: false,
     width: 1280,
     height: 720,
     decorations: true,
-    resizable: true
+    resizable: true,
   })
+}
+
+export async function openBeamerWindow(): Promise<void> {
+  await openDisplayWindow(WINDOW_LABELS.BEAMER, 'UltrastarDJ — Display 1', '/beamer')
+}
+
+export async function openBeamer2Window(): Promise<void> {
+  await openDisplayWindow(WINDOW_LABELS.BEAMER2, 'UltrastarDJ — Display 2', '/beamer')
+}
+
+export async function closeDisplayWindow(label: string): Promise<void> {
+  const win = await WebviewWindow.getByLabel(label)
+  if (win) await win.close()
+}
+
+// ── Screen config ──────────────────────────────────────────────
+export async function sendScreenConfig(payload: ScreenConfigPayload): Promise<void> {
+  await emit(IPC_EVENTS.SCREEN_CONFIG, payload)
+}
+
+export function onScreenConfig(
+  handler: (payload: ScreenConfigPayload) => void
+): Promise<UnlistenFn> {
+  return listen<ScreenConfigPayload>(IPC_EVENTS.SCREEN_CONFIG, e => handler(e.payload))
 }
 
 // ── DJ → Beamer: send song to play ────────────────────────────
