@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { onPlaySong, onPreviewSong, onStopSong, onPauseSong, onResumeSong, onScreenConfig, onTimeTick, getWindowLabel } from '$lib/ipc/tauri'
+  import { onPlaySong, onPreviewSong, onStopSong, onPauseSong, onResumeSong, onScreenConfig, onTimeTick, getWindowLabel, sendCountdownDone } from '$lib/ipc/tauri'
   import type { UnlistenFn } from '@tauri-apps/api/event'
   import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
   import BeamerView from '$components/game/BeamerView.svelte'
@@ -57,6 +57,7 @@
 
   function onCountdownDone() {
     screen = 'playing'
+    sendCountdownDone()
   }
 </script>
 

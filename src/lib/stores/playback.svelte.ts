@@ -4,6 +4,7 @@
  */
 
 import type { Song } from '$lib/ultrastar/types'
+import { player } from '$lib/stores/player.svelte'
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
 import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick } from '$lib/ipc/tauri'
@@ -24,11 +25,20 @@ let showClearBeamers = $state(false)
 // ── Time-tick loop ────────────────────────────────────────────
 let getTime: (() => number) | null = null
 let tickInterval: ReturnType<typeof setInterval> | null = null
+let _currentTime = $state(0)
 
 function startTick() {
   if (tickInterval) return
+  console.log('[playback] startTick — getTime registered:', getTime !== null)
   tickInterval = setInterval(() => {
-    if (getTime) sendTimeTick(getTime())
+    if (getTime) {
+      _currentTime = getTime()
+      // log every ~1s
+      if (Math.round(_currentTime * 10) % 10 === 0) console.log('[playback] tick currentTime:', _currentTime)
+      sendTimeTick(_currentTime)
+    } else {
+      console.warn('[playback] tick fired but getTime is null')
+    }
   }, 100)
 }
 
@@ -48,14 +58,17 @@ export const playback = {
   /** Can only start playback when a song is loaded and at least one beamer is open */
   get canPlay()  { return (state.status === 'loaded' || state.status === 'preview') && (displaysStore.display1.open || displaysStore.display2.open) },
   get showClearBeamers() { return showClearBeamers },
+  get currentTime() { return _currentTime },
 
   /** Called by PlayerWidget to register how to get current playback time */
-  registerTimeProvider(fn: () => number) { getTime = fn },
-  unregisterTimeProvider() { getTime = null },
+  registerTimeProvider(fn: () => number) { console.log('[playback] registerTimeProvider called'); getTime = fn },
+  unregisterTimeProvider() { console.log('[playback] unregisterTimeProvider called'); getTime = null },
 
   /** Load a song into the player without starting playback */
   load(song: Song) {
     if (!playback.canLoad) return
+    console.log('[playback] load() called, song:', song.title, 'audioPath:', song.audioPath, 'videoPath:', song.videoPath)
+    player.load(song)
     state = { status: 'loaded', song }
     showClearBeamers = false
     layout.showNowPlaying || layout.toggleNowPlaying()

@@ -29,6 +29,13 @@
     y = Math.max(0, Math.min(y, window.innerHeight - cardEl.offsetHeight))
   }
 
+  function formatTime(s: number): string {
+    const m = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    const tenth = Math.floor((s % 1) * 10)
+    return `${m}:${String(sec).padStart(2, '0')}.${tenth}`
+  }
+
   function onDragStart(e: MouseEvent) {
     if (!cardEl) return
     if (x === null) {
@@ -91,11 +98,13 @@
       <div class="status-bar status-playing">
         <span class="icon" style="font-size:16px">fiber_manual_record</span>
         Now playing
+        <span class="status-time">{formatTime(playback.currentTime)}</span>
       </div>
     {:else if playback.status === 'paused'}
       <div class="status-bar status-paused">
         <span class="icon" style="font-size:16px">pause_circle</span>
         Paused
+        <span class="status-time">{formatTime(playback.currentTime)}</span>
       </div>
     {:else}
       <div class="status-bar status-ready">
@@ -250,6 +259,12 @@
   .status-playing { color: #4ecb71; background: rgba(78,203,113,0.12); }
   .status-paused  { color: #ffb300; background: rgba(255,179,0,0.15); }
   .status-ready   { color: var(--md-sys-color-on-surface-variant); }
+
+  .status-time {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+  }
 
   /* ── Song info + badges ── */
   .song-section {

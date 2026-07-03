@@ -21,6 +21,7 @@ export const IPC_EVENTS = {
   RESUME_SONG:   'ultrastar:resume-song',
   SCREEN_CONFIG: 'ultrastar:screen-config',
   TIME_TICK:     'ultrastar:time-tick',
+  COUNTDOWN_DONE: 'ultrastar:countdown-done',
 } as const
 
 // ── Window labels ──────────────────────────────────────────────
@@ -149,6 +150,14 @@ export function onResumeSong(handler: () => void): Promise<UnlistenFn> {
 
 export async function sendTimeTick(currentTime: number): Promise<void> {
   await emit(IPC_EVENTS.TIME_TICK, { currentTime })
+}
+
+export async function sendCountdownDone(): Promise<void> {
+  await emit(IPC_EVENTS.COUNTDOWN_DONE, {})
+}
+
+export function onCountdownDone(handler: () => void): Promise<UnlistenFn> {
+  return listen(IPC_EVENTS.COUNTDOWN_DONE, () => handler())
 }
 
 export function onTimeTick(

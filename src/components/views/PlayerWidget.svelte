@@ -7,7 +7,7 @@
   import { songQueue } from '$lib/stores/queue.svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { network } from '$lib/stores/network.svelte'
-  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
+  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, onCountdownDone } from '$lib/ipc/tauri'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
 
@@ -17,8 +17,8 @@
     const s = player.song
     if (!s) return 'none'
     if (s.videoPath) return 'video'
-    if (s.youtubeId && network.isOnline) return 'youtube'
     if (s.audioPath) return 'audio'
+    if (s.youtubeId && network.isOnline) return 'youtube'
     return 'none'
   })
 
@@ -35,6 +35,36 @@
   let transcodedPath = $state<string | null>(null)
   let transcoding = $state(false)
   let transcodeError = $state<string | null>(null)
+
+  // Plyr instance ref — set by the action so $effect can drive play/pause/stop
+  let plyrRef: Plyr | null = null
+  let playDelayTimer: ReturnType<typeof setTimeout> | null = null
+
+  // Listen for beamer countdown-done event to start audio at the right moment
+  const unlistenCountdown = onCountdownDone(() => {
+    if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
+    plyrPlay()
+  })
+  onDestroy(async () => (await unlistenCountdown)())
+
+  function plyrPlay() {
+    if (!plyrRef) return
+    const p = plyrRef.play()
+    if (p instanceof Promise) p.catch(e => console.error('[PlayerWidget] plyr.play() rejected:', e))
+  }
+
+  // Drive Plyr from playback store status
+  $effect(() => {
+    const s = playback.status
+    console.log('[PlayerWidget] status effect fired, status:', s, 'plyrRef:', plyrRef ? 'set' : 'null', 'player.song:', player.song?.title ?? 'null', 'mediaType:', mediaType)
+    if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
+    if (!plyrRef) return
+    if (s === 'playing') {
+      // Wait for beamer countdown-done IPC — do nothing here, plyrPlay() fires from listener
+    }
+    else if (s === 'paused') plyrRef.pause()
+    else if (s === 'loaded' || s === 'idle') { try { plyrRef.stop() } catch {} }
+  })
 
   // Reset transcoding state BEFORE the DOM update so {#if transcodedPath}
   // never renders with a stale value from the previous song.
@@ -68,6 +98,26 @@
     }
   })
 
+  function plyrYoutubeAction(node: HTMLDivElement, youtubeId: string) {
+    const instance = new Plyr(node, {
+      controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume'],
+      autoplay: false,
+    })
+    playback.registerTimeProvider(() => instance.currentTime)
+    plyrRef = instance
+    console.log('[PlayerWidget] plyrYoutubeAction mounted, plyrRef set')
+    // countdown-done IPC will trigger plyrPlay() when beamer countdown finishes
+
+    return {
+      destroy() {
+        if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
+        playback.unregisterTimeProvider()
+        plyrRef = null
+        try { instance.destroy() } catch {}
+      },
+    }
+  }
+
   // Svelte action — attached to the media element itself so Plyr lifecycle
   // is tied to element lifetime, not component effects.
   function plyrAction(
@@ -81,6 +131,8 @@
     })
 
     playback.registerTimeProvider(() => instance.currentTime)
+    plyrRef = instance
+    console.log('[PlayerWidget] plyrAction mounted, plyrRef set')
 
     function mimeForPath(path: string): string {
       const ext = path.split('.').pop()?.toLowerCase() ?? ''
@@ -118,7 +170,9 @@
         load(newParams)
       },
       destroy() {
+        if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
         playback.unregisterTimeProvider()
+        plyrRef = null
         try { instance.destroy() } catch {}
       },
     }
@@ -159,13 +213,12 @@
         {/if}
 
       {:else if mediaType === 'youtube' && player.song.youtubeId}
-        <div class="yt-embed">
-          <iframe
-            src="https://www.youtube-nocookie.com/embed/{player.song.youtubeId}?origin=https://tauri.localhost&iv_load_policy=3&modestbranding=1&playsinline=1&showinfo=0&rel=0&enablejsapi=1"
-            title={player.song.title}
-            allowfullscreen
-          ></iframe>
-        </div>
+        <div
+          class="yt-embed"
+          data-plyr-provider="youtube"
+          data-plyr-embed-id={player.song.youtubeId}
+          use:plyrYoutubeAction={player.song.youtubeId}
+        ></div>
 
       {:else if mediaType === 'audio' && player.song.audioPath}
         <div class="audio-backdrop">
@@ -302,7 +355,8 @@
     width: 100%;
     height: 100%;
   }
-  .yt-embed iframe {
+  :global(.yt-embed .plyr),
+  :global(.yt-embed .plyr iframe) {
     width: 100%;
     height: 100%;
     border: none;
