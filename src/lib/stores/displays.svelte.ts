@@ -13,6 +13,8 @@ export interface DisplayConfig {
   open: boolean
 }
 
+import { sendScreenConfig } from '$lib/ipc/tauri'
+
 const STORAGE_KEY = 'ultrastardj-displays'
 
 function defaultDisplays(): DisplayConfig[] {
@@ -46,37 +48,52 @@ let displays = $state<DisplayConfig[]>(load())
 export const displaysStore = {
   get all() { return displays },
 
-  get display1() { return displays[0] },
-  get display2() { return displays[1] },
+  get display1() { return displays.find(d => d.id === 1)! },
+  get display2() { return displays.find(d => d.id === 2)! },
 
   setOpen(id: 1 | 2, open: boolean) {
-    displays = displays.map(d => d.id === id ? { ...d, open } : d)
+    const d = displays.find(x => x.id === id)!
+    d.open = open
   },
 
   setPlayerIds(id: 1 | 2, playerIds: number[]) {
-    displays = displays.map(d => d.id === id ? { ...d, playerIds } : d)
+    const d = displays.find(x => x.id === id)!
+    d.playerIds = playerIds
     save(displays)
   },
 
   /** Toggle a player on/off for a given display, ensuring no player appears on both. */
   togglePlayer(displayId: 1 | 2, playerId: number) {
-    const current = displays.map(d => ({ ...d }))
-    const target = current.find(d => d.id === displayId)!
-    const other  = current.find(d => d.id !== displayId)!
-    const alreadyOnTarget = target.playerIds.includes(playerId)
-    if (alreadyOnTarget) {
-      target.playerIds = target.playerIds.filter(p => p !== playerId)
+    const target = displays.find(d => d.id === displayId)!
+    const other  = displays.find(d => d.id !== displayId)!
+    const idx = target.playerIds.indexOf(playerId)
+    if (idx !== -1) {
+      target.playerIds.splice(idx, 1)
     } else {
-      target.playerIds = [...target.playerIds, playerId]
-      other.playerIds  = other.playerIds.filter(p => p !== playerId)
+      target.playerIds.push(playerId)
+      const otherIdx = other.playerIds.indexOf(playerId)
+      if (otherIdx !== -1) other.playerIds.splice(otherIdx, 1)
     }
-    displays = current
     save(displays)
+    displaysStore._syncAll()
   },
 
   /** Remove a player from all displays (e.g. when deactivated). */
   removePlayer(playerId: number) {
-    displays = displays.map(d => ({ ...d, playerIds: d.playerIds.filter(p => p !== playerId) }))
+    for (const d of displays) {
+      const idx = d.playerIds.indexOf(playerId)
+      if (idx !== -1) d.playerIds.splice(idx, 1)
+    }
     save(displays)
+    displaysStore._syncAll()
+  },
+
+  /** Send current playerIds to all open beamer windows. */
+  _syncAll() {
+    for (const d of displays) {
+      if (d.open) {
+        sendScreenConfig({ windowLabel: d.label, playerIds: [...d.playerIds].sort((a, b) => a - b) })
+      }
+    }
   },
 }

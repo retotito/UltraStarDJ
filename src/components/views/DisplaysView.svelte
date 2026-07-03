@@ -9,6 +9,7 @@
     sendScreenConfig,
     WINDOW_LABELS,
   } from '$lib/ipc/tauri'
+  // Note: sendScreenConfig is still used directly for the open-window initial sync
 
   let { onclose }: { onclose?: () => void } = $props()
 
@@ -22,37 +23,43 @@
   const activePlayers = $derived(playersStore.all.filter(p => p.active))
   const allPlayers = $derived(playersStore.all)
 
+  const ts = () => new Date().toISOString().slice(11, 23)
+
+  // Explicit derived references so Svelte 5 tracks the full array dependency
+  const d1playerIds = $derived(displaysStore.display1.playerIds)
+  const d2playerIds = $derived(displaysStore.display2.playerIds)
+  const d1open = $derived(displaysStore.display1.open)
+  const d2open = $derived(displaysStore.display2.open)
+
+  $inspect(d1playerIds, d2playerIds).with((type, v1, v2) =>
+    console.log(`[${ts()}] [DJ/Displays] $inspect d1=${JSON.stringify(v1)} d2=${JSON.stringify(v2)} (${type})`)
+  )
+
   async function toggleDisplay(id: 1 | 2) {
-    console.log('[DisplaysView] toggleDisplay', id)
     const display = id === 1 ? displaysStore.display1 : displaysStore.display2
-    console.log('[DisplaysView] display state', display)
+    console.log(`[${ts()}] [DJ/Displays] toggleDisplay ${id} open=${display.open}`)
     if (display.open) {
-      console.log('[DisplaysView] closing', display.label)
       await closeDisplayWindow(display.label)
       displaysStore.setOpen(id, false)
+      console.log(`[${ts()}] [DJ/Displays] closed display ${id}`)
     } else {
-      console.log('[DisplaysView] opening', id)
       try {
         if (id === 1) await openBeamerWindow()
         else await openBeamer2Window()
         displaysStore.setOpen(id, true)
+        console.log(`[${ts()}] [DJ/Displays] opened display ${id}`)
         setTimeout(() => sendScreenConfig({
           windowLabel: display.label,
           playerIds: display.playerIds,
         }), 800)
       } catch (e) {
-        console.error('[DisplaysView] open failed', e)
+        console.error(`[${ts()}] [DJ/Displays] open failed`, e)
       }
     }
   }
 
   function togglePlayer(displayId: 1 | 2, playerId: number) {
     displaysStore.togglePlayer(displayId, playerId)
-    // push updated config if display is open
-    const display = displayId === 1 ? displaysStore.display1 : displaysStore.display2
-    if (display.open) {
-      sendScreenConfig({ windowLabel: display.label, playerIds: display.playerIds })
-    }
   }
 </script>
 
@@ -75,10 +82,10 @@
       <span class="display-name">Display 1</span>
       <button
         class="btn btn-sm"
-        class:btn-danger={displaysStore.display1.open}
+        class:btn-danger={d1open}
         onclick={() => toggleDisplay(1)}
       >
-        {displaysStore.display1.open ? 'Close' : 'Open'}
+        {d1open ? 'Close' : 'Open'}
       </button>
     </div>
 
@@ -86,7 +93,7 @@
       {#each allPlayers as player (player.id)}
         <button
           class="player-chip"
-          class:is-assigned={displaysStore.display1.playerIds.includes(player.id)}
+          class:is-assigned={d1playerIds.includes(player.id)}
           class:is-inactive={!player.active}
           style="--chip-color: {PLAYER_COLOR_VAR[player.id] ?? player.color}"
           disabled={!player.active}
@@ -108,10 +115,10 @@
         <span class="display-name">Display 2</span>
         <button
           class="btn btn-sm"
-          class:btn-danger={displaysStore.display2.open}
+          class:btn-danger={d2open}
           onclick={() => toggleDisplay(2)}
         >
-          {displaysStore.display2.open ? 'Close' : 'Open'}
+          {d2open ? 'Close' : 'Open'}
         </button>
       </div>
 
@@ -119,7 +126,7 @@
         {#each allPlayers as player (player.id)}
           <button
             class="player-chip"
-            class:is-assigned={displaysStore.display2.playerIds.includes(player.id)}
+            class:is-assigned={d2playerIds.includes(player.id)}
             class:is-inactive={!player.active}
             style="--chip-color: {PLAYER_COLOR_VAR[player.id] ?? player.color}"
             disabled={!player.active}

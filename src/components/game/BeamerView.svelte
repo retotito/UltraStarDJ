@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte'
   import type { PlaySongPayload } from '$lib/ultrastar/types'
+
+  const ts = () => new Date().toISOString().slice(11, 23)
 
   let { payload, assignedPlayerIds = [] }: {
     payload: PlaySongPayload | null
@@ -12,6 +15,13 @@
     3: '#4ecb71',
     4: '#f7c84f',
   }
+
+  onMount(() => console.log(`[${ts()}] [BeamerView] mounted, assignedPlayerIds=${JSON.stringify(assignedPlayerIds)}`))
+  onDestroy(() => console.log(`[${ts()}] [BeamerView] destroyed`))
+
+  $effect(() => {
+    console.log(`[${ts()}] [BeamerView] assignedPlayerIds prop → ${JSON.stringify(assignedPlayerIds)}`)
+  })
 </script>
 
 <div class="beamer-view">
@@ -31,7 +41,7 @@
           {/each}
         </div>
       {:else}
-        <span class="waiting">Waiting for DJ…</span>
+        <span class="waiting">No players assigned</span>
       {/if}
     </div>
   {/if}

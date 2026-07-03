@@ -92,6 +92,8 @@
         checked={player.active}
         onchange={async e => {
           const active = (e.target as HTMLInputElement).checked
+          const ts = new Date().toISOString().slice(11, 23)
+          console.log(`[${ts}] [DJ/Players] player ${player.id} active → ${active}`)
           if (!active && isMonitoring) {
             await stopMicMonitor(player.id).catch(() => {})
             playersStore.setMonitoring(player.id, false)
