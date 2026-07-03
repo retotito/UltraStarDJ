@@ -34,18 +34,22 @@
   let transcoding = $state(false)
   let transcodeError = $state<string | null>(null)
 
+  // Reset transcoding state BEFORE the DOM update so {#if transcodedPath}
+  // never renders with a stale value from the previous song.
+  $effect.pre(() => {
+    player.song  // track song changes
+    untrack(() => {
+      const prev = transcodedPath
+      transcodedPath = null
+      transcoding = false
+      transcodeError = null
+      if (prev) deleteTempFile(prev).catch(() => {})
+    })
+  })
+
   $effect(() => {
     const song = player.song
-
-    // Clean up previous temp file
-    const prev = untrack(() => transcodedPath)
-    transcodedPath = null
-    transcoding = false
-    transcodeError = null
-    if (prev) deleteTempFile(prev).catch(() => {})
-
     if (!song) return
-
     if (song.videoPath && needsTranscode(song.videoPath)) {
       transcoding = true
       transcodeToMp4(song.videoPath)
@@ -173,9 +177,6 @@
       {/if}
       {/key}
     </div>
-
-    <!-- DEBUG: cover test -->
-    <img src={coverSrc} alt="cover-debug" style="width:80px;height:80px;object-fit:cover;border:2px solid red;" />
 
     <div class="song-info">
       <p class="song-title truncate">{player.song.title}</p>
