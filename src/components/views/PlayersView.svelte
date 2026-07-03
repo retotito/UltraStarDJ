@@ -13,6 +13,8 @@
   } from '$lib/ipc/tauri'
   import PlayerCard from '$components/ui/PlayerCard.svelte'
 
+  let { onclose }: { onclose?: () => void } = $props()
+
   let devices = $state<AudioInputDevice[]>([])
 
   let unlistenLevel: (() => void) | null = null
@@ -28,10 +30,9 @@
     })
 
     unlistenDisconnected = await onMicDisconnected(async e => {
-      playersStore.setDisconnected(e.player_id, true)
+      // Stop the dead stream on Rust side; toast handles mic assignment clear
       playersStore.setMonitoring(e.player_id, false)
       playersStore.setLevel(e.player_id, 0)
-      // Stop the dead stream on Rust side
       await stopMicMonitor(e.player_id).catch(() => {})
     })
 
@@ -66,14 +67,21 @@
 <div class="players-view">
   <div class="view-header">
     <span class="view-title">Players</span>
-    <button
-      class="btn btn-icon"
-      title="Refresh mic list"
-      aria-label="Refresh microphone list"
-      onclick={refreshDevices}
-    >
-      <span class="icon">refresh</span>
-    </button>
+    <div class="header-actions">
+      <button
+        class="btn btn-icon"
+        title="Refresh mic list"
+        aria-label="Refresh microphone list"
+        onclick={refreshDevices}
+      >
+        <span class="icon">refresh</span>
+      </button>
+      {#if onclose}
+        <button class="btn btn-icon" onclick={onclose} aria-label="Close">
+          <span class="icon">close</span>
+        </button>
+      {/if}
+    </div>
   </div>
 
   <div class="cards">
@@ -89,13 +97,19 @@
     flex-direction: column;
     gap: var(--space-3);
     padding: var(--space-3);
-    width: 280px;
+    width: 100%;
   }
 
   .view-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
   }
 
   .view-title {
@@ -110,5 +124,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    width: 100%;
   }
 </style>

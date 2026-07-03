@@ -2,22 +2,24 @@
   interface Option {
     value: string
     label: string
+    disabled?: boolean
   }
 
   interface Props {
     value: string
     options: Option[]
     onchange: (value: string) => void
+    disabled?: boolean
     class?: string
   }
 
-  let { value, options, onchange, class: className = '' }: Props = $props()
+  let { value, options, onchange, disabled = false, class: className = '' }: Props = $props()
 
   let isOpen = $state(false)
   let triggerEl = $state<HTMLButtonElement | null>(null)
   let menuPos = $state({ top: 0, left: 0, width: 0 })
 
-  const selectedLabel = $derived(options.find(o => o.value === value)?.label ?? '')
+  const selectedLabel = $derived(options.find(o => o.value === value)?.label ?? options[0]?.label ?? '')
 
   function openMenu() {
     if (!triggerEl) return
@@ -27,12 +29,13 @@
   }
 
   function toggle() {
+    if (disabled) return
     if (isOpen) isOpen = false
     else openMenu()
   }
 
   function select(v: string) {
-    if (v !== value) onchange(v)
+    onchange(v)
     isOpen = false
   }
 
@@ -55,9 +58,11 @@
         type="button"
         class="select-item"
         class:is-selected={opt.value === value}
+        class:is-disabled={opt.disabled}
+        disabled={opt.disabled}
         onclick={() => select(opt.value)}
       >
-        <span>{opt.label}</span>
+        <div class="item-label">{opt.label}</div>
         {#if opt.value === value}
           <span class="icon icon-sm">check</span>
         {/if}
@@ -71,9 +76,11 @@
   bind:this={triggerEl}
   class="select-trigger {className}"
   class:is-open={isOpen}
+  class:is-disabled={disabled}
+  {disabled}
   onclick={toggle}
 >
-  <span class="select-trigger-label">{selectedLabel}</span>
+  <div class="select-trigger-label">{selectedLabel}</div>
   <span class="icon icon-sm">expand_more</span>
 </button>
 
@@ -112,9 +119,17 @@
 
   .select-trigger-label {
     flex: 1;
-    text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  .item-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .select-backdrop {
@@ -164,5 +179,17 @@
   .select-item.is-selected {
     color: var(--md-sys-color-primary);
     font-weight: var(--font-weight-medium);
+  }
+
+  .select-item.is-disabled,
+  .select-item:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .select-trigger.is-disabled,
+  .select-trigger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

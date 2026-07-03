@@ -2,8 +2,40 @@
   import { playersStore, type PlayerConfig, type MicChannel } from '$lib/stores/players.svelte'
   import type { AudioInputDevice } from '$lib/ipc/tauri'
   import { startMicMonitor, stopMicMonitor } from '$lib/ipc/tauri'
+  import Select from '$components/ui/Select.svelte'
 
   let { player, devices }: { player: PlayerConfig; devices: AudioInputDevice[] } = $props()
+
+  // Exact "deviceId|channel" entries taken by OTHER players
+  const takenEntries = $derived(
+    new Set(
+      playersStore.all
+        .filter(p => p.id !== player.id && p.mic?.deviceId)
+        .map(p => `${p.mic!.deviceId}|${p.mic!.channel}`)
+    )
+  )
+
+  const deviceOptions = $derived([
+    { value: '', label: '— No mic —' },
+    ...devices.flatMap(d => {
+      if (d.channels >= 2) {
+        const leftKey  = `${d.id}|left`
+        const rightKey = `${d.id}|right`
+        return [
+          { value: leftKey,  label: takenEntries.has(leftKey)  ? `${d.name} — Left (in use)`  : `${d.name} — Left`,  disabled: takenEntries.has(leftKey) },
+          { value: rightKey, label: takenEntries.has(rightKey) ? `${d.name} — Right (in use)` : `${d.name} — Right`, disabled: takenEntries.has(rightKey) },
+        ]
+      }
+      const monoKey = `${d.id}|mono`
+      return [{ value: monoKey, label: takenEntries.has(monoKey) ? `${d.name} (in use)` : d.name, disabled: takenEntries.has(monoKey) }]
+    }),
+  ])
+
+  // Encoded select value: "deviceId|channel"
+  const micSelectValue = $derived(
+    player.mic ? `${player.mic.deviceId}|${player.mic.channel}` : ''
+  )
+
 
   const COLOR_MAP: Record<string, string> = {
     blue:   'var(--player-1)',
@@ -41,22 +73,15 @@
     }
   }
 
-  function handleDeviceChange(e: Event) {
-    const select = e.target as HTMLSelectElement
-    const deviceId = select.value
-    if (!deviceId) {
+  function handleDeviceChange(encoded: string) {
+    if (!encoded) {
       playersStore.setMic(player.id, null)
       return
     }
-    const device = devices.find(d => d.id === deviceId)
-    const channel: MicChannel = device && device.channels >= 2 ? 'left' : 'mono'
+    const sep = encoded.lastIndexOf('|')
+    const deviceId = encoded.slice(0, sep)
+    const channel = encoded.slice(sep + 1) as MicChannel
     playersStore.setMic(player.id, { deviceId, channel })
-  }
-
-  function handleChannelChange(e: Event) {
-    const select = e.target as HTMLSelectElement
-    if (!player.mic) return
-    playersStore.setMic(player.id, { ...player.mic, channel: select.value as MicChannel })
   }
 </script>
 
@@ -88,29 +113,13 @@
     <!-- Mic assignment row -->
     <div class="mic-row">
       <span class="icon mic-icon">mic</span>
-      <select
-        class="mic-select"
-        value={player.mic?.deviceId ?? ''}
+      <Select
+        value={micSelectValue}
+        options={deviceOptions}
         onchange={handleDeviceChange}
         disabled={isMonitoring}
-      >
-        <option value="">— No mic —</option>
-        {#each devices as dev (dev.id)}
-          <option value={dev.id}>{dev.name}</option>
-        {/each}
-      </select>
-
-      {#if player.mic && devices.find(d => d.id === player.mic?.deviceId)?.channels >= 2}
-        <select
-          class="channel-select"
-          value={player.mic.channel}
-          onchange={handleChannelChange}
-          disabled={isMonitoring}
-        >
-          <option value="left">L</option>
-          <option value="right">R</option>
-        </select>
-      {/if}
+        class="mic-select"
+      />
     </div>
 
     <!-- Test button + disconnected badge -->
@@ -151,6 +160,7 @@
     flex-direction: column;
     gap: var(--space-2);
     transition: opacity var(--transition-fast);
+    width: 100%;
   }
 
   .player-card.inactive {
@@ -192,38 +202,24 @@
   }
 
   .mic-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+    position: relative;
+    padding-left: 24px;
   }
 
   .mic-icon {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
     font-size: 16px;
     color: var(--md-sys-color-on-surface-variant);
-    flex-shrink: 0;
   }
 
-  .mic-select {
-    flex: 1;
-    min-width: 0;
-    background: var(--md-sys-color-surface-container-high);
-    border: 1px solid var(--md-sys-color-outline-variant);
-    border-radius: var(--radius-md);
-    color: var(--md-sys-color-on-surface);
+  /* Override Select trigger sizing for the mic row */
+  :global(.mic-select) {
+    width: 100%;
+    height: 32px;
     font-size: var(--text-xs);
-    padding: 4px 6px;
-    cursor: pointer;
-  }
-
-  .channel-select {
-    background: var(--md-sys-color-surface-container-high);
-    border: 1px solid var(--md-sys-color-outline-variant);
-    border-radius: var(--radius-md);
-    color: var(--md-sys-color-on-surface);
-    font-size: var(--text-xs);
-    padding: 4px 6px;
-    cursor: pointer;
-    width: 48px;
   }
 
   .test-row {

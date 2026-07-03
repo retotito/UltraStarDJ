@@ -64,8 +64,15 @@
 
 {#if showLayoutMenu}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="layout-popover" onmouseleave={() => showLayoutMenu = false}>
-    <p class="popover-label">Panels</p>
+  <div class="popover-backdrop" onclick={() => showLayoutMenu = false}></div>
+  <div class="layout-popover">
+    <div class="popover-header">
+      <span class="popover-title">Layout</span>
+      <button class="btn btn-icon" onclick={() => showLayoutMenu = false} aria-label="Close">
+        <span class="icon">close</span>
+      </button>
+    </div>
+    <div class="popover-content">
 
     <label class="toggle-row">
       <span>Player</span>
@@ -93,13 +100,15 @@
         </label>
       </label>
     {/each}
+    </div><!-- /popover-content -->
   </div>
 {/if}
 
 {#if showPlayers}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="players-popover" onmouseleave={() => showPlayers = false}>
-    <PlayersView />
+  <div class="popover-backdrop" onclick={() => showPlayers = false}></div>
+  <div class="players-popover">
+    <PlayersView onclose={() => showPlayers = false} />
   </div>
 {/if}
 
@@ -158,24 +167,53 @@
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
-    padding: var(--space-3) var(--space-4);
-    min-width: 200px;
+    min-width: 240px;
+    width: max-content;
     z-index: var(--z-overlay);
     box-shadow: var(--elevation-2);
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    overflow: hidden;
   }
 
   .players-popover {
     position: fixed;
     left: 64px;
-    top: 108px; /* below layout button */
+    top: 108px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
+    width: 380px;
     z-index: var(--z-overlay);
     box-shadow: var(--elevation-2);
+    overflow: hidden;
+  }
+
+  .popover-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-overlay) - 1);
+  }
+
+  .popover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  }
+
+  .popover-title {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--md-sys-color-on-surface);
+  }
+
+  .popover-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding-bottom: var(--space-3);
   }
 
   .popover-label {
@@ -185,6 +223,8 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-bottom: var(--space-1);
+    padding: 0 var(--space-4);
+    padding-top: var(--space-3);
   }
 
   .toggle-row {
@@ -194,7 +234,7 @@
     gap: var(--space-4);
     font-size: var(--text-sm);
     color: var(--md-sys-color-on-surface);
-    padding: var(--space-1) 0;
+    padding: var(--space-1) var(--space-4);
     cursor: pointer;
   }
 </style>

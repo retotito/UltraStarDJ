@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import { playersStore } from '$lib/stores/players.svelte'
-  import { onMicDisconnected, onMicReconnected } from '$lib/ipc/tauri'
+  import { onMicDisconnected, onMicReconnected, onDevicesChanged } from '$lib/ipc/tauri'
 
   interface Toast {
     id: number
@@ -13,13 +13,17 @@
   let toasts = $state<Toast[]>([])
   let nextId = 0
 
+  // Remember which device was last disconnected per player so reconnect can match
+  const lastDisconnectedDevice = new Map<number, string>() // playerId → deviceId
+
   let unlistenDisconnected: (() => void) | null = null
   let unlistenReconnected: (() => void) | null = null
+  let unlistenDevices: (() => void) | null = null
 
   function addToast(toast: Omit<Toast, 'id'>) {
     const id = ++nextId
     toasts = [...toasts, { ...toast, id }]
-    setTimeout(() => dismiss(id), 5000)
+    setTimeout(() => dismiss(id), 4000)
   }
 
   function dismiss(id: number) {
@@ -28,29 +32,39 @@
 
   onMount(async () => {
     unlistenDisconnected = await onMicDisconnected(e => {
-      const player = playersStore.getById(e.player_id)
-      addToast({
-        type: 'disconnected',
-        playerName: player?.name ?? `Player ${e.player_id}`,
-        deviceId: e.device_id,
-      })
+      const player = playersStore.all.find(p => p.mic?.deviceId === e.device_id)
+        ?? playersStore.getById(e.player_id)
+      if (!player) return
+      lastDisconnectedDevice.set(player.id, e.device_id)
+      playersStore.setMic(player.id, null)
+      playersStore.setDisconnected(player.id, false)
+      addToast({ type: 'disconnected', playerName: player.name, deviceId: e.device_id })
+    })
+
+    // Also catch disconnects for assigned-but-not-testing mics via devices-changed
+    unlistenDevices = await onDevicesChanged(updatedDevices => {
+      for (const player of playersStore.all) {
+        if (!player.mic) continue
+        const stillExists = updatedDevices.some(d => d.id === player.mic!.deviceId)
+        if (!stillExists) {
+          const deviceId = player.mic.deviceId
+          lastDisconnectedDevice.set(player.id, deviceId)
+          playersStore.setMic(player.id, null)
+          playersStore.setDisconnected(player.id, false)
+          addToast({ type: 'disconnected', playerName: player.name, deviceId })
+        }
+      }
     })
 
     unlistenReconnected = await onMicReconnected(e => {
-      // Only show reconnect toast if a player had this device assigned
-      const player = playersStore.all.find(p => p.mic?.deviceId === e.device_id)
-      if (!player) return
-      addToast({
-        type: 'reconnected',
-        playerName: player.name,
-        deviceId: e.device_id,
-      })
+      addToast({ type: 'reconnected', playerName: '', deviceId: e.device_id })
     })
   })
 
   onDestroy(() => {
     unlistenDisconnected?.()
     unlistenReconnected?.()
+    unlistenDevices?.()
   })
 </script>
 
@@ -63,9 +77,11 @@
         </span>
         <div class="toast-body">
           <span class="toast-title">
-            {toast.type === 'disconnected' ? 'Mic disconnected' : 'Mic reconnected'}
+            {toast.type === 'disconnected' ? 'Mic disconnected' : 'New mic connected'}
           </span>
-          <span class="toast-sub">{toast.playerName} — {toast.deviceId}</span>
+          <span class="toast-sub">
+            {toast.type === 'disconnected' ? `${toast.playerName} — ${toast.deviceId}` : toast.deviceId}
+          </span>
         </div>
         <button class="toast-close btn btn-icon" onclick={() => dismiss(toast.id)} aria-label="Dismiss">
           <span class="icon">close</span>
