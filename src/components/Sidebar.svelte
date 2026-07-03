@@ -22,7 +22,7 @@
       class:is-active={showLayoutMenu}
       data-tooltip="Layout"
       aria-label="Toggle layout options"
-      onclick={() => { showLayoutMenu = !showLayoutMenu; showPlayers = false }}
+      onclick={() => { showLayoutMenu = !showLayoutMenu; showPlayers = false; showDisplays = false }}
     >
       <span class="icon">dashboard</span>
     </button>
@@ -32,9 +32,19 @@
       class:is-active={showPlayers}
       data-tooltip="Players"
       aria-label="Player & mic settings"
-      onclick={() => { showPlayers = !showPlayers; showLayoutMenu = false }}
+      onclick={() => { showPlayers = !showPlayers; showLayoutMenu = false; showDisplays = false }}
     >
       <span class="icon">group</span>
+    </button>
+
+    <button
+      class="btn btn-icon"
+      class:is-active={showDisplays}
+      data-tooltip="Displays"
+      aria-label="Open Displays"
+      onclick={() => { showDisplays = !showDisplays; showPlayers = false; showLayoutMenu = false }}
+    >
+      <span class="icon">tv_displays</span>
     </button>
   </nav>
 
@@ -46,16 +56,6 @@
       onclick={() => showSettings = true}
     >
       <span class="icon">settings</span>
-    </button>
-
-    <button
-      class="btn btn-icon"
-      class:is-active={showDisplays}
-      data-tooltip="Displays"
-      aria-label="Open Displays"
-      onclick={() => showDisplays = !showDisplays}
-    >
-      <span class="icon">tv_displays</span>
     </button>
   </div>
 </aside>
@@ -207,11 +207,11 @@
   .displays-popover {
     position: fixed;
     left: 64px;
-    bottom: 16px;
+    top: 200px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
-    width: 280px;
+    width: 660px;
     display: flex;
     flex-direction: column;
     z-index: var(--z-overlay);

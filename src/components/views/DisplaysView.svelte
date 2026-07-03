@@ -11,7 +11,15 @@
 
   let { onclose }: { onclose?: () => void } = $props()
 
+  const PLAYER_COLOR_VAR: Record<number, string> = {
+    1: 'var(--player-1)',
+    2: 'var(--player-2)',
+    3: 'var(--player-3)',
+    4: 'var(--player-4)',
+  }
+
   const activePlayers = $derived(playersStore.all.filter(p => p.active))
+  const allPlayers = $derived(playersStore.all)
   const canHaveSecond = $derived(activePlayers.length >= 3)
 
   async function toggleDisplay(id: 1 | 2) {
@@ -51,6 +59,8 @@
     {/if}
   </div>
 
+  <!-- Cards row -->
+  <div class="displays-cards">
   <!-- Display 1 -->
   <div class="display-card">
     <div class="display-header">
@@ -66,18 +76,20 @@
     </div>
 
     <div class="player-chips">
-      {#each activePlayers as player (player.id)}
+      {#each allPlayers as player (player.id)}
         <button
           class="player-chip"
           class:is-assigned={displaysStore.display1.playerIds.includes(player.id)}
-          style="--chip-color: {player.color}"
+          class:is-inactive={!player.active}
+          style="--chip-color: {PLAYER_COLOR_VAR[player.id] ?? player.color}"
+          disabled={!player.active}
           onclick={() => togglePlayer(1, player.id)}
         >
-          P{player.id}
+          {player.name || `Player ${player.id}`}
         </button>
       {/each}
-      {#if activePlayers.length === 0}
-        <span class="no-players">No active players</span>
+      {#if allPlayers.length === 0}
+        <span class="no-players">No players configured</span>
       {/if}
     </div>
   </div>
@@ -98,28 +110,38 @@
       </div>
 
       <div class="player-chips">
-        {#each activePlayers as player (player.id)}
+        {#each allPlayers as player (player.id)}
           <button
             class="player-chip"
             class:is-assigned={displaysStore.display2.playerIds.includes(player.id)}
-            style="--chip-color: {player.color}"
+            class:is-inactive={!player.active}
+            style="--chip-color: {PLAYER_COLOR_VAR[player.id] ?? player.color}"
+            disabled={!player.active}
             onclick={() => togglePlayer(2, player.id)}
           >
-            P{player.id}
+            {player.name || `Player ${player.id}`}
           </button>
         {/each}
       </div>
     </div>
   {/if}
+  </div><!-- /displays-cards -->
 </div>
 
 <style>
   .displays-view {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--space-3);
     padding: var(--space-3);
     width: 100%;
+  }
+
+  .displays-cards {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-3);
+    align-items: flex-start;
   }
 
   .view-header {
@@ -145,6 +167,8 @@
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
     padding: var(--space-3);
+    width: 300px;
+    flex-shrink: 0;
   }
 
   .display-header {
@@ -168,7 +192,7 @@
   .btn-sm {
     padding: 4px 12px;
     font-size: var(--text-xs);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-md);
     background: var(--md-sys-color-primary);
     color: var(--md-sys-color-on-primary);
     font-weight: 600;
@@ -187,29 +211,35 @@
   /* ── Player chips ── */
   .player-chips {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: var(--space-2);
   }
 
   .player-chip {
-    width: 36px;
+    width: 100%;
     height: 36px;
-    border-radius: var(--radius-full);
-    border: 2px solid var(--chip-color);
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--chip-color);
     background: transparent;
-    color: var(--chip-color);
+    color: var(--md-sys-color-on-surface);
+    font-family: var(--font-sans);
     font-size: var(--text-sm);
-    font-weight: 700;
+    font-weight: 500;
+    text-align: left;
     cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    transition: border-width 80ms ease, border-color 80ms ease;
   }
 
   .player-chip.is-assigned {
-    background: var(--chip-color);
-    color: #fff;
+    border-width: 3px;
+    border-color: var(--chip-color);
+    font-weight: 700;
+  }
+
+  .player-chip.is-inactive {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 
   .no-players {
