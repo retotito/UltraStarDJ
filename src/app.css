@@ -632,9 +632,12 @@ a {
    ========================================================== */
 :root {
   --plyr-color-main: var(--md-sys-color-primary);
-  --plyr-audio-controls-background: transparent;
-  --plyr-audio-control-color: var(--md-sys-color-on-surface);
+  /* Audio controls bar */
+  --plyr-audio-controls-background: rgba(0, 0, 0, 0.55);
+  --plyr-audio-control-color: #fff;
   --plyr-audio-control-color-hover: var(--md-sys-color-primary);
+  /* Video controls */
+  --plyr-video-controls-background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.6));
   --plyr-video-control-color: #fff;
   --plyr-video-control-color-hover: var(--md-sys-color-primary);
   --plyr-control-radius: var(--radius-sm);
@@ -643,12 +646,26 @@ a {
   --plyr-range-thumb-height: 12px;
   --plyr-range-track-height: 3px;
   --plyr-range-fill-background: var(--md-sys-color-primary);
-  --plyr-video-background: #000;
+  --plyr-video-background: transparent;
   --plyr-menu-background: var(--md-sys-color-surface-container-high);
   --plyr-menu-color: var(--md-sys-color-on-surface);
   --plyr-tooltip-background: var(--md-sys-color-surface-container-high);
   --plyr-tooltip-color: var(--md-sys-color-on-surface);
   --plyr-tooltip-radius: var(--radius-sm);
+}
+
+/* Remove Plyr's default black poster/overlay behind video before playback */
+.plyr__poster { background-color: transparent !important; }
+
+/* Force video compositing layer — fixes black video in some WebViews */
+.plyr__video-wrapper video {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Keep audio player flush at the bottom of the cover backdrop */
+.plyr--audio .plyr__controls {
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
 

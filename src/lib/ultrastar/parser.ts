@@ -51,6 +51,7 @@ function parseHeader(text: string): ParsedHeader {
           header.video = value
         }
         break
+      case 'youtube':    header.youtubeId = extractYoutubeId(value) ?? value; break
       case 'videogap':   header.videogap = parseFloat(value.replace(',', '.')); break
       case 'year':       header.year = parseInt(value, 10); break
       case 'language':   header.language = value; break
@@ -81,6 +82,9 @@ function extractYoutubeId(value: string): string | null {
 }
 
 
+/** Video formats that will be attempted. macOS AVFoundation handles mpeg/mpg via WKWebView. */
+const SUPPORTED_VIDEO_EXTS = new Set(['.mp4', '.m4v', '.webm', '.mov', '.mpg', '.mpeg', '.avi'])
+
 function resolveSibling(txtPath: string, filename: string): string {
   const dir = txtPath.substring(0, txtPath.lastIndexOf('/'))
   return `${dir}/${filename}`
@@ -96,6 +100,9 @@ export function parseSongHeader(txtPath: string, sourceId: string, text: string)
   const header = parseHeader(text)
 
   if (!header.title || !header.artist) return null
+
+  // Debug: log raw header tags for this song
+  console.debug('[parser] raw header tags:', txtPath, header)
 
   const id = `${sourceId}::${txtPath}`
 
@@ -116,7 +123,7 @@ export function parseSongHeader(txtPath: string, sourceId: string, text: string)
     audioPath:      header.mp3        ? resolveSibling(txtPath, header.mp3)        : undefined,
     coverPath:      header.cover      ? resolveSibling(txtPath, header.cover)      : undefined,
     backgroundPath: header.background ? resolveSibling(txtPath, header.background) : undefined,
-    videoPath:      header.video      ? resolveSibling(txtPath, header.video)      : undefined,
+    videoPath:      header.video && SUPPORTED_VIDEO_EXTS.has(header.video.toLowerCase().slice(header.video.lastIndexOf('.'))) ? resolveSibling(txtPath, header.video) : undefined,
     videoGap:       header.videogap,
     youtubeId:      header.youtubeId,
   }
