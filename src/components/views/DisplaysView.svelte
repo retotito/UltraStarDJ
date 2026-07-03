@@ -21,7 +21,7 @@
     4: 'var(--player-4)',
   }
 
-  const activePlayers = $derived(playersStore.all.filter(p => p.active))
+  const activePlayers = $derived(playersStore.all.filter(p => playersStore.isActive(p.id)))
   const allPlayers = $derived(playersStore.all)
 
   // Explicit derived references so Svelte 5 tracks the full array dependency
@@ -92,9 +92,9 @@
         <button
           class="player-chip"
           class:is-assigned={d1playerIds.includes(player.id)}
-          class:is-inactive={!player.active}
+          class:is-inactive={!playersStore.isActive(player.id)}
           style="--chip-color: {PLAYER_COLOR_VAR[player.id] ?? player.color}"
-          disabled={!player.active}
+          disabled={!playersStore.isActive(player.id)}
           onclick={() => togglePlayer(1, player.id)}
         >
           {player.name || `Player ${player.id}`}
@@ -125,9 +125,9 @@
           <button
             class="player-chip"
             class:is-assigned={d2playerIds.includes(player.id)}
-            class:is-inactive={!player.active}
+            class:is-inactive={!playersStore.isActive(player.id)}
             style="--chip-color: {PLAYER_COLOR_VAR[player.id] ?? player.color}"
-            disabled={!player.active}
+            disabled={!playersStore.isActive(player.id)}
             onclick={() => togglePlayer(2, player.id)}
           >
             {player.name || `Player ${player.id}`}

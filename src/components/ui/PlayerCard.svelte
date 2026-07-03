@@ -1,6 +1,5 @@
 <script lang="ts">
   import { playersStore, type PlayerConfig, type MicChannel } from '$lib/stores/players.svelte'
-  import { displaysStore } from '$lib/stores/displays.svelte'
   import type { AudioInputDevice } from '$lib/ipc/tauri'
   import { startMicMonitor, stopMicMonitor } from '$lib/ipc/tauri'
   import Select from '$components/ui/Select.svelte'
@@ -83,34 +82,13 @@
   }
 </script>
 
-<div class="player-card" class:inactive={!player.active} class:disconnected={isDisconnected}>
-  <!-- Header row: toggle + name + color dot -->
+<div class="player-card" class:disconnected={isDisconnected}>
+  <!-- Header row: name + color dot -->
   <div class="card-header">
-    <label class="toggle-switch" title={player.active ? 'Deactivate player' : 'Activate player'}>
-      <input
-        type="checkbox"
-        checked={player.active}
-        onchange={async e => {
-          const active = (e.target as HTMLInputElement).checked
-          const ts = new Date().toISOString().slice(11, 23)
-          console.log(`[${ts}] [DJ/Players] player ${player.id} active → ${active}`)
-          if (!active && isMonitoring) {
-            await stopMicMonitor(player.id).catch(() => {})
-            playersStore.setMonitoring(player.id, false)
-            playersStore.setLevel(player.id, 0)
-          }
-          if (!active) displaysStore.removePlayer(player.id)
-          playersStore.setActive(player.id, active)
-        }}
-      />
-      <span class="toggle-slider"></span>
-    </label>
-
     <input
       class="name-input"
       type="text"
       value={player.name}
-      disabled={!player.active}
       onchange={e => playersStore.setName(player.id, (e.target as HTMLInputElement).value)}
       style="--accent: {accent}"
     />
@@ -118,7 +96,6 @@
     <span class="color-dot" style="background: {accent}"></span>
   </div>
 
-  {#if player.active}
     <!-- Mic assignment row -->
     <div class="mic-row">
       <span class="icon mic-icon">mic</span>
@@ -169,7 +146,6 @@
       />
       <span class="gain-value">{Math.round(player.gain * 100)}%</span>
     </div>
-  {/if}
 </div>
 
 <style>

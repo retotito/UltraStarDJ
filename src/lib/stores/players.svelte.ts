@@ -4,6 +4,8 @@
  * Persisted to localStorage (same pattern as settings store).
  */
 
+import { displaysStore } from '$lib/stores/displays.svelte'
+
 export type MicChannel = 'left' | 'right' | 'mono'
 
 export interface MicAssignment {
@@ -54,13 +56,15 @@ export const playersStore = {
   get levels() { return levels },
   get disconnectedIds() { return disconnectedIds },
 
-  getById(id: number): PlayerConfig | undefined {
-    return players.find(p => p.id === id)
+  /** A player is active when it has a mic assigned and is not disconnected */
+  isActive(id: number): boolean {
+    const p = players.find(p => p.id === id)
+    if (!p) return false
+    return p.mic !== null && !disconnectedIds.has(id)
   },
 
-  setActive(id: number, active: boolean) {
-    players = players.map(p => p.id === id ? { ...p, active } : p)
-    playersStore.save()
+  getById(id: number): PlayerConfig | undefined {
+    return players.find(p => p.id === id)
   },
 
   setName(id: number, name: string) {
@@ -75,6 +79,8 @@ export const playersStore = {
 
   setMic(id: number, mic: MicAssignment | null) {
     players = players.map(p => p.id === id ? { ...p, mic } : p)
+    // When mic is removed, also remove player from any display
+    if (mic === null) displaysStore.removePlayer(id)
     playersStore.save()
   },
 
@@ -95,7 +101,12 @@ export const playersStore = {
 
   setDisconnected(playerId: number, disconnected: boolean) {
     const next = new Set(disconnectedIds)
-    if (disconnected) next.add(playerId); else next.delete(playerId)
+    if (disconnected) {
+      next.add(playerId)
+      displaysStore.removePlayer(playerId)
+    } else {
+      next.delete(playerId)
+    }
     disconnectedIds = next
   },
 
