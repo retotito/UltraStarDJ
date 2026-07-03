@@ -7,7 +7,7 @@ import type { Song } from '$lib/ultrastar/types'
 import { player } from '$lib/stores/player.svelte'
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
-import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick } from '$lib/ipc/tauri'
+import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, onBeamerReady } from '$lib/ipc/tauri'
 import { readFile } from '$lib/ipc/tauri'
 import { parseSongNotes } from '$lib/ultrastar/parser'
 import { convertFileSrc } from '@tauri-apps/api/core'
@@ -21,6 +21,10 @@ interface PlaybackState {
 
 let state = $state<PlaybackState>({ status: 'idle', song: null })
 let showClearBeamers = $state(false)
+let beamerReady = $state(true) // true when no beamers open or media is buffered
+
+// Listen for beamer-ready events from beamer windows
+onBeamerReady(() => { console.log('[playback] beamer-ready received — enabling play'); beamerReady = true })
 
 // ── Time-tick loop ────────────────────────────────────────────
 let getTime: (() => number) | null = null
@@ -55,9 +59,10 @@ export const playback = {
   get isActive() { return state.status === 'playing' || state.status === 'paused' },
   /** Cannot load a new song while playing or paused */
   get canLoad()  { return state.status === 'idle' || state.status === 'loaded' || state.status === 'preview' },
-  /** Can only start playback when a song is loaded and at least one beamer is open */
-  get canPlay()  { return (state.status === 'loaded' || state.status === 'preview') && (displaysStore.display1.open || displaysStore.display2.open) },
+  /** Can play only when a song is loaded, a beamer is open, AND beamer media is buffered */
+  get canPlay()  { return (state.status === 'loaded' || state.status === 'preview') && (displaysStore.display1.open || displaysStore.display2.open) && beamerReady },
   get showClearBeamers() { return showClearBeamers },
+  get beamerReady() { return beamerReady },
   get currentTime() { return _currentTime },
 
   /** Called by PlayerWidget to register how to get current playback time */
@@ -65,13 +70,29 @@ export const playback = {
   unregisterTimeProvider() { console.log('[playback] unregisterTimeProvider called'); getTime = null },
 
   /** Load a song into the player without starting playback */
-  load(song: Song) {
+  async load(song: Song) {
     if (!playback.canLoad) return
     console.log('[playback] load() called, song:', song.title, 'audioPath:', song.audioPath, 'videoPath:', song.videoPath)
     player.load(song)
     state = { status: 'loaded', song }
     showClearBeamers = false
     layout.showNowPlaying || layout.toggleNowPlaying()
+
+    // Send preview to all open beamers so they start buffering media immediately
+    const assetBase = convertFileSrc('')
+    const openDisplays = [displaysStore.display1, displaysStore.display2].filter(d => d.open)
+    if (openDisplays.length > 0) {
+      console.log('[playback] beamers open, waiting for beamer-ready before enabling play')
+      beamerReady = false  // disable play until beamer signals ready
+      for (const display of openDisplays) {
+        await sendPreviewSong({
+          song,
+          assetBase,
+          playerIds: [...display.playerIds].sort((a, b) => a - b),
+          windowLabel: display.label,
+        })
+      }
+    }
   },
 
   /** Send preview-song to beamers — show get-ready screen without starting audio */

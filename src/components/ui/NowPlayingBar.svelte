@@ -154,11 +154,16 @@
         <button
           class="ctrl-btn ctrl-play"
           class:is-blocked={!playback.canPlay}
+          class:is-buffering={playback.isLoaded && !playback.beamerReady}
           disabled={!playback.canPlay}
-          title={!playback.canPlay ? 'Open a display first' : 'Play'}
+          title={!playback.canPlay && !playback.beamerReady ? 'Buffering video…' : !playback.canPlay ? 'Open a display first' : 'Play'}
           onclick={() => playback.play()}
         >
-          <span class="icon">play_arrow</span>
+          {#if playback.isLoaded && !playback.beamerReady}
+            <span class="icon spin">progress_activity</span>
+          {:else}
+            <span class="icon">play_arrow</span>
+          {/if}
         </button>
         {#if playback.showClearBeamers}
         <button
@@ -348,6 +353,10 @@
     cursor: not-allowed;
   }
   .ctrl-play.is-blocked:active { transform: none; }
+  .ctrl-play.is-buffering { opacity: 0.6; cursor: wait; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
 
   .ctrl-pause {
     background: var(--md-sys-color-secondary-container);

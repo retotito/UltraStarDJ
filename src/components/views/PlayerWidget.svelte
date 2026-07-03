@@ -16,8 +16,8 @@
   const mediaType = $derived.by((): MediaType => {
     const s = player.song
     if (!s) return 'none'
-    if (s.videoPath) return 'video'
-    if (s.audioPath) return 'audio'
+    if (s.audioPath) return 'audio'          // MP3 always preferred for audio
+    if (s.videoPath) return 'video'          // MP4 audio fallback (no MP3)
     if (s.youtubeId && network.isOnline) return 'youtube'
     return 'none'
   })
@@ -48,7 +48,8 @@
   onDestroy(async () => (await unlistenCountdown)())
 
   function plyrPlay() {
-    if (!plyrRef) return
+    if (!plyrRef) { console.warn('[PlayerWidget] plyrPlay called but plyrRef is null'); return }
+    console.log('[PlayerWidget] plyrPlay() — starting audio')
     const p = plyrRef.play()
     if (p instanceof Promise) p.catch(e => console.error('[PlayerWidget] plyr.play() rejected:', e))
   }
@@ -105,7 +106,7 @@
     })
     playback.registerTimeProvider(() => instance.currentTime)
     plyrRef = instance
-    console.log('[PlayerWidget] plyrYoutubeAction mounted, plyrRef set')
+    console.log('[PlayerWidget] plyrYoutubeAction mounted — audio source: YouTube', player.song?.youtubeId)
     // countdown-done IPC will trigger plyrPlay() when beamer countdown finishes
 
     return {
@@ -160,6 +161,7 @@
 
     let loadedSrc: string | undefined
     load(params)
+    console.log('[PlayerWidget] plyrAction mounted — audio source:', params.type, '→', params.src ?? (params.type === 'audio' ? params.song.audioPath : params.song.videoPath))
 
     instance.on('error', () => {
       console.warn('[PlayerWidget] media load error — format may be unsupported')

@@ -3,6 +3,7 @@
   import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
   import type { BeamerScreen } from '../../routes/beamer/+page.svelte'
   import LyricsRenderer from '$components/game/LyricsRenderer.svelte'
+  import BeamerBackground from '$components/game/BeamerBackground.svelte'
 
   let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone }: {
     screen?: BeamerScreen
@@ -65,6 +66,10 @@
 
   {:else if screen === 'preview' && payload}
     <div class="preview-screen">
+      <!-- Preload background media during preview so it's fully buffered before playback -->
+      <div class="preload-bg" aria-hidden="true">
+        <BeamerBackground song={payload.song} assetBase={payload.assetBase} currentTime={0} />
+      </div>
       {#if payload.song.coverPath}
         <img
           class="preview-cover"
@@ -107,25 +112,28 @@
 
   {:else if (screen === 'playing' || screen === 'paused') && payload}
     <div class="playing-screen">
-      <div class="now-playing-header">
-        <span class="np-artist">{payload.song.artist}</span>
-        <span class="np-title">{payload.song.title}</span>
-        {#if screen === 'paused'}
-          <span class="paused-badge">PAUSED</span>
-        {/if}
-      </div>
-      <div class="lyrics-area">
-        {#if payload.song.notes && payload.song.notes.length > 0}
-          <LyricsRenderer
-            tracks={payload.song.notes}
-            {currentTime}
-            bpm={payload.song.bpm}
-            gap={payload.song.gap}
-            videoGap={payload.song.videoGap ?? 0}
-          />
-        {:else}
-          <span class="lyrics-placeholder">♪ No lyrics available ♪</span>
-        {/if}
+      <BeamerBackground song={payload.song} assetBase={payload.assetBase} {currentTime} />
+      <div class="playing-overlay">
+        <div class="now-playing-header">
+          <span class="np-artist">{payload.song.artist}</span>
+          <span class="np-title">{payload.song.title}</span>
+          {#if screen === 'paused'}
+            <span class="paused-badge">PAUSED</span>
+          {/if}
+        </div>
+        <div class="lyrics-area">
+          {#if payload.song.notes && payload.song.notes.length > 0}
+            <LyricsRenderer
+              tracks={payload.song.notes}
+              {currentTime}
+              bpm={payload.song.bpm}
+              gap={payload.song.gap}
+              videoGap={payload.song.videoGap ?? 0}
+            />
+          {:else}
+            <span class="lyrics-placeholder">♪ No lyrics available ♪</span>
+          {/if}
+        </div>
       </div>
     </div>
 
@@ -205,6 +213,7 @@
 
   /* ── Preview ── */
   .preview-screen {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -263,10 +272,19 @@
 
   /* ── Countdown ── */
   .countdown-screen {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-8);
+  }
+
+  .preload-bg {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
   }
 
   .song-splash {
@@ -304,11 +322,24 @@
 
   /* ── Playing ── */
   .playing-screen {
-    display: flex;
-    flex-direction: column;
+    position: relative;
     width: 100%;
     height: 100%;
+    overflow: hidden;
+  }
+
+  .playing-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
     padding: var(--space-6);
+    background: linear-gradient(to bottom,
+      rgba(0,0,0,0.55) 0%,
+      rgba(0,0,0,0.1) 40%,
+      rgba(0,0,0,0.1) 60%,
+      rgba(0,0,0,0.7) 100%
+    );
   }
 
   .now-playing-header {

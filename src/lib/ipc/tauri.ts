@@ -22,6 +22,7 @@ export const IPC_EVENTS = {
   SCREEN_CONFIG: 'ultrastar:screen-config',
   TIME_TICK:     'ultrastar:time-tick',
   COUNTDOWN_DONE: 'ultrastar:countdown-done',
+  BEAMER_READY:   'ultrastar:beamer-ready',
 } as const
 
 // ── Window labels ──────────────────────────────────────────────
@@ -158,6 +159,14 @@ export async function sendCountdownDone(): Promise<void> {
 
 export function onCountdownDone(handler: () => void): Promise<UnlistenFn> {
   return listen(IPC_EVENTS.COUNTDOWN_DONE, () => handler())
+}
+
+export async function sendBeamerReady(): Promise<void> {
+  await emit(IPC_EVENTS.BEAMER_READY, {})
+}
+
+export function onBeamerReady(handler: () => void): Promise<UnlistenFn> {
+  return listen(IPC_EVENTS.BEAMER_READY, () => handler())
 }
 
 export function onTimeTick(
