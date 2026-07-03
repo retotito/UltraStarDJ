@@ -79,6 +79,15 @@ export async function closeDisplayWindow(label: string): Promise<void> {
   if (win) await win.close()
 }
 
+// ── Display window close detection ────────────────────────────
+/** Calls handler with the closed window's label whenever a display window is destroyed. */
+/** Listen for close on a specific display window by label. */
+export async function watchDisplayWindow(label: string, onClosed: () => void): Promise<UnlistenFn> {
+  return listen('tauri://destroyed', () => onClosed(), {
+    target: { kind: 'Window', label },
+  })
+}
+
 // ── Screen config ──────────────────────────────────────────────
 export async function sendScreenConfig(payload: ScreenConfigPayload): Promise<void> {
   await emit(IPC_EVENTS.SCREEN_CONFIG, payload)
