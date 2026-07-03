@@ -1,6 +1,7 @@
 <script lang="ts">
   import { displaysStore } from '$lib/stores/displays.svelte'
   import { playersStore } from '$lib/stores/players.svelte'
+  import { playback } from '$lib/stores/playback.svelte'
 
   import {
     openBeamerWindow,
@@ -39,7 +40,12 @@
         if (id === 1) await openBeamerWindow()
         else await openBeamer2Window()
         displaysStore.setOpen(id, true)
-        watchDisplayWindow(display.label, () => displaysStore.setOpen(id, false))
+        watchDisplayWindow(display.label, async () => {
+          displaysStore.setOpen(id, false)
+          // If no beamers remain open and playback is active, abort
+          const anyOpen = displaysStore.display1.open || displaysStore.display2.open
+          if (!anyOpen && playback.isActive) await playback.stop()
+        })
         setTimeout(() => sendScreenConfig({
           windowLabel: display.label,
           playerIds: display.playerIds,

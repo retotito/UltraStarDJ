@@ -26,6 +26,8 @@ export const playback = {
   get isActive() { return state.status === 'playing' || state.status === 'paused' },
   /** Cannot load a new song while playing or paused */
   get canLoad()  { return state.status === 'idle' || state.status === 'loaded' },
+  /** Can only start playback when a song is loaded and at least one beamer is open */
+  get canPlay()  { return state.status === 'loaded' && (displaysStore.display1.open || displaysStore.display2.open) },
 
   /** Load a song into the player without starting playback */
   load(song: Song) {

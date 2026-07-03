@@ -96,7 +96,12 @@
       <!-- Transport controls -->
       <div class="controls">
         {#if playback.status === 'loaded'}
-          <button class="btn btn-icon" title="Play" onclick={() => playback.play()}>
+          <button
+            class="btn btn-icon"
+            disabled={!playback.canPlay}
+            title={!playback.canPlay ? 'Open a display first' : 'Play'}
+            onclick={() => playback.play()}
+          >
             <span class="icon">play_arrow</span>
           </button>
         {:else if playback.status === 'playing'}
