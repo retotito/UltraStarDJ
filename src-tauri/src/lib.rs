@@ -66,15 +66,12 @@ fn which_ffmpeg(name: &str) -> Option<PathBuf> {
 #[tauri::command]
 async fn transcode_to_mp4(app: tauri::AppHandle, input: String) -> Result<String, String> {
     let ffmpeg = ffmpeg_path(&app)?;
-    eprintln!("[transcode] ffmpeg binary: {:?}", ffmpeg);
-    eprintln!("[transcode] input: {}", input);
 
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
     let out = std::env::temp_dir().join(format!("ultrastardj_preview_{}.mp4", ts));
-    eprintln!("[transcode] output: {:?}", out);
 
     let result = std::process::Command::new(&ffmpeg)
         .args([
@@ -90,7 +87,6 @@ async fn transcode_to_mp4(app: tauri::AppHandle, input: String) -> Result<String
         .output()
         .map_err(|e| format!("Failed to launch FFmpeg: {}", e))?;
 
-    eprintln!("[transcode] exit status: {}", result.status);
     if !result.status.success() {
         let stderr = String::from_utf8_lossy(&result.stderr);
         return Err(format!("FFmpeg failed ({}): {}", result.status, &stderr[stderr.len().saturating_sub(500)..]))
