@@ -7,12 +7,12 @@
 
   let { player, devices }: { player: PlayerConfig; devices: AudioInputDevice[] } = $props()
 
-  // Exact "deviceId|channel" entries taken by OTHER players
-  const takenEntries = $derived(
-    new Set(
+  // Exact "deviceId|channel" entries taken by OTHER active players, with player info
+  const takenByMap = $derived(
+    new Map(
       playersStore.all
         .filter(p => p.id !== player.id && p.mic?.deviceId)
-        .map(p => `${p.mic!.deviceId}|${p.mic!.channel}`)
+        .map(p => [`${p.mic!.deviceId}|${p.mic!.channel}`, p])
     )
   )
 
@@ -22,13 +22,16 @@
       if (d.channels >= 2) {
         const leftKey  = `${d.id}|left`
         const rightKey = `${d.id}|right`
+        const leftOwner  = takenByMap.get(leftKey)
+        const rightOwner = takenByMap.get(rightKey)
         return [
-          { value: leftKey,  label: takenEntries.has(leftKey)  ? `${d.name} — Left (in use)`  : `${d.name} — Left`,  disabled: takenEntries.has(leftKey) },
-          { value: rightKey, label: takenEntries.has(rightKey) ? `${d.name} — Right (in use)` : `${d.name} — Right`, disabled: takenEntries.has(rightKey) },
+          { value: leftKey,  label: `${d.name} — Left`,  disabled: !!leftOwner,  takenBy: leftOwner  ? { label: `P${leftOwner.id}`, color: leftOwner.color }  : undefined },
+          { value: rightKey, label: `${d.name} — Right`, disabled: !!rightOwner, takenBy: rightOwner ? { label: `P${rightOwner.id}`, color: rightOwner.color } : undefined },
         ]
       }
       const monoKey = `${d.id}|mono`
-      return [{ value: monoKey, label: takenEntries.has(monoKey) ? `${d.name} (in use)` : d.name, disabled: takenEntries.has(monoKey) }]
+      const monoOwner = takenByMap.get(monoKey)
+      return [{ value: monoKey, label: d.name, disabled: !!monoOwner, takenBy: monoOwner ? { label: `P${monoOwner.id}`, color: monoOwner.color } : undefined }]
     }),
   ])
 

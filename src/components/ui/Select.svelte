@@ -3,6 +3,7 @@
     value: string
     label: string
     disabled?: boolean
+    takenBy?: { label: string; color: string }
   }
 
   interface Props {
@@ -74,6 +75,11 @@
         disabled={opt.disabled}
         onclick={() => select(opt.value)}
       >
+        <span class="badge-slot">
+          {#if opt.takenBy}
+            <span class="taken-badge" style="background: {opt.takenBy.color}">{opt.takenBy.label}</span>
+          {/if}
+        </span>
         <div class="item-label">{opt.label}</div>
         {#if opt.value === value}
           <span class="icon icon-sm">check</span>
@@ -142,6 +148,23 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .badge-slot {
+    flex-shrink: 0;
+    width: 24px;
+    display: flex;
+    align-items: center;
+  }
+
+  .taken-badge {
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+    color: #fff;
+    letter-spacing: 0.03em;
   }
 
   .select-backdrop {
