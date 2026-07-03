@@ -3,6 +3,7 @@
   import type { AudioInputDevice } from '$lib/ipc/tauri'
   import { startMicMonitor, stopMicMonitor } from '$lib/ipc/tauri'
   import Select from '$components/ui/Select.svelte'
+  import MicLevelMeter from '$components/ui/MicLevelMeter.svelte'
 
   let { player, devices }: { player: PlayerConfig; devices: AudioInputDevice[] } = $props()
 
@@ -47,14 +48,7 @@
   const accent = $derived(COLOR_MAP[player.color] ?? 'var(--player-1)')
   const isMonitoring = $derived(playersStore.monitoringIds.has(player.id))
   const isDisconnected = $derived(playersStore.disconnectedIds.has(player.id))
-  const level = $derived(playersStore.levels[player.id] ?? 0)
-
-  // level bar color thresholds
-  const barColor = $derived(
-    level > 0.85 ? '#f75f5f' :
-    level > 0.5  ? '#f7c84f' :
-                   accent
-  )
+  const level = $derived(Math.min(1, (playersStore.levels[player.id] ?? 0) * player.gain))
 
   async function toggleMonitor() {
     if (isMonitoring) {
@@ -143,11 +137,22 @@
     </div>
 
     <!-- Level meter -->
-    <div class="level-meter" aria-label="Mic level">
-      <div
-        class="level-fill"
-        style="width: {Math.round(level * 100)}%; background: {barColor};"
-      ></div>
+    <MicLevelMeter {level} />
+
+    <!-- Gain slider -->
+    <div class="gain-row">
+      <span class="icon gain-icon">tune</span>
+      <input
+        type="range"
+        class="gain-slider"
+        min="0"
+        max="2"
+        step="0.05"
+        value={player.gain}
+        oninput={e => playersStore.setGain(player.id, parseFloat((e.target as HTMLInputElement).value))}
+        aria-label="Mic gain"
+      />
+      <span class="gain-value">{Math.round(player.gain * 100)}%</span>
     </div>
   {/if}
 </div>
@@ -253,19 +258,36 @@
     font-size: 14px;
   }
 
-  /* ── Level meter ── */
-  .level-meter {
-    height: 10px;
-    background: var(--md-sys-color-surface-container-high);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-    margin-top: var(--space-1);
+  /* ── Gain slider ── */
+  .gain-row {
+    position: relative;
+    padding-left: 24px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
 
-  .level-fill {
-    height: 100%;
-    border-radius: var(--radius-full);
-    transition: width 60ms linear, background 200ms ease;
-    min-width: 2px;
+  .gain-icon {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .gain-slider {
+    flex: 1;
+    height: 4px;
+    accent-color: var(--md-sys-color-primary);
+    cursor: pointer;
+  }
+
+  .gain-value {
+    font-size: var(--text-xs);
+    color: var(--md-sys-color-on-surface-variant);
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
   }
 </style>

@@ -18,16 +18,19 @@ export interface PlayerConfig {
   /** Tailwind-style color key used for player accent, e.g. 'blue', 'red' */
   color: string
   mic: MicAssignment | null
+  /** Software gain multiplier 0.0–2.0, default 1.0 */
+  gain: number
 }
 
 const PLAYER_COLORS = ['blue', 'red', 'green', 'yellow'] as const
 
 const DEFAULTS: PlayerConfig[] = [1, 2, 3, 4].map((id, i) => ({
   id: id as PlayerConfig['id'],
-  active: id <= 2, // P1 + P2 on by default
+  active: id <= 2,
   name: `Player ${id}`,
   color: PLAYER_COLORS[i],
   mic: null,
+  gain: 1.0,
 }))
 
 let players = $state<PlayerConfig[]>(structuredClone(DEFAULTS))
@@ -72,6 +75,11 @@ export const playersStore = {
 
   setMic(id: number, mic: MicAssignment | null) {
     players = players.map(p => p.id === id ? { ...p, mic } : p)
+    playersStore.save()
+  },
+
+  setGain(id: number, gain: number) {
+    players = players.map(p => p.id === id ? { ...p, gain: Math.round(gain * 100) / 100 } : p)
     playersStore.save()
   },
 
