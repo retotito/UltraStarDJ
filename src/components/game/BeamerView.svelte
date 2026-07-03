@@ -2,11 +2,13 @@
   import { onMount, onDestroy } from 'svelte'
   import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
   import type { BeamerScreen } from '../../routes/beamer/+page.svelte'
+  import LyricsRenderer from '$components/game/LyricsRenderer.svelte'
 
-  let { screen = 'idle', payload, assignedPlayerIds = [], onCountdownDone }: {
+  let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone }: {
     screen?: BeamerScreen
     payload: PlaySongPayload | PreviewSongPayload | null
     assignedPlayerIds?: number[]
+    currentTime?: number
     onCountdownDone?: () => void
   } = $props()
 
@@ -113,7 +115,17 @@
         {/if}
       </div>
       <div class="lyrics-area">
-        <span class="lyrics-placeholder">♪ Lyrics coming in Sprint 7 ♪</span>
+        {#if payload.song.notes && payload.song.notes.length > 0}
+          <LyricsRenderer
+            tracks={payload.song.notes}
+            {currentTime}
+            bpm={payload.song.bpm}
+            gap={payload.song.gap}
+            videoGap={payload.song.videoGap ?? 0}
+          />
+        {:else}
+          <span class="lyrics-placeholder">♪ No lyrics available ♪</span>
+        {/if}
       </div>
     </div>
 

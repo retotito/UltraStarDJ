@@ -82,7 +82,68 @@ function extractYoutubeId(value: string): string | null {
 }
 
 
-/** Video formats that will be attempted. macOS AVFoundation handles mpeg/mpg via WKWebView. */
+/**
+ * Parse the note lines from a UltraStar .txt file into NoteTrack[].
+ * Call this on-demand when a song is about to be played.
+ */
+export function parseSongNotes(text: string): import('./types').NoteTrack[] {
+  const lines = text.split('\n')
+  const tracks: import('./types').NoteTrack[] = []
+  let currentPlayer = 0
+  let currentLines: import('./types').LyricLine[] = []
+  let currentNotes: import('./types').Note[] = []
+  let currentLineStart = 0
+
+  const NOTE_TYPES: Record<string, import('./types').NoteType> = {
+    ':': 'normal', '*': 'golden', 'F': 'freestyle', 'R': 'rap', 'G': 'rap-golden',
+  }
+
+  function flushLine() {
+    if (currentNotes.length > 0) {
+      currentLines.push({ startBeat: currentLineStart, notes: currentNotes })
+      currentNotes = []
+    }
+  }
+
+  function flushTrack() {
+    flushLine()
+    if (currentLines.length > 0) {
+      tracks.push({ player: currentPlayer, lines: currentLines })
+      currentLines = []
+    }
+  }
+
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+
+    if (line === 'P1' || line === 'P 1') { flushTrack(); currentPlayer = 0; continue }
+    if (line === 'P2' || line === 'P 2') { flushTrack(); currentPlayer = 1; continue }
+    if (line === 'E') { flushTrack(); break }
+
+    const noteType = NOTE_TYPES[line[0]]
+    if (noteType) {
+      const parts = line.slice(1).trim().split(/\s+/)
+      const startBeat   = parseInt(parts[0], 10)
+      const lengthBeats = parseInt(parts[1], 10)
+      const pitch       = parseInt(parts[2], 10)
+      const syllable    = parts.slice(3).join(' ')
+      currentNotes.push({ type: noteType, startBeat, lengthBeats, pitch, syllable })
+      continue
+    }
+
+    if (line[0] === '-') {
+      const parts = line.slice(1).trim().split(/\s+/)
+      const nextLineStart = parseInt(parts[0], 10)
+      flushLine()
+      currentLineStart = nextLineStart
+    }
+  }
+
+  flushTrack()
+  return tracks
+}
+
 const SUPPORTED_VIDEO_EXTS = new Set(['.mp4', '.m4v', '.webm', '.mov', '.mpg', '.mpeg', '.avi'])
 
 function resolveSibling(txtPath: string, filename: string): string {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { onPlaySong, onPreviewSong, onStopSong, onPauseSong, onResumeSong, onScreenConfig, getWindowLabel } from '$lib/ipc/tauri'
+  import { onPlaySong, onPreviewSong, onStopSong, onPauseSong, onResumeSong, onScreenConfig, onTimeTick, getWindowLabel } from '$lib/ipc/tauri'
   import type { UnlistenFn } from '@tauri-apps/api/event'
   import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
   import BeamerView from '$components/game/BeamerView.svelte'
@@ -10,6 +10,7 @@
   let screen = $state<BeamerScreen>('idle')
   let currentPayload = $state<PlaySongPayload | PreviewSongPayload | null>(null)
   let assignedPlayerIds = $state<number[]>([])
+  let currentTime = $state(0)
   let unlisteners: UnlistenFn[] = []
 
   const windowLabel = getWindowLabel()
@@ -48,6 +49,7 @@
           assignedPlayerIds = cfg.playerIds
         }
       }),
+      onTimeTick(t => { currentTime = t }),
     ])
   })
 
@@ -58,5 +60,5 @@
   }
 </script>
 
-<BeamerView {screen} payload={currentPayload} {assignedPlayerIds} onCountdownDone={onCountdownDone} />
+<BeamerView {screen} payload={currentPayload} {assignedPlayerIds} {currentTime} onCountdownDone={onCountdownDone} />
 

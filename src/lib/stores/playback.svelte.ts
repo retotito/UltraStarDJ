@@ -6,7 +6,9 @@
 import type { Song } from '$lib/ultrastar/types'
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
-import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong } from '$lib/ipc/tauri'
+import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick } from '$lib/ipc/tauri'
+import { readFile } from '$lib/ipc/tauri'
+import { parseSongNotes } from '$lib/ultrastar/parser'
 import { convertFileSrc } from '@tauri-apps/api/core'
 
 export type PlaybackStatus = 'idle' | 'loaded' | 'preview' | 'playing' | 'paused'
@@ -18,6 +20,21 @@ interface PlaybackState {
 
 let state = $state<PlaybackState>({ status: 'idle', song: null })
 let showClearBeamers = $state(false)
+
+// ── Time-tick loop ────────────────────────────────────────────
+let getTime: (() => number) | null = null
+let tickInterval: ReturnType<typeof setInterval> | null = null
+
+function startTick() {
+  if (tickInterval) return
+  tickInterval = setInterval(() => {
+    if (getTime) sendTimeTick(getTime())
+  }, 100)
+}
+
+function stopTick() {
+  if (tickInterval) { clearInterval(tickInterval); tickInterval = null }
+}
 
 export const playback = {
   get status() { return state.status },
@@ -31,6 +48,10 @@ export const playback = {
   /** Can only start playback when a song is loaded and at least one beamer is open */
   get canPlay()  { return (state.status === 'loaded' || state.status === 'preview') && (displaysStore.display1.open || displaysStore.display2.open) },
   get showClearBeamers() { return showClearBeamers },
+
+  /** Called by PlayerWidget to register how to get current playback time */
+  registerTimeProvider(fn: () => number) { getTime = fn },
+  unregisterTimeProvider() { getTime = null },
 
   /** Load a song into the player without starting playback */
   load(song: Song) {
@@ -63,7 +84,19 @@ export const playback = {
     if ((state.status !== 'loaded' && state.status !== 'preview') || !state.song) return
     const song = state.song
     state.status = 'playing'
+    startTick()
     const assetBase = convertFileSrc('')
+
+    // Parse notes on-demand if not already loaded
+    if (!song.notes && song.txtPath) {
+      try {
+        const txt = await readFile(song.txtPath)
+        song.notes = parseSongNotes(txt)
+      } catch (e) {
+        console.warn('[playback] failed to parse notes', e)
+      }
+    }
+
     for (const display of [displaysStore.display1, displaysStore.display2]) {
       if (display.open) {
         await sendPlaySong({
@@ -79,18 +112,21 @@ export const playback = {
   async pause() {
     if (state.status !== 'playing') return
     state.status = 'paused'
+    stopTick()
     await sendPauseSong()
   },
 
   async resume() {
     if (state.status !== 'paused') return
     state.status = 'playing'
+    startTick()
     await sendResumeSong()
   },
 
   /** Stop playback — song stays loaded in the bar */
   async stop() {
     if (state.status === 'idle') return
+    stopTick()
     state.status = 'loaded'
     showClearBeamers = true
     await sendStopSong()

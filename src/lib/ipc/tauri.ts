@@ -20,6 +20,7 @@ export const IPC_EVENTS = {
   PAUSE_SONG:    'ultrastar:pause-song',
   RESUME_SONG:   'ultrastar:resume-song',
   SCREEN_CONFIG: 'ultrastar:screen-config',
+  TIME_TICK:     'ultrastar:time-tick',
 } as const
 
 // ── Window labels ──────────────────────────────────────────────
@@ -144,6 +145,16 @@ export function onPauseSong(handler: () => void): Promise<UnlistenFn> {
 
 export function onResumeSong(handler: () => void): Promise<UnlistenFn> {
   return listen(IPC_EVENTS.RESUME_SONG, () => handler())
+}
+
+export async function sendTimeTick(currentTime: number): Promise<void> {
+  await emit(IPC_EVENTS.TIME_TICK, { currentTime })
+}
+
+export function onTimeTick(
+  handler: (currentTime: number) => void
+): Promise<UnlistenFn> {
+  return listen<{ currentTime: number }>(IPC_EVENTS.TIME_TICK, e => handler(e.payload.currentTime))
 }
 
 // ── File system ────────────────────────────────────────────────

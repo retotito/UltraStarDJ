@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte'
   import Plyr from 'plyr'
   import 'plyr/dist/plyr.css'
   import { untrack } from 'svelte'
@@ -79,6 +80,8 @@
       resetOnEnd: true,
     })
 
+    playback.registerTimeProvider(() => instance.currentTime)
+
     function mimeForPath(path: string): string {
       const ext = path.split('.').pop()?.toLowerCase() ?? ''
       const map: Record<string, string> = {
@@ -115,6 +118,7 @@
         load(newParams)
       },
       destroy() {
+        playback.unregisterTimeProvider()
         try { instance.destroy() } catch {}
       },
     }
