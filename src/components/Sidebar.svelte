@@ -179,11 +179,14 @@
   .players-popover {
     position: fixed;
     left: 64px;
-    top: 108px;
+    top: 98px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
     width: 380px;
+    max-height: calc(100vh - 124px);
+    display: flex;
+    flex-direction: column;
     z-index: var(--z-overlay);
     box-shadow: var(--elevation-2);
     overflow: hidden;

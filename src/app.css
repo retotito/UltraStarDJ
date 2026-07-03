@@ -433,6 +433,13 @@ a {
 .btn-filled:hover { opacity: 0.88; }
 .btn-filled:active { box-shadow: none; }
 
+/* Danger — destructive / stop action */
+.btn-danger {
+  background: #f75f5f;
+  color: #fff;
+}
+.btn-danger:hover { opacity: 0.88; }
+
 /* Tonal — secondary action */
 .btn-tonal {
   background: var(--md-sys-color-primary-container);

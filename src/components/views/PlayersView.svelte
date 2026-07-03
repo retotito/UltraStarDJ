@@ -52,7 +52,13 @@
     })
   })
 
-  onDestroy(() => {
+  onDestroy(async () => {
+    // Stop all active mic monitors when the panel closes
+    for (const id of playersStore.monitoringIds) {
+      await stopMicMonitor(id).catch(() => {})
+      playersStore.setMonitoring(id, false)
+      playersStore.setLevel(id, 0)
+    }
     unlistenLevel?.()
     unlistenDisconnected?.()
     unlistenReconnected?.()
@@ -98,6 +104,9 @@
     gap: var(--space-3);
     padding: var(--space-3);
     width: 100%;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
   }
 
   .view-header {
@@ -125,5 +134,8 @@
     flex-direction: column;
     gap: var(--space-3);
     width: 100%;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
   }
 </style>

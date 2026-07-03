@@ -127,6 +127,7 @@
       <button
         class="btn btn-sm"
         class:is-active={isMonitoring}
+        class:btn-danger={isMonitoring}
         disabled={!player.mic}
         onclick={toggleMonitor}
       >
