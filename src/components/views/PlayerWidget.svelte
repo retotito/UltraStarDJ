@@ -5,7 +5,7 @@
   import { player } from '$lib/stores/player.svelte'
   import { songQueue } from '$lib/stores/queue.svelte'
   import { network } from '$lib/stores/network.svelte'
-  import { toAssetUrl, toBlobUrl, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
+  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
 
@@ -20,9 +20,10 @@
     return 'none'
   })
 
-  // Cover uses blob (images work fine as blobs)
-  let coverBlobUrl = $state<string | null>(null)
-  const coverSrc = $derived(coverBlobUrl ?? placeholderSrc)
+  // Cover: synchronous media:// URL — no async, no timing issues
+  const coverSrc = $derived(
+    player.song?.coverPath ? toAssetUrl(player.song.coverPath) : placeholderSrc
+  )
 
   const isOfflineYoutube = $derived(
     !!player.song?.youtubeId && !player.song?.videoPath && !player.song?.audioPath && !network.isOnline
@@ -35,10 +36,8 @@
 
   $effect(() => {
     const song = player.song
-    coverBlobUrl = null
 
-    // Clean up previous temp file — use untrack so reading transcodedPath
-    // does NOT create a reactive dependency (would cause an infinite loop)
+    // Clean up previous temp file
     const prev = untrack(() => transcodedPath)
     transcodedPath = null
     transcoding = false
@@ -46,14 +45,20 @@
     if (prev) deleteTempFile(prev).catch(() => {})
 
     if (!song) return
-    if (song.coverPath) toBlobUrl(song.coverPath).then(u => { coverBlobUrl = u }).catch(console.error)
 
-    // Kick off transcoding for unsupported formats
     if (song.videoPath && needsTranscode(song.videoPath)) {
       transcoding = true
       transcodeToMp4(song.videoPath)
-        .then(p => { transcodedPath = p; transcoding = false })
-        .catch(e => { transcodeError = String(e); transcoding = false })
+        .then(p => {
+          if (player.song !== song) return  // song changed while transcoding — discard
+          transcodedPath = p
+          transcoding = false
+        })
+        .catch(e => {
+          if (player.song !== song) return
+          transcodeError = String(e)
+          transcoding = false
+        })
     }
   })
 
@@ -61,7 +66,7 @@
   // is tied to element lifetime, not component effects.
   function plyrAction(
     node: HTMLAudioElement | HTMLVideoElement,
-    params: { song: Song; type: 'audio' | 'video'; src?: string }
+    params: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }
   ) {
     const instance = new Plyr(node, {
       controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume'],
@@ -79,14 +84,21 @@
       return map[ext] ?? (params.type === 'audio' ? 'audio/mpeg' : 'video/mp4')
     }
 
-    function load(p: { song: Song; type: 'audio' | 'video'; src?: string }) {
+    function load(p: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }) {
       const filePath = p.src ?? (p.type === 'audio' ? p.song.audioPath : p.song.videoPath)
       if (!filePath) return
+      if (filePath === loadedSrc) return  // poster-only update — skip reload
+      loadedSrc = filePath
       const src = toAssetUrl(filePath)
       const type = mimeForPath(filePath)
-      instance.source = { type: p.type, sources: [{ src, type }] }
+      instance.source = {
+        type: p.type,
+        sources: [{ src, type }],
+        ...(p.type === 'video' && p.poster ? { poster: p.poster } : {}),
+      }
     }
 
+    let loadedSrc: string | undefined
     load(params)
 
     instance.on('error', () => {
@@ -94,7 +106,7 @@
     })
 
     return {
-      update(newParams: { song: Song; type: 'audio' | 'video'; src?: string }) {
+      update(newParams: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }) {
         load(newParams)
       },
       destroy() {
@@ -111,6 +123,7 @@
 <div class="player-widget">
   {#if player.song}
     <div class="media-area">
+      {#key player.song}
       {#if mediaType === 'video' && player.song.videoPath}
         {#if needsTranscode(player.song.videoPath)}
           {#if transcoding}
@@ -125,16 +138,12 @@
             </div>
           {:else if transcodedPath}
             <!-- svelte-ignore a11y_media_has_caption -->
-            <video use:plyrAction={{ song: player.song, type: 'video', src: transcodedPath }} playsinline></video>
+            <video use:plyrAction={{ song: player.song, type: 'video', src: transcodedPath, poster: coverSrc }} playsinline></video>
           {/if}
         {:else}
           <!-- svelte-ignore a11y_media_has_caption -->
-          <video use:plyrAction={{ song: player.song, type: 'video' }} playsinline></video>
+          <video use:plyrAction={{ song: player.song, type: 'video', poster: coverSrc }} playsinline></video>
         {/if}
-
-
-        <!-- svelte-ignore a11y_media_has_caption -->
-        <video use:plyrAction={{ song: player.song, type: 'video' }} playsinline></video>
 
       {:else if mediaType === 'youtube' && player.song.youtubeId}
         <div class="yt-embed">
@@ -162,7 +171,11 @@
           <img src={placeholderSrc} alt="No media" />
         </div>
       {/if}
+      {/key}
     </div>
+
+    <!-- DEBUG: cover test -->
+    <img src={coverSrc} alt="cover-debug" style="width:80px;height:80px;object-fit:cover;border:2px solid red;" />
 
     <div class="song-info">
       <p class="song-title truncate">{player.song.title}</p>

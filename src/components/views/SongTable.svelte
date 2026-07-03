@@ -48,7 +48,7 @@
   function closeMenu() { menuSongId = null }
 
   function handleRowClick(song: Song) {
-    // Show song in player widget
+    player.clear()   // destroy current player first
     player.load(song)
   }
 
@@ -154,7 +154,7 @@
     style="left: {menuPos.x}px; top: {menuPos.y}px"
     role="menu"
   >
-    <button class="menu-item" role="menuitem" onclick={() => { player.load(menuSong); closeMenu() }}>
+    <button class="menu-item" role="menuitem" onclick={() => { player.clear(); player.load(menuSong); closeMenu() }}>
       <span class="icon icon-sm">play_arrow</span> Preview
     </button>
     <button class="menu-item" role="menuitem" onclick={() => addToQueue(menuSong)}>

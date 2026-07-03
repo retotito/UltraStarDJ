@@ -631,15 +631,15 @@ a {
    Plyr player theme — MD3 dark tokens
    ========================================================== */
 :root {
-  --plyr-color-main: var(--md-sys-color-primary);
+  --plyr-color-main: rgba(255, 255, 255, 0.18);
   /* Audio controls bar */
   --plyr-audio-controls-background: rgba(0, 0, 0, 0.55);
   --plyr-audio-control-color: #fff;
-  --plyr-audio-control-color-hover: var(--md-sys-color-primary);
+  --plyr-audio-control-color-hover: #fff;
   /* Video controls */
   --plyr-video-controls-background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.6));
   --plyr-video-control-color: #fff;
-  --plyr-video-control-color-hover: var(--md-sys-color-primary);
+  --plyr-video-control-color-hover: #fff;
   --plyr-control-radius: var(--radius-sm);
   --plyr-font-family: var(--font-sans);
   --plyr-font-size-base: var(--text-xs);
@@ -653,9 +653,6 @@ a {
   --plyr-tooltip-color: var(--md-sys-color-on-surface);
   --plyr-tooltip-radius: var(--radius-sm);
 }
-
-/* Remove Plyr's default black poster/overlay behind video before playback */
-.plyr__poster { background-color: transparent !important; }
 
 /* Force video compositing layer — fixes black video in some WebViews */
 .plyr__video-wrapper video {

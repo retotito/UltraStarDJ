@@ -30,6 +30,9 @@ export const player = {
   load(song: Song) {
     state = { status: 'loading', song, positionMs: 0, durationMs: 0 }
   },
+  clear() {
+    state = { status: 'idle', song: null, positionMs: 0, durationMs: 0 }
+  },
   play() {
     if (state.song) state.status = 'playing'
   },
