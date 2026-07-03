@@ -75,14 +75,35 @@
       </button>
     </div>
 
-    <div class="card-body">
-      <!-- Song info -->
+    <!-- Status message bar -->
+    {#if !displaysStore.display1.open && !displaysStore.display2.open}
+      <div class="status-bar status-warn">
+        <span class="icon" style="font-size:16px">tv_off</span>
+        No display open — open a display to start
+      </div>
+    {:else if playback.status === 'playing'}
+      <div class="status-bar status-playing">
+        <span class="icon" style="font-size:16px">fiber_manual_record</span>
+        Now playing
+      </div>
+    {:else if playback.status === 'paused'}
+      <div class="status-bar status-paused">
+        <span class="icon" style="font-size:16px">pause_circle</span>
+        Paused
+      </div>
+    {:else}
+      <div class="status-bar status-ready">
+        <span class="icon" style="font-size:16px">check_circle</span>
+        Ready — press play to start
+      </div>
+    {/if}
+
+    <!-- Song info + badges -->
+    <div class="song-section">
       <div class="song-info">
         <span class="song-title">{playback.song.title}</span>
-        <span class="song-artist text-muted text-sm">{playback.song.artist}</span>
+        <span class="song-artist">{playback.song.artist}</span>
       </div>
-
-      <!-- Player badges -->
       {#if allPlayerIds.length > 0}
         <div class="player-badges">
           {#each allPlayerIds as id (id)}
@@ -92,34 +113,35 @@
           {/each}
         </div>
       {/if}
+    </div>
 
-      <!-- Transport controls -->
-      <div class="controls">
-        {#if playback.status === 'loaded'}
-          <button
-            class="btn btn-icon"
-            disabled={!playback.canPlay}
-            title={!playback.canPlay ? 'Open a display first' : 'Play'}
-            onclick={() => playback.play()}
-          >
-            <span class="icon">play_arrow</span>
-          </button>
-        {:else if playback.status === 'playing'}
-          <button class="btn btn-icon" title="Pause" onclick={() => playback.pause()}>
-            <span class="icon">pause</span>
-          </button>
-          <button class="btn btn-icon btn-danger" title="Stop" onclick={() => playback.stop()}>
-            <span class="icon">stop</span>
-          </button>
-        {:else if playback.status === 'paused'}
-          <button class="btn btn-icon" title="Resume" onclick={() => playback.resume()}>
-            <span class="icon">play_arrow</span>
-          </button>
-          <button class="btn btn-icon btn-danger" title="Stop" onclick={() => playback.stop()}>
-            <span class="icon">stop</span>
-          </button>
-        {/if}
-      </div>
+    <!-- Transport controls -->
+    <div class="controls">
+      {#if playback.status === 'loaded'}
+        <button
+          class="ctrl-btn ctrl-play"
+          class:is-blocked={!playback.canPlay}
+          disabled={!playback.canPlay}
+          title={!playback.canPlay ? 'Open a display first' : 'Play'}
+          onclick={() => playback.play()}
+        >
+          <span class="icon">play_arrow</span>
+        </button>
+      {:else if playback.status === 'playing'}
+        <button class="ctrl-btn ctrl-pause" title="Pause" onclick={() => playback.pause()}>
+          <span class="icon">pause</span>
+        </button>
+        <button class="ctrl-btn ctrl-stop" title="Stop" onclick={() => playback.stop()}>
+          <span class="icon">stop</span>
+        </button>
+      {:else if playback.status === 'paused'}
+        <button class="ctrl-btn ctrl-play" title="Resume" onclick={() => playback.resume()}>
+          <span class="icon">play_arrow</span>
+        </button>
+        <button class="ctrl-btn ctrl-stop" title="Stop" onclick={() => playback.stop()}>
+          <span class="icon">stop</span>
+        </button>
+      {/if}
     </div>
   </div>
 {/if}
@@ -134,33 +156,30 @@
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    min-width: 320px;
-    max-width: 480px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    width: 420px;
     user-select: none;
   }
 
-  /* After first drag: switch to top/left absolute positioning */
   .now-playing-card.is-positioned {
     bottom: unset;
     left: unset;
     translate: none;
   }
 
+  /* ── Drag handle ── */
   .drag-handle {
-    padding: var(--space-1) var(--space-3);
+    padding: var(--space-2) var(--space-3);
     cursor: grab;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--md-sys-color-on-surface-variant);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     position: relative;
   }
   .drag-handle:hover { background: rgba(255,255,255,0.04); }
   .is-dragging .drag-handle { cursor: grabbing; }
-
-  .handle-dots { font-size: 14px; letter-spacing: 2px; opacity: 0.4; }
+  .handle-dots { font-size: 14px; letter-spacing: 2px; opacity: 0.3; }
 
   .btn-dismiss {
     position: absolute;
@@ -172,53 +191,114 @@
     cursor: pointer;
     color: var(--md-sys-color-on-surface-variant);
     opacity: 0.4;
-    padding: 2px;
+    padding: 4px;
     display: flex;
     align-items: center;
     border-radius: var(--radius-sm);
   }
   .btn-dismiss:hover { opacity: 1; background: rgba(255,255,255,0.08); }
 
-  .card-body {
+  /* ── Status bar ── */
+  .status-bar {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-2) var(--space-4) var(--space-3);
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .status-warn    { color: #f7c84f; background: rgba(247,200,79,0.08); }
+  .status-playing { color: #4ecb71; background: rgba(78,203,113,0.08); }
+  .status-paused  { color: #f7c84f; background: rgba(247,200,79,0.08); }
+  .status-ready   { color: var(--md-sys-color-on-surface-variant); }
+
+  /* ── Song info + badges ── */
+  .song-section {
+    padding: var(--space-4) var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
   }
 
   .song-info {
-    flex: 1;
-    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-1);
   }
 
   .song-title {
-    font-weight: 600;
-    font-size: var(--text-sm);
+    font-size: 1.25rem;
+    font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
+  .song-artist {
+    font-size: var(--text-sm);
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
   .player-badges {
     display: flex;
-    gap: var(--space-1);
-    flex-shrink: 0;
+    gap: var(--space-2);
   }
 
   .badge {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
-    padding: 2px 6px;
+    padding: 3px 10px;
     border-radius: var(--radius-full);
     border: 2px solid;
   }
 
+  /* ── Transport controls ── */
   .controls {
     display: flex;
-    gap: var(--space-1);
-    flex-shrink: 0;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    justify-content: center;
   }
+
+  .ctrl-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.15s, filter 0.15s;
+  }
+  .ctrl-btn :global(.icon) { font-size: 36px; }
+  .ctrl-btn:active { transform: scale(0.93); }
+
+  .ctrl-play {
+    background: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+  }
+  .ctrl-play:hover:not(:disabled) { filter: brightness(1.15); }
+  .ctrl-play.is-blocked {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .ctrl-play.is-blocked:active { transform: none; }
+
+  .ctrl-pause {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+  .ctrl-pause:hover { filter: brightness(1.15); }
+
+  .ctrl-stop {
+    background: rgba(247, 95, 95, 0.15);
+    color: #f75f5f;
+    border: 2px solid rgba(247, 95, 95, 0.4);
+  }
+  .ctrl-stop:hover { background: rgba(247, 95, 95, 0.25); }
 </style>
