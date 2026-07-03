@@ -200,3 +200,66 @@ export async function transcodeToMp4(input: string): Promise<string> {
 export async function deleteTempFile(path: string): Promise<void> {
   await invoke('delete_temp_file', { path })
 }
+
+// ── Audio / Mic ────────────────────────────────────────────────────────────
+
+export interface AudioInputDevice {
+  id: string
+  name: string
+  channels: number
+}
+
+export interface MicLevelEvent {
+  player_id: number
+  rms: number // 0.0 – 1.0
+}
+
+export interface MicDisconnectedEvent {
+  device_id: string
+  player_id: number
+}
+
+export interface MicReconnectedEvent {
+  device_id: string
+  player_id: number // 0 = unknown player (device just appeared)
+}
+
+export const MIC_EVENTS = {
+  LEVEL: 'mic:level',
+  DISCONNECTED: 'mic:disconnected',
+  RECONNECTED: 'mic:reconnected',
+  DEVICES_CHANGED: 'mic:devices-changed',
+} as const
+
+export async function listAudioInputDevices(): Promise<AudioInputDevice[]> {
+  return await invoke<AudioInputDevice[]>('list_audio_input_devices')
+}
+
+/** Start streaming RMS level events for a player's mic. channel: 'left' | 'right' | 'mono' */
+export async function startMicMonitor(
+  deviceId: string,
+  channel: 'left' | 'right' | 'mono',
+  playerId: number,
+): Promise<void> {
+  await invoke('start_mic_monitor', { deviceId, channel, playerId })
+}
+
+export async function stopMicMonitor(playerId: number): Promise<void> {
+  await invoke('stop_mic_monitor', { playerId })
+}
+
+export function onMicLevel(cb: (e: MicLevelEvent) => void): Promise<UnlistenFn> {
+  return listen<MicLevelEvent>(MIC_EVENTS.LEVEL, e => cb(e.payload))
+}
+
+export function onMicDisconnected(cb: (e: MicDisconnectedEvent) => void): Promise<UnlistenFn> {
+  return listen<MicDisconnectedEvent>(MIC_EVENTS.DISCONNECTED, e => cb(e.payload))
+}
+
+export function onMicReconnected(cb: (e: MicReconnectedEvent) => void): Promise<UnlistenFn> {
+  return listen<MicReconnectedEvent>(MIC_EVENTS.RECONNECTED, e => cb(e.payload))
+}
+
+export function onDevicesChanged(cb: (devices: AudioInputDevice[]) => void): Promise<UnlistenFn> {
+  return listen<AudioInputDevice[]>(MIC_EVENTS.DEVICES_CHANGED, e => cb(e.payload))
+}

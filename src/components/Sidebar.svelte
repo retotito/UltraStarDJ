@@ -3,9 +3,11 @@
   import { openBeamerWindow } from '$lib/ipc/tauri'
   import Modal from '$components/ui/Modal.svelte'
   import SettingsDialog from '$components/dialogs/SettingsDialog.svelte'
+  import PlayersView from '$components/views/PlayersView.svelte'
 
   let showSettings = $state(false)
   let showLayoutMenu = $state(false)
+  let showPlayers = $state(false)
 
   async function handleBeamer() {
     await openBeamerWindow()
@@ -23,9 +25,19 @@
       class:is-active={showLayoutMenu}
       data-tooltip="Layout"
       aria-label="Toggle layout options"
-      onclick={() => showLayoutMenu = !showLayoutMenu}
+      onclick={() => { showLayoutMenu = !showLayoutMenu; showPlayers = false }}
     >
       <span class="icon">dashboard</span>
+    </button>
+
+    <button
+      class="btn btn-icon"
+      class:is-active={showPlayers}
+      data-tooltip="Players"
+      aria-label="Player & mic settings"
+      onclick={() => { showPlayers = !showPlayers; showLayoutMenu = false }}
+    >
+      <span class="icon">group</span>
     </button>
   </nav>
 
@@ -81,6 +93,13 @@
         </label>
       </label>
     {/each}
+  </div>
+{/if}
+
+{#if showPlayers}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="players-popover" onmouseleave={() => showPlayers = false}>
+    <PlayersView />
   </div>
 {/if}
 
@@ -146,6 +165,17 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
+  }
+
+  .players-popover {
+    position: fixed;
+    left: 64px;
+    top: 108px; /* below layout button */
+    background: var(--md-sys-color-surface-container-high);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--radius-lg);
+    z-index: var(--z-overlay);
+    box-shadow: var(--elevation-2);
   }
 
   .popover-label {

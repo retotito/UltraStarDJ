@@ -1,5 +1,8 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::Manager;
+
+mod audio;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -103,7 +106,10 @@ fn delete_temp_file(path: String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let audio_state = Arc::new(audio::AudioState::new());
+
     tauri::Builder::default()
+        .manage(audio_state.clone())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -141,7 +147,18 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, transcode_to_mp4, delete_temp_file])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            transcode_to_mp4,
+            delete_temp_file,
+            audio::list_audio_input_devices,
+            audio::start_mic_monitor,
+            audio::stop_mic_monitor,
+        ])
+        .setup(move |app| {
+            audio::start_hotplug_watcher(app.handle().clone(), audio_state);
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

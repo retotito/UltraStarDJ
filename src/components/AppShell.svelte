@@ -1,8 +1,12 @@
 <script lang="ts">
   import { layout } from '$lib/stores/layout.svelte'
+  import { playersStore } from '$lib/stores/players.svelte'
   import Sidebar from '$components/Sidebar.svelte'
   import LibraryPanel from '$components/views/LibraryPanel.svelte'
   import RightPanel from '$components/views/RightPanel.svelte'
+  import MicDisconnectedToast from '$components/ui/MicDisconnectedToast.svelte'
+
+  playersStore.load()
 
   let isDragging = $state(false)
 
@@ -48,6 +52,8 @@
     </aside>
   {/if}
 </div>
+
+<MicDisconnectedToast />
 
 <style>
   .shell {
