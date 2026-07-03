@@ -139,7 +139,10 @@ export async function pathExists(path: string): Promise<boolean> {
  * enabling MPEG-2 and other formats that blob:/asset: URLs cannot play.
  */
 export function toAssetUrl(path: string): string {
-  const encoded = path.split('/').map(encodeURIComponent).join('/')
+  // Split on path separators, encode each segment, then also encode apostrophes
+  // (encodeURIComponent intentionally skips ' but Plyr wraps poster in url('...')
+  // which breaks if the URL contains a literal apostrophe)
+  const encoded = path.split('/').map(s => encodeURIComponent(s).replace(/'/g, '%27')).join('/')
   return `media://localhost${encoded}`
 }
 
