@@ -4,6 +4,7 @@
   import { untrack } from 'svelte'
   import { player } from '$lib/stores/player.svelte'
   import { songQueue } from '$lib/stores/queue.svelte'
+  import { playback } from '$lib/stores/playback.svelte'
   import { network } from '$lib/stores/network.svelte'
   import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
@@ -122,6 +123,10 @@
   function addToQueue() {
     if (player.song) songQueue.add(player.song)
   }
+
+  function loadIntoPlayer() {
+    if (player.song && playback.canLoad) playback.load(player.song)
+  }
 </script>
 
 <div class="player-widget">
@@ -188,8 +193,12 @@
 
     <div class="actions">
       <button class="btn btn-tonal" onclick={addToQueue}>
-        <span class="icon icon-sm">queue_music</span>
+        <span class="icon">queue_music</span>
         Add to Queue
+      </button>
+      <button class="btn btn-tonal" onclick={loadIntoPlayer} disabled={!playback.canLoad}>
+        <span class="icon">play_circle</span>
+        Load
       </button>
     </div>
 
@@ -338,8 +347,14 @@
     color: var(--md-sys-color-on-surface);
   }
 
+  .actions {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-2);
+  }
+
   .actions .btn {
-    width: 100%;
+    flex: 1;
     justify-content: center;
   }
 

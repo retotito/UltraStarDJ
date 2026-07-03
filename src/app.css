@@ -388,7 +388,7 @@ a {
   user-select: none;
   -webkit-user-select: none;
 }
-.icon-sm { font-size: 16px; }
+.icon-sm { font-size: 20px; }
 .icon-lg { font-size: 24px; }
 
 /* --- Buttons ---

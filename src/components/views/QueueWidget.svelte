@@ -5,7 +5,7 @@
   function loadSong(songId: string) {
     const song = songQueue.items.find(s => s.id === songId)
     if (!song || !playback.canLoad) return
-    songQueue.setActive(songId)
+    songQueue.remove(songId)
     playback.load(song)
   }
 </script>
@@ -40,7 +40,7 @@
               onclick={() => loadSong(song.id)}
               aria-label="Load"
             >
-              <span class="icon icon-sm">playlist_play</span>
+              <span class="icon icon-sm">play_circle</span>
             </button>
             <button class="btn btn-icon-sm" onclick={() => songQueue.moveUp(song.id)} disabled={i === 0} aria-label="Move up">
               <span class="icon icon-sm">keyboard_arrow_up</span>
@@ -60,7 +60,7 @@
   {#if songQueue.items.length > 0 && playback.canLoad}
     <div class="queue-footer">
       <button class="btn btn-filled" style="width: 100%" onclick={() => loadSong(songQueue.items[0].id)}>
-        <span class="icon icon-sm">playlist_play</span>
+        <span class="icon">play_circle</span>
         Load next song
       </button>
     </div>

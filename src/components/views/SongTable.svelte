@@ -3,6 +3,7 @@
   import { layout } from '$lib/stores/layout.svelte'
   import { songQueue } from '$lib/stores/queue.svelte'
   import { player } from '$lib/stores/player.svelte'
+  import { playback } from '$lib/stores/playback.svelte'
   import { appSettings } from '$lib/stores/settings.svelte'
 
   let { songs }: { songs: Song[] } = $props()
@@ -157,6 +158,9 @@
     <button class="menu-item" role="menuitem" onclick={() => { player.clear(); player.load(menuSong); closeMenu() }}>
       <span class="icon icon-sm">play_arrow</span> Preview
     </button>
+    <button class="menu-item" role="menuitem" onclick={() => { if (playback.canLoad) { playback.load(menuSong); closeMenu() } }} class:disabled={!playback.canLoad}>
+      <span class="icon icon-sm">play_circle</span> Load into player
+    </button>
     <button class="menu-item" role="menuitem" onclick={() => addToQueue(menuSong)}>
       <span class="icon icon-sm">queue_music</span> Add to queue
     </button>
@@ -290,6 +294,7 @@
   }
   .menu-item:hover { background: var(--color-table-row-hover); }
   .menu-item.text-muted { color: var(--md-sys-color-on-surface-variant); }
+  .menu-item.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 
   .menu-divider {
     height: 1px;

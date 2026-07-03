@@ -17,6 +17,7 @@ interface PlaybackState {
 }
 
 let state = $state<PlaybackState>({ status: 'idle', song: null })
+let showClearBeamers = $state(false)
 
 export const playback = {
   get status() { return state.status },
@@ -29,11 +30,13 @@ export const playback = {
   get canLoad()  { return state.status === 'idle' || state.status === 'loaded' },
   /** Can only start playback when a song is loaded and at least one beamer is open */
   get canPlay()  { return state.status === 'loaded' && (displaysStore.display1.open || displaysStore.display2.open) },
+  get showClearBeamers() { return showClearBeamers },
 
   /** Load a song into the player without starting playback */
   load(song: Song) {
     if (!playback.canLoad) return
     state = { status: 'loaded', song }
+    showClearBeamers = false
     layout.showNowPlaying || layout.toggleNowPlaying()
   },
 
@@ -70,21 +73,18 @@ export const playback = {
   async stop() {
     if (state.status === 'idle') return
     state.status = 'loaded'
+    showClearBeamers = true
     await sendStopSong()
   },
 
   /** Send a second stop to clear the score screen and return beamers to idle */
   async clearBeamers() {
+    showClearBeamers = false
     await sendStopSong()
   },
 
-  /** Dismiss the now-playing bar entirely */
   dismiss() {
     state = { status: 'idle', song: null }
-  },
-
-  /** Send a second stop to clear the score screen and return beamers to idle */
-  async clearBeamers() {
-    await sendStopSong()
+    showClearBeamers = false
   },
 }

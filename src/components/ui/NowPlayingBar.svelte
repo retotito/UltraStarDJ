@@ -141,6 +141,7 @@
         >
           <span class="icon">play_arrow</span>
         </button>
+        {#if playback.showClearBeamers}
         <button
           class="ctrl-btn ctrl-clear"
           title="Clear beamer screens — back to home"
@@ -148,6 +149,7 @@
         >
           <span class="icon">tv</span>
         </button>
+        {/if}
       {:else if playback.status === 'playing'}
         <button class="ctrl-btn ctrl-pause" title="Pause" onclick={() => playback.pause()}>
           <span class="icon">pause</span>
