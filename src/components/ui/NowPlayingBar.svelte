@@ -60,7 +60,7 @@
   onDestroy(() => window.removeEventListener('resize', clamp))
 </script>
 
-{#if playback.isLoaded && playback.song && layout.showNowPlaying}
+{#if layout.showNowPlaying}
   <div
     class="now-playing-card"
     class:is-dragging={dragging}
@@ -77,7 +77,12 @@
     </div>
 
     <!-- Status message bar -->
-    {#if !displaysStore.display1.open && !displaysStore.display2.open}
+    {#if !playback.isLoaded}
+      <div class="status-bar status-ready">
+        <span class="icon" style="font-size:16px">radio_button_unchecked</span>
+        No song loaded
+      </div>
+    {:else if !displaysStore.display1.open && !displaysStore.display2.open}
       <div class="status-bar status-warn">
         <span class="icon" style="font-size:16px">tv_off</span>
         No display open — open a display to start
@@ -100,6 +105,7 @@
     {/if}
 
     <!-- Song info + badges -->
+    {#if playback.isLoaded && playback.song}
     <div class="song-section">
       <div class="song-info">
         <span class="song-title">{playback.song.title}</span>
@@ -115,8 +121,15 @@
         </div>
       {/if}
     </div>
+    {:else}
+    <div class="empty-section">
+      <span class="icon" style="font-size:32px; opacity:0.3">queue_music</span>
+      <span class="text-muted text-sm">No song loaded — pick one from the queue</span>
+    </div>
+    {/if}
 
     <!-- Transport controls -->
+    {#if playback.isLoaded}
     <div class="controls">
       {#if playback.status === 'loaded'}
         <button
@@ -151,6 +164,7 @@
         </button>
       {/if}
     </div>
+    {/if}
   </div>
 {/if}
 
@@ -231,6 +245,15 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+  }
+
+  .empty-section {
+    padding: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: center;
   }
 
   .song-info {

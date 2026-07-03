@@ -5,6 +5,7 @@
 
 import type { Song } from '$lib/ultrastar/types'
 import { displaysStore } from '$lib/stores/displays.svelte'
+import { layout } from '$lib/stores/layout.svelte'
 import { sendPlaySong, sendPauseSong, sendResumeSong, sendStopSong } from '$lib/ipc/tauri'
 import { convertFileSrc } from '@tauri-apps/api/core'
 
@@ -33,6 +34,7 @@ export const playback = {
   load(song: Song) {
     if (!playback.canLoad) return
     state = { status: 'loaded', song }
+    layout.showNowPlaying || layout.toggleNowPlaying()
   },
 
   /** Start playback of the currently loaded song */
