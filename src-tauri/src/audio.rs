@@ -61,7 +61,7 @@ unsafe impl Sync for AudioState {}
 impl AudioState {
     pub fn new() -> Self {
         let host = cpal::default_host();
-        let known = device_names(&host);
+        let known = device_ids(&host);
         AudioState {
             streams: Mutex::new(HashMap::new()),
             known_devices: Mutex::new(known),
@@ -75,18 +75,54 @@ fn host() -> Host {
     cpal::default_host()
 }
 
-fn device_names(host: &Host) -> Vec<String> {
-    host.input_devices()
-        .map(|devs| {
-            devs.filter_map(|d| d.name().ok())
-                .collect()
-        })
-        .unwrap_or_default()
+/// Enumerate input devices and assign unique IDs.
+/// Duplicate names get a `#2`, `#3` suffix so two "USB Microphone" dongles
+/// are distinguishable. Returns (unique_id, Device) pairs.
+fn enumerate_devices(host: &Host) -> Vec<(String, Device)> {
+    let Ok(devs) = host.input_devices() else { return vec![] };
+    let mut name_counts: HashMap<String, usize> = HashMap::new();
+    devs.filter_map(|d| {
+        let name = d.name().ok()?;
+        let count = name_counts.entry(name.clone()).or_insert(0);
+        *count += 1;
+        let id = if *count == 1 {
+            name
+        } else {
+            format!("{}#{}", name, count)
+        };
+        Some((id, d))
+    })
+    .collect()
 }
 
+/// Returns the unique IDs of all current input devices.
+fn device_ids(host: &Host) -> Vec<String> {
+    enumerate_devices(host).into_iter().map(|(id, _)| id).collect()
+}
+
+/// Find a device by its unique ID (strips `#N` suffix to locate the Nth device
+/// with that base name).
 fn find_device(host: &Host, id: &str) -> Option<Device> {
+    // Parse optional "#N" suffix
+    let (base_name, target_index) = if let Some(pos) = id.rfind('#') {
+        let suffix = &id[pos + 1..];
+        if let Ok(n) = suffix.parse::<usize>() {
+            (&id[..pos], n)
+        } else {
+            (id, 1)
+        }
+    } else {
+        (id, 1)
+    };
+
+    let mut count = 0usize;
     host.input_devices().ok()?.find(|d| {
-        d.name().map(|n| n == id).unwrap_or(false)
+        if d.name().map(|n| n == base_name).unwrap_or(false) {
+            count += 1;
+            count == target_index
+        } else {
+            false
+        }
     })
 }
 
@@ -104,16 +140,13 @@ fn rms(samples: &[f32]) -> f32 {
 #[tauri::command]
 pub fn list_audio_input_devices() -> Vec<AudioInputDevice> {
     let host = host();
-    let Ok(devices) = host.input_devices() else {
-        return vec![];
-    };
-    devices
-        .filter_map(|d| {
-            let name = d.name().ok()?;
+    enumerate_devices(&host)
+        .into_iter()
+        .filter_map(|(id, d)| {
             let config = d.default_input_config().ok()?;
             Some(AudioInputDevice {
-                id: name.clone(),
-                name,
+                name: id.clone(),
+                id,
                 channels: config.channels(),
             })
         })
@@ -283,29 +316,36 @@ pub fn start_hotplug_watcher(app: AppHandle, state: Arc<AudioState>) {
             std::thread::sleep(std::time::Duration::from_secs(2));
 
             let host = host();
-            let current = device_names(&host);
+            let current = device_ids(&host);
 
             let mut known = state.known_devices.lock().unwrap();
 
-            // Detect removals
-            let removed: Vec<String> = known
-                .iter()
-                .filter(|n| !current.contains(n))
-                .cloned()
+            // Count occurrences per id (handles duplicate names like "USB Microphone#2")
+            let mut current_counts: HashMap<String, usize> = HashMap::new();
+            for id in &current { *current_counts.entry(id.clone()).or_insert(0) += 1; }
+            let mut known_counts: HashMap<String, usize> = HashMap::new();
+            for id in known.iter() { *known_counts.entry(id.clone()).or_insert(0) += 1; }
+
+            // Removed: ids whose count decreased
+            let removed: Vec<String> = known_counts.iter()
+                .flat_map(|(id, &kc)| {
+                    let cc = *current_counts.get(id).unwrap_or(&0);
+                    (0..kc.saturating_sub(cc)).map(move |_| id.clone())
+                })
                 .collect();
 
-            // Detect additions
-            let added: Vec<String> = current
-                .iter()
-                .filter(|n| !known.contains(n))
-                .cloned()
+            // Added: ids whose count increased
+            let added: Vec<String> = current_counts.iter()
+                .flat_map(|(id, &cc)| {
+                    let kc = *known_counts.get(id).unwrap_or(&0);
+                    (0..cc.saturating_sub(kc)).map(move |_| id.clone())
+                })
                 .collect();
 
             if !removed.is_empty() || !added.is_empty() {
                 *known = current.clone();
-                drop(known); // release lock before emitting
+                drop(known);
 
-                // Emit generic devices-changed so frontend can refresh dropdown
                 let all = list_audio_input_devices();
                 let _ = app.emit(EVT_DEVICES_CHANGED, all);
 
