@@ -1,5 +1,6 @@
 <script lang="ts">
   import { layout } from '$lib/stores/layout.svelte'
+  import { playback } from '$lib/stores/playback.svelte'
   import Modal from '$components/ui/Modal.svelte'
   import SettingsDialog from '$components/dialogs/SettingsDialog.svelte'
   import PlayersView from '$components/views/PlayersView.svelte'
@@ -15,6 +16,19 @@
   <nav class="sidebar-nav">
     <button class="btn btn-icon is-active" data-tooltip="Library" aria-label="Library">
       <span class="icon">library_music</span>
+    </button>
+
+    <button
+      class="btn btn-icon now-playing-btn"
+      class:is-active={layout.showNowPlaying && playback.isLoaded}
+      data-tooltip="Now Playing"
+      aria-label="Toggle now playing"
+      onclick={() => layout.toggleNowPlaying()}
+    >
+      <span class="icon">play_circle</span>
+      {#if playback.isLoaded && !layout.showNowPlaying}
+        <span class="np-dot"></span>
+      {/if}
     </button>
 
     <button
@@ -158,6 +172,23 @@
   .sidebar-nav :global(.icon),
   .sidebar-bottom :global(.icon) {
     font-size: 36px;
+  }
+
+  .now-playing-btn { position: relative; }
+  .np-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--md-sys-color-primary);
+    border: 2px solid var(--md-sys-color-surface);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
   }
 
   /* CSS tooltip */

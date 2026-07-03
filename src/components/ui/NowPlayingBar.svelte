@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { displaysStore } from '$lib/stores/displays.svelte'
+  import { layout } from '$lib/stores/layout.svelte'
 
   const PLAYER_COLORS: Record<number, string> = {
     1: 'var(--player-1)',
@@ -59,7 +60,7 @@
   onDestroy(() => window.removeEventListener('resize', clamp))
 </script>
 
-{#if playback.isLoaded && playback.song}
+{#if playback.isLoaded && playback.song && layout.showNowPlaying}
   <div
     class="now-playing-card"
     class:is-dragging={dragging}
@@ -70,7 +71,7 @@
     <!-- Drag handle + dismiss -->
     <div class="drag-handle" onmousedown={onDragStart} role="none">
       <span class="handle-dots">⠿</span>
-      <button class="btn-dismiss" onclick={() => playback.dismiss()} title="Dismiss" aria-label="Dismiss">
+      <button class="btn-dismiss" onclick={() => layout.toggleNowPlaying()} title="Hide player" aria-label="Hide player">
         <span class="icon" style="font-size:16px">close</span>
       </button>
     </div>
@@ -160,7 +161,9 @@
     left: 50%;
     translate: -50% 0;
     z-index: 200;
-    background: var(--md-sys-color-surface-container-high);
+    background: rgba(var(--md-sys-color-surface-container-high-rgb, 40,40,46), 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
