@@ -51,6 +51,7 @@
       <span class="icon">group</span>
     </button>
 
+    <!-- Queue toggle (hidden for now — accessible via Layout panel)
     <button
       class="btn btn-icon"
       class:is-active={layout.showQueue}
@@ -60,6 +61,7 @@
     >
       <span class="icon">queue_music</span>
     </button>
+    -->
 
     <button
       class="btn btn-icon"
