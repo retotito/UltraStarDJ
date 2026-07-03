@@ -97,7 +97,7 @@
           disabled={!playersStore.isActive(player.id)}
           onclick={() => togglePlayer(1, player.id)}
         >
-          {player.name || `Player ${player.id}`}
+          {player.name || `Player ${player.id}`}{#if !playersStore.isActive(player.id)} — no mic{/if}
         </button>
       {/each}
       {#if allPlayers.length === 0}
@@ -130,7 +130,7 @@
             disabled={!playersStore.isActive(player.id)}
             onclick={() => togglePlayer(2, player.id)}
           >
-            {player.name || `Player ${player.id}`}
+            {player.name || `Player ${player.id}`}{#if !playersStore.isActive(player.id)} — no mic{/if}
           </button>
         {/each}
       </div>

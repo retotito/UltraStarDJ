@@ -82,7 +82,11 @@
   }
 </script>
 
-<div class="player-card" class:disconnected={isDisconnected}>
+<div class="player-card"
+  class:status-active={playersStore.isActive(player.id)}
+  class:status-no-mic={!player.mic && !isDisconnected}
+  class:disconnected={isDisconnected}
+>
   <!-- Header row: name + color dot -->
   <div class="card-header">
     <input
@@ -109,6 +113,7 @@
     </div>
 
     <!-- Test button + disconnected badge -->
+    {#if player.mic}
     <div class="test-row">
       <button
         class="btn btn-sm"
@@ -146,18 +151,32 @@
       />
       <span class="gain-value">{Math.round(player.gain * 100)}%</span>
     </div>
+    {/if}
 </div>
 
 <style>
   .player-card {
     background: var(--md-sys-color-surface-container);
     border-radius: var(--radius-lg);
+    border-left: 3px solid transparent;
     padding: var(--space-3);
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    transition: opacity var(--transition-fast);
+    transition: border-color var(--transition-fast);
     width: 100%;
+  }
+
+  .player-card.status-active {
+    border-left-color: #4ecb71;
+  }
+
+  .player-card.status-no-mic {
+    border-left-color: color-mix(in srgb, #f5a623 70%, transparent);
+  }
+
+  .player-card.disconnected {
+    border-left-color: color-mix(in srgb, #f75f5f 70%, transparent);
   }
 
   .player-card.inactive {
