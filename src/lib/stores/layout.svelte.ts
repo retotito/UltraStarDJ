@@ -34,7 +34,7 @@ const DEFAULTS: LayoutState = {
   rightPlayerHeightPct: 40,
   showPlayer: true,
   showQueue: true,
-  showNowPlaying: true,
+  showNowPlaying: false,
   columns: DEFAULT_COLUMNS
 }
 
