@@ -10,11 +10,12 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readDir, readTextFile, readFile as fsReadFile, exists } from '@tauri-apps/plugin-fs'
-import type { PlaySongPayload } from '$lib/ultrastar/types'
+import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
 
 // ── Event names ────────────────────────────────────────────────
 export const IPC_EVENTS = {
   PLAY_SONG:     'ultrastar:play-song',
+  PREVIEW_SONG:  'ultrastar:preview-song',
   STOP_SONG:     'ultrastar:stop-song',
   PAUSE_SONG:    'ultrastar:pause-song',
   RESUME_SONG:   'ultrastar:resume-song',
@@ -104,6 +105,10 @@ export async function sendPlaySong(payload: PlaySongPayload): Promise<void> {
   await emit(IPC_EVENTS.PLAY_SONG, payload)
 }
 
+export async function sendPreviewSong(payload: PreviewSongPayload): Promise<void> {
+  await emit(IPC_EVENTS.PREVIEW_SONG, payload)
+}
+
 export async function sendStopSong(): Promise<void> {
   await emit(IPC_EVENTS.STOP_SONG, null)
 }
@@ -121,6 +126,12 @@ export function onPlaySong(
   handler: (payload: PlaySongPayload) => void
 ): Promise<UnlistenFn> {
   return listen<PlaySongPayload>(IPC_EVENTS.PLAY_SONG, e => handler(e.payload))
+}
+
+export function onPreviewSong(
+  handler: (payload: PreviewSongPayload) => void
+): Promise<UnlistenFn> {
+  return listen<PreviewSongPayload>(IPC_EVENTS.PREVIEW_SONG, e => handler(e.payload))
 }
 
 export function onStopSong(handler: () => void): Promise<UnlistenFn> {

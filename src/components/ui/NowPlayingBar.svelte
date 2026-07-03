@@ -131,7 +131,17 @@
     <!-- Transport controls -->
     {#if playback.isLoaded}
     <div class="controls">
-      {#if playback.status === 'loaded'}
+      {#if playback.status === 'loaded' || playback.status === 'preview'}
+        <button
+          class="ctrl-btn ctrl-preview"
+          class:is-blocked={!playback.canPlay}
+          class:is-active={playback.status === 'preview'}
+          disabled={!playback.canPlay}
+          title={!playback.canPlay ? 'Open a display first' : playback.status === 'preview' ? 'Preview active' : 'Show preview on beamers'}
+          onclick={() => playback.preview()}
+        >
+          <span class="icon">tv</span>
+        </button>
         <button
           class="ctrl-btn ctrl-play"
           class:is-blocked={!playback.canPlay}
@@ -147,7 +157,7 @@
           title="Clear beamer screens — back to home"
           onclick={() => playback.clearBeamers()}
         >
-          <span class="icon">tv</span>
+          <span class="icon">tv_off</span>
         </button>
         {/if}
       {:else if playback.status === 'playing'}
@@ -343,4 +353,17 @@
     border: 2px solid color-mix(in srgb, var(--md-sys-color-outline) 30%, transparent);
   }
   .ctrl-clear:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); }
+
+  .ctrl-preview {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+    color: var(--md-sys-color-on-surface-variant);
+    border: 2px solid color-mix(in srgb, var(--md-sys-color-outline) 30%, transparent);
+  }
+  .ctrl-preview:hover:not(:disabled) { background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); }
+  .ctrl-preview.is-active {
+    background: color-mix(in srgb, var(--md-sys-color-primary) 15%, transparent);
+    color: var(--md-sys-color-primary);
+    border-color: var(--md-sys-color-primary);
+  }
+  .ctrl-preview.is-blocked { opacity: 0.35; cursor: not-allowed; }
 </style>

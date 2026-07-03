@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import type { PlaySongPayload } from '$lib/ultrastar/types'
+  import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
   import type { BeamerScreen } from '../../routes/beamer/+page.svelte'
 
   let { screen = 'idle', payload, assignedPlayerIds = [], onCountdownDone }: {
     screen?: BeamerScreen
-    payload: PlaySongPayload | null
+    payload: PlaySongPayload | PreviewSongPayload | null
     assignedPlayerIds?: number[]
     onCountdownDone?: () => void
   } = $props()
@@ -59,6 +59,32 @@
       {:else}
         <span class="waiting">No players assigned</span>
       {/if}
+    </div>
+
+  {:else if screen === 'preview' && payload}
+    <div class="preview-screen">
+      {#if payload.song.coverPath}
+        <img
+          class="preview-cover"
+          src="{payload.assetBase}{payload.song.coverPath}"
+          alt="{payload.song.title} cover"
+        />
+      {/if}
+      <div class="preview-content">
+        <span class="preview-artist">{payload.song.artist}</span>
+        <span class="preview-title">{payload.song.title}</span>
+        {#if payload.song.year}
+          <span class="preview-year">{payload.song.year}</span>
+        {/if}
+      </div>
+      <div class="player-badges">
+        {#each assignedPlayerIds as id (id)}
+          <div class="player-badge" style="border-color: {PLAYER_COLORS[id] ?? '#888'}; color: {PLAYER_COLORS[id] ?? '#888'}">
+            P{id}
+          </div>
+        {/each}
+      </div>
+      <span class="preview-ready">Get ready…</span>
     </div>
 
   {:else if screen === 'countdown' && payload}
@@ -163,6 +189,64 @@
     justify-content: center;
     font-size: 1.5rem;
     font-weight: 700;
+  }
+
+  /* ── Preview ── */
+  .preview-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-6);
+    height: 100%;
+  }
+
+  .preview-cover {
+    width: 220px;
+    height: 220px;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+
+  .preview-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    text-align: center;
+  }
+
+  .preview-artist {
+    font-size: clamp(1.5rem, 4vw, 3rem);
+    font-weight: 400;
+    opacity: 0.7;
+    letter-spacing: 0.05em;
+  }
+
+  .preview-title {
+    font-size: clamp(2.5rem, 7vw, 6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .preview-year {
+    font-size: 1.2rem;
+    opacity: 0.4;
+  }
+
+  .preview-ready {
+    font-size: 1.2rem;
+    opacity: 0.5;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
   }
 
   /* ── Countdown ── */

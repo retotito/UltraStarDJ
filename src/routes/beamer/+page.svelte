@@ -1,14 +1,14 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { onPlaySong, onStopSong, onPauseSong, onResumeSong, onScreenConfig, getWindowLabel } from '$lib/ipc/tauri'
+  import { onPlaySong, onPreviewSong, onStopSong, onPauseSong, onResumeSong, onScreenConfig, getWindowLabel } from '$lib/ipc/tauri'
   import type { UnlistenFn } from '@tauri-apps/api/event'
-  import type { PlaySongPayload } from '$lib/ultrastar/types'
+  import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
   import BeamerView from '$components/game/BeamerView.svelte'
 
-  export type BeamerScreen = 'idle' | 'countdown' | 'playing' | 'paused' | 'score'
+  export type BeamerScreen = 'idle' | 'preview' | 'countdown' | 'playing' | 'paused' | 'score'
 
   let screen = $state<BeamerScreen>('idle')
-  let currentPayload = $state<PlaySongPayload | null>(null)
+  let currentPayload = $state<PlaySongPayload | PreviewSongPayload | null>(null)
   let assignedPlayerIds = $state<number[]>([])
   let unlisteners: UnlistenFn[] = []
 
@@ -16,7 +16,14 @@
 
   onMount(async () => {
     unlisteners = await Promise.all([
+      onPreviewSong(payload => {
+        if (payload.windowLabel !== windowLabel) return
+        currentPayload = payload
+        assignedPlayerIds = payload.playerIds
+        screen = 'preview'
+      }),
       onPlaySong(payload => {
+        if (payload.windowLabel !== windowLabel) return
         currentPayload = payload
         assignedPlayerIds = payload.playerIds
         screen = 'countdown'
@@ -24,6 +31,10 @@
       onStopSong(() => {
         if (screen === 'playing' || screen === 'paused' || screen === 'countdown') {
           screen = 'score'
+        } else if (screen === 'preview') {
+          screen = 'idle'
+          currentPayload = null
+          assignedPlayerIds = []
         } else if (screen === 'score') {
           screen = 'idle'
           currentPayload = null

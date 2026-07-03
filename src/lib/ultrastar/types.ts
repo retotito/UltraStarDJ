@@ -66,4 +66,14 @@ export interface PlaySongPayload {
   assetBase: string
   /** Player IDs assigned to the display receiving this event */
   playerIds: number[]
+  /** Tauri window label of the target beamer */
+  windowLabel: string
+}
+
+/** What the DJ sends to show the preview/get-ready screen before playback */
+export interface PreviewSongPayload {
+  song: Song
+  assetBase: string
+  playerIds: number[]
+  windowLabel: string
 }

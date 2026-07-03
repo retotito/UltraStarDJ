@@ -6,10 +6,10 @@
 import type { Song } from '$lib/ultrastar/types'
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
-import { sendPlaySong, sendPauseSong, sendResumeSong, sendStopSong } from '$lib/ipc/tauri'
+import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong } from '$lib/ipc/tauri'
 import { convertFileSrc } from '@tauri-apps/api/core'
 
-export type PlaybackStatus = 'idle' | 'loaded' | 'playing' | 'paused'
+export type PlaybackStatus = 'idle' | 'loaded' | 'preview' | 'playing' | 'paused'
 
 interface PlaybackState {
   status: PlaybackStatus
@@ -27,9 +27,9 @@ export const playback = {
   /** True only while actively playing or paused */
   get isActive() { return state.status === 'playing' || state.status === 'paused' },
   /** Cannot load a new song while playing or paused */
-  get canLoad()  { return state.status === 'idle' || state.status === 'loaded' },
+  get canLoad()  { return state.status === 'idle' || state.status === 'loaded' || state.status === 'preview' },
   /** Can only start playback when a song is loaded and at least one beamer is open */
-  get canPlay()  { return state.status === 'loaded' && (displaysStore.display1.open || displaysStore.display2.open) },
+  get canPlay()  { return (state.status === 'loaded' || state.status === 'preview') && (displaysStore.display1.open || displaysStore.display2.open) },
   get showClearBeamers() { return showClearBeamers },
 
   /** Load a song into the player without starting playback */
@@ -40,9 +40,27 @@ export const playback = {
     layout.showNowPlaying || layout.toggleNowPlaying()
   },
 
+  /** Send preview-song to beamers — show get-ready screen without starting audio */
+  async preview() {
+    if (!state.song || !playback.canPlay) return
+    const song = state.song
+    state.status = 'preview'
+    const assetBase = convertFileSrc('')
+    for (const display of [displaysStore.display1, displaysStore.display2]) {
+      if (display.open) {
+        await sendPreviewSong({
+          song,
+          assetBase,
+          playerIds: [...display.playerIds].sort((a, b) => a - b),
+          windowLabel: display.label,
+        })
+      }
+    }
+  },
+
   /** Start playback of the currently loaded song */
   async play() {
-    if (state.status !== 'loaded' || !state.song) return
+    if ((state.status !== 'loaded' && state.status !== 'preview') || !state.song) return
     const song = state.song
     state.status = 'playing'
     const assetBase = convertFileSrc('')
@@ -52,6 +70,7 @@ export const playback = {
           song,
           assetBase,
           playerIds: [...display.playerIds].sort((a, b) => a - b),
+          windowLabel: display.label,
         })
       }
     }
