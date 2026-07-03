@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { displaysStore } from '$lib/stores/displays.svelte'
 
@@ -9,22 +10,26 @@
     4: 'var(--player-4)',
   }
 
-  // All player IDs across both displays (deduplicated)
   const allPlayerIds = $derived(
     [...new Set([...displaysStore.display1.playerIds, ...displaysStore.display2.playerIds])].sort((a, b) => a - b)
   )
 
-  // Dragging state
-  let x = $state<number | null>(null)  // null = use CSS default centering
+  // Dragging state — null = CSS default (bottom-center)
+  let x = $state<number | null>(null)
   let y = $state<number | null>(null)
   let dragging = $state(false)
   let dragStartX = 0
   let dragStartY = 0
   let cardEl: HTMLDivElement | undefined
 
+  function clamp() {
+    if (x === null || y === null || !cardEl) return
+    x = Math.max(0, Math.min(x, window.innerWidth  - cardEl.offsetWidth))
+    y = Math.max(0, Math.min(y, window.innerHeight - cardEl.offsetHeight))
+  }
+
   function onDragStart(e: MouseEvent) {
     if (!cardEl) return
-    // On first drag, capture current rendered position
     if (x === null) {
       const rect = cardEl.getBoundingClientRect()
       x = rect.left
@@ -32,19 +37,16 @@
     }
     dragging = true
     dragStartX = e.clientX - x
-    dragStartY = e.clientY - y
+    dragStartY = e.clientY - (y ?? 0)
     document.addEventListener('mousemove', onDragMove)
     document.addEventListener('mouseup', onDragEnd)
   }
 
   function onDragMove(e: MouseEvent) {
     if (!dragging || !cardEl || x === null || y === null) return
-    const newX = e.clientX - dragStartX
-    const newY = e.clientY - dragStartY
-    const maxX = window.innerWidth  - cardEl.offsetWidth
-    const maxY = window.innerHeight - cardEl.offsetHeight
-    x = Math.max(0, Math.min(newX, maxX))
-    y = Math.max(0, Math.min(newY, maxY))
+    x = e.clientX - dragStartX
+    y = e.clientY - dragStartY
+    clamp()
   }
 
   function onDragEnd() {
@@ -52,9 +54,12 @@
     document.removeEventListener('mousemove', onDragMove)
     document.removeEventListener('mouseup', onDragEnd)
   }
+
+  onMount(() => window.addEventListener('resize', clamp))
+  onDestroy(() => window.removeEventListener('resize', clamp))
 </script>
 
-{#if playback.isActive && playback.song}
+{#if playback.isLoaded && playback.song}
   <div
     class="now-playing-card"
     class:is-dragging={dragging}
@@ -62,9 +67,12 @@
     style={x !== null ? `left: ${x}px; top: ${y}px;` : ''}
     bind:this={cardEl}
   >
-    <!-- Drag handle -->
+    <!-- Drag handle + dismiss -->
     <div class="drag-handle" onmousedown={onDragStart} role="none">
       <span class="handle-dots">⠿</span>
+      <button class="btn-dismiss" onclick={() => playback.dismiss()} title="Dismiss" aria-label="Dismiss">
+        <span class="icon" style="font-size:16px">close</span>
+      </button>
     </div>
 
     <div class="card-body">
@@ -87,18 +95,25 @@
 
       <!-- Transport controls -->
       <div class="controls">
-        {#if playback.status === 'playing'}
+        {#if playback.status === 'loaded'}
+          <button class="btn btn-icon" title="Play" onclick={() => playback.play()}>
+            <span class="icon">play_arrow</span>
+          </button>
+        {:else if playback.status === 'playing'}
           <button class="btn btn-icon" title="Pause" onclick={() => playback.pause()}>
             <span class="icon">pause</span>
           </button>
-        {:else}
+          <button class="btn btn-icon btn-danger" title="Stop" onclick={() => playback.stop()}>
+            <span class="icon">stop</span>
+          </button>
+        {:else if playback.status === 'paused'}
           <button class="btn btn-icon" title="Resume" onclick={() => playback.resume()}>
             <span class="icon">play_arrow</span>
           </button>
+          <button class="btn btn-icon btn-danger" title="Stop" onclick={() => playback.stop()}>
+            <span class="icon">stop</span>
+          </button>
         {/if}
-        <button class="btn btn-icon btn-danger" title="Stop" onclick={() => playback.stop()}>
-          <span class="icon">stop</span>
-        </button>
       </div>
     </div>
   </div>
@@ -128,18 +143,36 @@
   }
 
   .drag-handle {
-    padding: var(--space-1) var(--space-4);
+    padding: var(--space-1) var(--space-3);
     cursor: grab;
     display: flex;
+    align-items: center;
     justify-content: center;
     color: var(--md-sys-color-on-surface-variant);
-    opacity: 0.5;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    position: relative;
   }
-  .drag-handle:hover { opacity: 1; }
+  .drag-handle:hover { background: rgba(255,255,255,0.04); }
   .is-dragging .drag-handle { cursor: grabbing; }
 
-  .handle-dots { font-size: 14px; letter-spacing: 2px; }
+  .handle-dots { font-size: 14px; letter-spacing: 2px; opacity: 0.4; }
+
+  .btn-dismiss {
+    position: absolute;
+    right: var(--space-2);
+    top: 50%;
+    translate: 0 -50%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--md-sys-color-on-surface-variant);
+    opacity: 0.4;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius-sm);
+  }
+  .btn-dismiss:hover { opacity: 1; background: rgba(255,255,255,0.08); }
 
   .card-body {
     display: flex;

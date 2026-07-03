@@ -2,11 +2,11 @@
   import { songQueue } from '$lib/stores/queue.svelte'
   import { playback } from '$lib/stores/playback.svelte'
 
-  async function playSong(songId: string) {
+  function loadSong(songId: string) {
     const song = songQueue.items.find(s => s.id === songId)
-    if (!song || playback.isActive) return
+    if (!song || !playback.canLoad) return
     songQueue.setActive(songId)
-    await playback.play(song)
+    playback.load(song)
   }
 </script>
 
@@ -35,12 +35,12 @@
           <div class="q-actions">
             <button
               class="btn btn-icon-sm"
-              disabled={playback.isActive}
-              title={playback.isActive ? 'Stop current song first' : 'Play'}
-              onclick={() => playSong(song.id)}
-              aria-label="Play"
+              disabled={!playback.canLoad}
+              title={playback.isActive ? 'Stop current song first' : 'Load into player'}
+              onclick={() => loadSong(song.id)}
+              aria-label="Load"
             >
-              <span class="icon icon-sm">play_arrow</span>
+              <span class="icon icon-sm">playlist_play</span>
             </button>
             <button class="btn btn-icon-sm" onclick={() => songQueue.moveUp(song.id)} disabled={i === 0} aria-label="Move up">
               <span class="icon icon-sm">keyboard_arrow_up</span>
@@ -57,11 +57,11 @@
     {/if}
   </div>
 
-  {#if songQueue.items.length > 0 && !playback.isActive}
+  {#if songQueue.items.length > 0 && playback.canLoad}
     <div class="queue-footer">
-      <button class="btn btn-filled" style="width: 100%" onclick={() => playSong(songQueue.items[0].id)}>
-        <span class="icon icon-sm">play_arrow</span>
-        Start next song
+      <button class="btn btn-filled" style="width: 100%" onclick={() => loadSong(songQueue.items[0].id)}>
+        <span class="icon icon-sm">playlist_play</span>
+        Load next song
       </button>
     </div>
   {/if}

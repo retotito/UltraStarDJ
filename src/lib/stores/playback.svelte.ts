@@ -8,7 +8,7 @@ import { displaysStore } from '$lib/stores/displays.svelte'
 import { sendPlaySong, sendPauseSong, sendResumeSong, sendStopSong } from '$lib/ipc/tauri'
 import { convertFileSrc } from '@tauri-apps/api/core'
 
-export type PlaybackStatus = 'idle' | 'playing' | 'paused'
+export type PlaybackStatus = 'idle' | 'loaded' | 'playing' | 'paused'
 
 interface PlaybackState {
   status: PlaybackStatus
@@ -20,13 +20,25 @@ let state = $state<PlaybackState>({ status: 'idle', song: null })
 export const playback = {
   get status() { return state.status },
   get song()   { return state.song },
-  get isActive() { return state.status !== 'idle' },
+  /** Bar is visible whenever a song is loaded (even if not playing) */
+  get isLoaded() { return state.song !== null },
+  /** True only while actively playing or paused */
+  get isActive() { return state.status === 'playing' || state.status === 'paused' },
+  /** Cannot load a new song while playing or paused */
+  get canLoad()  { return state.status === 'idle' || state.status === 'loaded' },
 
-  async play(song: Song) {
-    state = { status: 'playing', song }
+  /** Load a song into the player without starting playback */
+  load(song: Song) {
+    if (!playback.canLoad) return
+    state = { status: 'loaded', song }
+  },
+
+  /** Start playback of the currently loaded song */
+  async play() {
+    if (state.status !== 'loaded' || !state.song) return
+    const song = state.song
+    state.status = 'playing'
     const assetBase = convertFileSrc('')
-
-    // Send to each open display with its own playerIds
     for (const display of [displaysStore.display1, displaysStore.display2]) {
       if (display.open) {
         await sendPlaySong({
@@ -50,8 +62,15 @@ export const playback = {
     await sendResumeSong()
   },
 
+  /** Stop playback — song stays loaded in the bar */
   async stop() {
-    state = { status: 'idle', song: null }
+    if (state.status === 'idle') return
+    state.status = 'loaded'
     await sendStopSong()
+  },
+
+  /** Fully dismiss the now-playing bar */
+  dismiss() {
+    state = { status: 'idle', song: null }
   },
 }
