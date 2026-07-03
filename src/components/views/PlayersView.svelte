@@ -26,6 +26,7 @@
     devices = await listAudioInputDevices()
 
     unlistenLevel = await onMicLevel(e => {
+      if (!playersStore.monitoringIds.has(e.player_id)) return
       playersStore.setLevel(e.player_id, e.rms)
     })
 
@@ -53,8 +54,9 @@
   })
 
   onDestroy(async () => {
-    // Stop all active mic monitors when the panel closes
-    for (const id of playersStore.monitoringIds) {
+    // Snapshot first — mutating the set while iterating it skips entries
+    const activeIds = [...playersStore.monitoringIds]
+    for (const id of activeIds) {
       await stopMicMonitor(id).catch(() => {})
       playersStore.setMonitoring(id, false)
       playersStore.setLevel(id, 0)
@@ -65,8 +67,16 @@
     unlistenDevices?.()
   })
 
+  let refreshing = $state(false)
+
   async function refreshDevices() {
-    devices = await listAudioInputDevices()
+    refreshing = true
+    const [result] = await Promise.allSettled([
+      listAudioInputDevices(),
+      new Promise(r => setTimeout(r, 1000)),
+    ])
+    if (result.status === 'fulfilled') devices = result.value
+    refreshing = false
   }
 </script>
 
@@ -79,8 +89,9 @@
         title="Refresh mic list"
         aria-label="Refresh microphone list"
         onclick={refreshDevices}
+        disabled={refreshing}
       >
-        <span class="icon">refresh</span>
+        <span class="icon" class:spinning={refreshing}>refresh</span>
       </button>
       {#if onclose}
         <button class="btn btn-icon" onclick={onclose} aria-label="Close">
@@ -119,6 +130,14 @@
     display: flex;
     align-items: center;
     gap: var(--space-1);
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .spinning {
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
   }
 
   .view-title {

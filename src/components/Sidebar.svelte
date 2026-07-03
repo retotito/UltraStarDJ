@@ -183,7 +183,7 @@
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
-    width: 380px;
+    width: 420px;
     max-height: calc(100vh - 124px);
     display: flex;
     flex-direction: column;
