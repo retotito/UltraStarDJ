@@ -61,6 +61,7 @@ reliable `canplaythrough` equivalent. See `video-preload.md`.
 | Audio/video sync | YouTube seeks to audio `currentTime` if drift > 0.5s |
 | Pause | Audio pauses, `ytPlayer.pauseVideo()` called |
 | Resume | Audio resumes, `ytPlayer.playVideo()` called, sync re-checked on next tick |
+| Song ends | `audio.ended` fires → `playback.stop()` → beamer score screen, DJ Clear button |
 | 2 beamers | Both sync to same `currentTime` → < 0.5s difference |
 
 ### Video/audio alignment (`#VIDEOGAP`)

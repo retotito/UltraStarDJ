@@ -73,6 +73,7 @@ via `transcodeToMp4()`, use the temp path for the `<video>` src.
 | 2 beamers | ~90ms IPC offset (acceptable) — both receive same `currentTime` |
 | Pause | Audio pauses, `videoEl.pause()` called |
 | Resume | Audio resumes, `videoEl.play()` called, seek-sync re-aligns |
+| Song ends | `audio.ended` fires → `playback.stop()` → beamer score screen, DJ Clear button |
 | DJ preview player | Plays from the same video file (or transcoded temp) |
 
 ## Unsupported format detection

@@ -71,6 +71,22 @@
     return () => audioEl?.removeEventListener('ended', onEnded)
   })
 
+  // Stop at #END if defined (timeupdate is sufficient — fires every ~250ms)
+  $effect(() => {
+    if (!audioEl) return
+    const song = playback.song
+    if (!song?.end) return
+    const endSecs = song.end / 1000
+    const onTimeUpdate = () => {
+      if (audioEl && audioEl.currentTime >= endSecs) {
+        console.log('[GameAudio] reached #END — calling playback.stop()')
+        playback.stop()
+      }
+    }
+    audioEl.addEventListener('timeupdate', onTimeUpdate)
+    return () => audioEl?.removeEventListener('timeupdate', onTimeUpdate)
+  })
+
   onDestroy(() => {
     unlistenCountdown?.()
     playback.unregisterTimeProvider()

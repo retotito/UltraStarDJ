@@ -33,6 +33,9 @@ export interface Song {
   /* --- Video timing --- */
   videoGap?: number    // seconds offset for video vs audio (UltraStar #VIDEOGAP)
 
+  /* --- Playback range --- */
+  end?: number         // ms — stop playback at this time (UltraStar #END)
+
   /* --- Parsed notes (loaded on demand, not at library scan) --- */
   notes?: NoteTrack[]
 }

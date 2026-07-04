@@ -23,6 +23,8 @@ Test each case in order. Verify all checkboxes before moving to the next.
 - [x] After countdown: background image fills beamer, lyrics overlay on top
 - [x] Pause: audio pauses, image stays (nothing to pause)
 - [x] Resume: audio resumes
+- [x] Song ends: playback stops automatically (natural end)
+- [x] Song ends at #END: playback stops at specified time if #END tag present
 - [x] Time counter in DJ modal advances correctly
 
 **Known issues / notes:**
@@ -51,6 +53,8 @@ _none_
 - [~] Both beamers show video at same position (< 0.1s difference) — ~90ms IPC latency, acceptable
 - [x] Pause: audio AND video both pause simultaneously
 - [x] Resume: audio AND video both resume from same position
+- [x] Song ends: playback stops automatically, beamer shows score screen, DJ shows Clear button
+- [x] Song ends at #END: playback stops at specified time if #END tag present
 - [x] DJ player plays from MP3 (not MP4) — confirm in console: `audio source: audio`
 
 **Known issues / notes:**
@@ -79,6 +83,8 @@ _none_
 - [x] DJ player plays from MP3 (not YouTube)
 - [x] Pause: audio pauses, YouTube video pauses
 - [x] Resume: audio resumes from correct position, YouTube video resumes
+- [x] Song ends: playback stops automatically, beamer shows score screen, DJ shows Clear button
+- [x] Song ends at #END: playback stops at specified time if #END tag present
 
 **Known issues / notes:**
 - Two separate YouTube streams (one per beamer) — sync via seekTo(currentTime + videoGap) each tick

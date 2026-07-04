@@ -16,6 +16,7 @@ interface ParsedHeader {
   background?: string
   video?: string
   videogap?: number
+  end?: number
   year?: number
   youtubeId?: string
   language?: string
@@ -53,6 +54,7 @@ function parseHeader(text: string): ParsedHeader {
         break
       case 'youtube':    header.youtubeId = extractYoutubeId(value) ?? value; break
       case 'videogap':   header.videogap = parseFloat(value.replace(',', '.')); break
+      case 'end':        header.end = parseFloat(value.replace(',', '.')); break
       case 'year':       header.year = parseInt(value, 10); break
       case 'language':   header.language = value; break
       case 'genre':      header.genre = value; break
@@ -186,6 +188,7 @@ export function parseSongHeader(txtPath: string, sourceId: string, text: string)
     backgroundPath: header.background ? resolveSibling(txtPath, header.background) : undefined,
     videoPath:      header.video && SUPPORTED_VIDEO_EXTS.has(header.video.toLowerCase().slice(header.video.lastIndexOf('.'))) ? resolveSibling(txtPath, header.video) : undefined,
     videoGap:       header.videogap,
+    end:            header.end,
     youtubeId:      header.youtubeId,
   }
 }
