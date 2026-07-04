@@ -1,10 +1,11 @@
 /**
  * Song validation — runs before load or queue-add.
- * Checks both TXT format (from parsed Song fields) and file existence.
+ * Returns a patched Song copy with missing optional files nulled out,
+ * so the loader's fallback chain works automatically.
  */
 
 import type { Song } from './types'
-import { pathExists } from '$lib/ipc/tauri'
+import { pathExists, readFile } from '$lib/ipc/tauri'
 
 export interface SongValidationError {
   field: string
@@ -14,19 +15,24 @@ export interface SongValidationError {
 export interface SongValidationResult {
   valid: boolean
   errors: SongValidationError[]
+  song: Song   // patched copy — always use this for loading, not the original
 }
 
 function isRemotePath(p: string): boolean {
   return p.startsWith('http://') || p.startsWith('https://')
 }
 
+async function fileExists(path: string): Promise<boolean> {
+  return pathExists(path).catch((e) => { console.warn('[validateSong] pathExists threw:', e); return false })
+}
+
 export async function validateSong(song: Song): Promise<SongValidationResult> {
   const t = performance.now().toFixed(0)
-  console.log(`[validateSong ${t}ms] start — "${song.title}" by ${song.artist}`)
-  console.log(`[validateSong] paths — txt:${song.txtPath} audio:${song.audioPath} video:${song.videoPath} cover:${song.coverPath} bg:${song.backgroundPath}`)
+  console.log(`[validateSong ${t}ms] "${song.title}" — audio:${song.audioPath} video:${song.videoPath} yt:${song.youtubeId}`)
   const errors: SongValidationError[] = []
+  const patched: Song = { ...song }
 
-  // ── TXT format checks (from parsed Song fields, no I/O) ─────────────────
+  // ── TXT format checks (no I/O) ──────────────────────────────────────────
   if (!song.title?.trim()) {
     errors.push({ field: 'title', message: 'Missing required tag: #TITLE' })
   }
@@ -37,40 +43,57 @@ export async function validateSong(song: Song): Promise<SongValidationResult> {
     errors.push({ field: 'bpm', message: 'Missing or invalid #BPM — notes cannot be timed' })
   }
 
-  // ── Audio source check ──────────────────────────────────────────────────
-  if (!song.audioPath && !song.youtubeId && !song.videoPath) {
-    errors.push({ field: 'audio', message: 'No audio source — song has no audio file, no video file and no YouTube link' })
-  }
-
-  // ── File existence checks ───────────────────────────────────────────────
-  // Only check files that directly affect playback. Cosmetic files (cover,
-  // background) are skipped — a song plays fine without them.
-
+  // ── Notes check (read txt, check for at least one note line) ───────────
   if (song.txtPath) {
-    const ok = await pathExists(song.txtPath).catch((e) => { console.warn('[validateSong] pathExists threw:', e); return false })
-    console.log(`[validateSong] txtPath exists=${ok} — ${song.txtPath}`)
-    if (!ok) errors.push({ field: 'txtPath', message: `Song file (.txt) not found: ${song.txtPath}` })
+    try {
+      const txt = await readFile(song.txtPath)
+      const hasNotes = txt.split('\n').some(l => l.trimStart().startsWith(':'))
+      if (!hasNotes) errors.push({ field: 'notes', message: 'Song has no singable notes' })
+    } catch {
+      // txt unreadable — format checks above already cover missing title/bpm
+    }
   }
 
+  // ── File existence + patching ───────────────────────────────────────────
+  // audioPath: if missing but a fallback exists → patch it out so loader skips it
   if (song.audioPath && !isRemotePath(song.audioPath)) {
-    const ok = await pathExists(song.audioPath).catch((e) => { console.warn('[validateSong] pathExists threw:', e); return false })
-    console.log(`[validateSong] audioPath exists=${ok} — ${song.audioPath}`)
-    if (!ok) errors.push({ field: 'audioPath', message: `Audio file not found: ${song.audioPath}` })
+    const ok = await fileExists(song.audioPath)
+    console.log(`[validateSong] audioPath exists=${ok}`)
+    if (!ok) {
+      if (song.videoPath || song.youtubeId) {
+        console.log(`[validateSong] audioPath missing but fallback available — patching out`)
+        patched.audioPath = undefined
+      } else {
+        errors.push({ field: 'audioPath', message: `Audio file not found: ${song.audioPath}` })
+      }
+    }
   }
 
-  // Only check videoPath existence when it is the sole audio source (no audioPath, no youtubeId).
-  // If audioPath or youtubeId is present, a missing video just means no video background — still playable.
-  if (song.videoPath && !isRemotePath(song.videoPath) && !song.audioPath && !song.youtubeId) {
-    const ok = await pathExists(song.videoPath).catch((e) => { console.warn('[validateSong] pathExists threw:', e); return false })
-    console.log(`[validateSong] videoPath (sole audio source) exists=${ok} — ${song.videoPath}`)
-    if (!ok) errors.push({ field: 'videoPath', message: `Video file not found (sole audio source): ${song.videoPath}` })
+  // videoPath: if missing AND it's the sole audio source → block
+  //            if missing but audioPath or youtubeId exists → patch it out (no video bg, still plays)
+  if (song.videoPath && !isRemotePath(song.videoPath)) {
+    const ok = await fileExists(song.videoPath)
+    console.log(`[validateSong] videoPath exists=${ok}`)
+    if (!ok) {
+      if (!song.audioPath && !song.youtubeId) {
+        errors.push({ field: 'videoPath', message: `Video file not found (sole audio source): ${song.videoPath}` })
+      } else {
+        console.log(`[validateSong] videoPath missing but audio fallback exists — patching out`)
+        patched.videoPath = undefined
+      }
+    }
   }
 
-  const result = { valid: errors.length === 0, errors }
-  if (result.valid) {
-    console.log(`[validateSong] ✓ valid`)
+  // ── Final: ensure at least one audio source remains after patching ──────
+  if (!patched.audioPath && !patched.videoPath && !patched.youtubeId) {
+    errors.push({ field: 'audio', message: 'No playable audio source — all files are missing' })
+  }
+
+  const valid = errors.length === 0
+  if (valid) {
+    console.log(`[validateSong] ✓ valid${patched.audioPath !== song.audioPath || patched.videoPath !== song.videoPath ? ' (patched)' : ''}`)
   } else {
     console.warn(`[validateSong] ✗ ${errors.length} error(s):`, errors.map(e => e.message))
   }
-  return result
+  return { valid, errors, song: patched }
 }

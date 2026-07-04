@@ -128,7 +128,7 @@
     try {
       const result = await validateSong(song)
       if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
-      songQueue.add(song)
+      songQueue.add(result.song)
     } catch (e) {
       console.error('[PlayerWidget] addToQueue validation threw:', e)
     }
@@ -146,7 +146,7 @@
     try {
       const result = await validateSong(song)
       if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
-      playback.load(song)
+      playback.load(result.song)
     } catch (e) {
       console.error('[PlayerWidget] loadIntoPlayer validation threw:', e)
     }

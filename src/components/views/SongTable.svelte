@@ -53,14 +53,14 @@
     const result = await validateSong(song)
     if (!result.valid) { errorStore.show('Song cannot be previewed', result.errors.map(e => e.message)); return }
     player.clear()
-    player.load(song)
+    player.load(result.song)
   }
 
   async function addToQueue(song: Song) {
     closeMenu()
     const result = await validateSong(song)
     if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
-    songQueue.add(song)
+    songQueue.add(result.song)
   }
 
   async function loadSong(song: Song) {
@@ -68,7 +68,7 @@
     closeMenu()
     const result = await validateSong(song)
     if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
-    playback.load(song)
+    playback.load(result.song)
   }
 
   $effect(() => {
