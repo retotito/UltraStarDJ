@@ -1,10 +1,14 @@
 <script lang="ts">
   import { songQueue } from '$lib/stores/queue.svelte'
   import { playback } from '$lib/stores/playback.svelte'
+  import { validateSong } from '$lib/ultrastar/validate_song'
+  import { errorStore } from '$lib/stores/error.svelte'
 
-  function loadSong(songId: string) {
+  async function loadSong(songId: string) {
     const song = songQueue.items.find(s => s.id === songId)
     if (!song || !playback.canLoad) return
+    const result = await validateSong(song)
+    if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
     songQueue.remove(songId)
     playback.load(song)
   }

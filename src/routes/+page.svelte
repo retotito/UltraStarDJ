@@ -5,6 +5,9 @@
   import AppShell from '$components/AppShell.svelte'
   import GameAudio from '$components/game/GameAudio.svelte'
   import VideoPreloader from '$components/game/VideoPreloader.svelte'
+  import Modal from '$components/ui/Modal.svelte'
+  import SongValidationDialog from '$components/dialogs/SongValidationDialog.svelte'
+  import { errorStore } from '$lib/stores/error.svelte'
 
   let stopWatcher: (() => void) | null = null
 
@@ -22,3 +25,10 @@
 <GameAudio />
 <VideoPreloader />
 <AppShell />
+
+<Modal open={errorStore.open} title={errorStore.title} onclose={() => errorStore.dismiss()}>
+  <SongValidationDialog
+    errors={errorStore.messages.map(m => ({ field: '', message: m }))}
+    onclose={() => errorStore.dismiss()}
+  />
+</Modal>

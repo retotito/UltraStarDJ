@@ -7,9 +7,8 @@
   import { playback } from '$lib/stores/playback.svelte'
   import { network } from '$lib/stores/network.svelte'
   import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
-  import { validateSong, type SongValidationError } from '$lib/ultrastar/validate_song'
-  import Modal from '$components/ui/Modal.svelte'
-  import SongValidationDialog from '$components/dialogs/SongValidationDialog.svelte'
+  import { validateSong } from '$lib/ultrastar/validate_song'
+  import { errorStore } from '$lib/stores/error.svelte'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
 
@@ -31,10 +30,6 @@
   const isOfflineYoutube = $derived(
     !!player.song?.youtubeId && !player.song?.videoPath && !player.song?.audioPath && !network.isOnline
   )
-
-  // Validation state
-  let validationErrors = $state<SongValidationError[]>([])
-  let showValidationModal = $state(false)
 
   // Transcoded temp file state
   let transcodedPath = $state<string | null>(null)
@@ -127,29 +122,34 @@
   }
 
   async function addToQueue() {
+    console.log('[PlayerWidget] addToQueue clicked, song:', player.song?.title)
     const song = player.song
     if (!song) return
-    const result = await validateSong(song)
-    if (!result.valid) {
-      validationErrors = result.errors
-      showValidationModal = true
-      return
+    try {
+      const result = await validateSong(song)
+      if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
+      songQueue.add(song)
+    } catch (e) {
+      console.error('[PlayerWidget] addToQueue validation threw:', e)
     }
-    songQueue.add(song)
   }
 
   async function loadIntoPlayer() {
+    console.log('[PlayerWidget] loadIntoPlayer clicked, song:', player.song?.title, 'canLoad:', playback.canLoad)
     const song = player.song
-    if (!song || !playback.canLoad) return
-    const t = performance.now().toFixed(0)
-    console.log(`[PlayerWidget ${t}ms] loadIntoPlayer() — song:${song.title}`)
-    const result = await validateSong(song)
-    if (!result.valid) {
-      validationErrors = result.errors
-      showValidationModal = true
+    if (!song || !playback.canLoad) {
+      console.warn('[PlayerWidget] loadIntoPlayer blocked — song:', !!song, 'canLoad:', playback.canLoad)
       return
     }
-    playback.load(song)
+    const t = performance.now().toFixed(0)
+    console.log(`[PlayerWidget ${t}ms] loadIntoPlayer() — song:${song.title}`)
+    try {
+      const result = await validateSong(song)
+      if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
+      playback.load(song)
+    } catch (e) {
+      console.error('[PlayerWidget] loadIntoPlayer validation threw:', e)
+    }
   }
 </script>
 
@@ -231,10 +231,6 @@
     </div>
   {/if}
 </div>
-
-<Modal open={showValidationModal} title="Song Validation" onclose={() => showValidationModal = false}>
-  <SongValidationDialog errors={validationErrors} onclose={() => showValidationModal = false} />
-</Modal>
 
 <style>
   .player-widget {

@@ -5,6 +5,8 @@
   import { player } from '$lib/stores/player.svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { appSettings } from '$lib/stores/settings.svelte'
+  import { validateSong } from '$lib/ultrastar/validate_song'
+  import { errorStore } from '$lib/stores/error.svelte'
 
   let { songs }: { songs: Song[] } = $props()
 
@@ -14,7 +16,6 @@
   let hoveredId = $state<string | null>(null)
   let menuSongId = $state<string | null>(null)
   let menuPos = $state({ x: 0, y: 0 })
-
   const sorted = $derived(
     [...songs].sort((a, b) => {
       const av = (a[sortKey] ?? '') as string | number
@@ -53,9 +54,19 @@
     player.load(song)
   }
 
-  function addToQueue(song: Song) {
-    songQueue.add(song)
+  async function addToQueue(song: Song) {
     closeMenu()
+    const result = await validateSong(song)
+    if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
+    songQueue.add(song)
+  }
+
+  async function loadSong(song: Song) {
+    if (!playback.canLoad) return
+    closeMenu()
+    const result = await validateSong(song)
+    if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
+    playback.load(song)
   }
 
   $effect(() => {
@@ -158,7 +169,7 @@
     <button class="menu-item" role="menuitem" onclick={() => { player.clear(); player.load(menuSong); closeMenu() }}>
       <span class="icon icon-sm">play_arrow</span> Preview
     </button>
-    <button class="menu-item" role="menuitem" onclick={() => { if (playback.canLoad) { playback.load(menuSong); closeMenu() } }} class:disabled={!playback.canLoad}>
+    <button class="menu-item" role="menuitem" onclick={() => { if (playback.canLoad) loadSong(menuSong) }} class:disabled={!playback.canLoad}>
       <span class="icon icon-sm">play_circle</span> Load into player
     </button>
     <button class="menu-item" role="menuitem" onclick={() => addToQueue(menuSong)}>
