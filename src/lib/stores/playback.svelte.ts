@@ -21,10 +21,15 @@ interface PlaybackState {
 
 let state = $state<PlaybackState>({ status: 'idle', song: null })
 let showClearBeamers = $state(false)
-let beamerReady = $state(true) // true when no beamers open or media is buffered
+let beamerReady = $state(true)
+let isBuffering = $state(false)
 
 // Listen for beamer-ready events from beamer windows
-onBeamerReady(() => { console.log('[playback] beamer-ready received — enabling play'); beamerReady = true })
+onBeamerReady(() => {
+  const t = performance.now().toFixed(0)
+  console.log(`[playback ${t}ms] beamer-ready received — enabling play button`)
+  beamerReady = true
+})
 
 // ── Time-tick loop ────────────────────────────────────────────
 let getTime: (() => number) | null = null
@@ -59,11 +64,19 @@ export const playback = {
   get isActive() { return state.status === 'playing' || state.status === 'paused' },
   /** Cannot load a new song while playing or paused */
   get canLoad()  { return state.status === 'idle' || state.status === 'loaded' || state.status === 'preview' },
-  /** Can play only when a song is loaded, a beamer is open, AND beamer media is buffered */
-  get canPlay()  { return (state.status === 'loaded' || state.status === 'preview') && (displaysStore.display1.open || displaysStore.display2.open) && beamerReady },
+  /** Can play only when a song is loaded, a beamer is open, video is buffered, AND beamer is ready */
+  get canPlay()  { return (state.status === 'loaded' || state.status === 'preview') && (displaysStore.display1.open || displaysStore.display2.open) && beamerReady && !isBuffering },
   get showClearBeamers() { return showClearBeamers },
   get beamerReady() { return beamerReady },
+  get isBuffering() { return isBuffering },
   get currentTime() { return _currentTime },
+
+  /** Called by VideoPreloader when video canplaythrough fires */
+  setBufferingDone() {
+    const t = performance.now().toFixed(0)
+    console.log(`[playback ${t}ms] setBufferingDone — video ready, enabling buttons`)
+    isBuffering = false
+  },
 
   /** Called by PlayerWidget to register how to get current playback time */
   registerTimeProvider(fn: () => number) { console.log('[playback] registerTimeProvider called'); getTime = fn },
@@ -72,7 +85,10 @@ export const playback = {
   /** Load a song into the player without starting playback */
   load(song: Song) {
     if (!playback.canLoad) return
-    console.log('[playback] load() called, song:', song.title, 'audioPath:', song.audioPath, 'videoPath:', song.videoPath)
+    isBuffering = !!(song.videoPath)  // block buttons until VideoPreloader fires canplaythrough
+    beamerReady = true
+    const t = performance.now().toFixed(0)
+    console.log(`[playback ${t}ms] load() song:"${song.title}" videoPath:${song.videoPath ?? 'none'} → isBuffering=${isBuffering}`)
     state = { status: 'loaded', song }
     showClearBeamers = false
     layout.showNowPlaying || layout.toggleNowPlaying()
@@ -82,6 +98,12 @@ export const playback = {
   async preview() {
     if (!state.song || !playback.canPlay) return
     const song = state.song
+    // Video songs need to buffer on beamer — show spinner until canplaythrough fires
+    if (song.videoPath) {
+      beamerReady = false
+      const t = performance.now().toFixed(0)
+      console.log(`[playback ${t}ms] preview() video song — beamerReady=false, waiting for canplaythrough`)
+    }
     state.status = 'preview'
     const assetBase = convertFileSrc('')
     for (const display of [displaysStore.display1, displaysStore.display2]) {

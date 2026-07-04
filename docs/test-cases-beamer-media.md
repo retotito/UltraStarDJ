@@ -17,16 +17,16 @@ Test each case in order. Verify all checkboxes before moving to the next.
 ```
 
 **Expected behavior:**
-- [ ] Loading song does NOT change beamer screen
-- [ ] Hitting Preview shows preview screen on beamer (cover + artist/title)
-- [ ] Play button is enabled immediately (no spinner — image is instant)
-- [ ] After countdown: background image fills beamer, lyrics overlay on top
-- [ ] Pause: audio pauses, image stays (nothing to pause)
-- [ ] Resume: audio resumes
-- [ ] Time counter in DJ modal advances correctly
+- [x] Loading song does NOT change beamer screen
+- [x] Hitting Preview shows preview screen on beamer (cover + artist/title)
+- [x] Play button is enabled immediately (no spinner — image is instant)
+- [x] After countdown: background image fills beamer, lyrics overlay on top
+- [x] Pause: audio pauses, image stays (nothing to pause)
+- [x] Resume: audio resumes
+- [x] Time counter in DJ modal advances correctly
 
 **Known issues / notes:**
-_none so far_
+_none_
 
 ---
 
@@ -43,21 +43,19 @@ _none so far_
 ```
 
 **Expected behavior:**
-- [ ] Loading song does NOT change beamer screen
-- [ ] Hitting Preview: spinner on play button while video buffers
-- [ ] Spinner disappears when video is ready (canplaythrough)
-- [ ] After countdown: video plays fullscreen muted, lyrics overlay on top
-- [ ] Video is in sync with audio (< 0.5s drift)
-- [ ] Both beamers show video at same position (< 0.1s difference)
-- [ ] Pause: audio AND video both pause simultaneously
-- [ ] Resume: audio AND video both resume from same position
-- [ ] DJ player plays from MP3 (not MP4) — confirm in console: `audio source: audio`
+- [x] Loading song does NOT change beamer screen
+- [x] Hitting Preview: spinner on play button while video buffers
+- [x] Spinner disappears when video is ready (canplaythrough)
+- [x] After countdown: video plays fullscreen muted, lyrics overlay on top
+- [x] Video is in sync with audio (< 0.5s drift)
+- [~] Both beamers show video at same position (< 0.1s difference) — ~90ms IPC latency, acceptable
+- [x] Pause: audio AND video both pause simultaneously
+- [x] Resume: audio AND video both resume from same position
+- [x] DJ player plays from MP3 (not MP4) — confirm in console: `audio source: audio`
 
-**Known issues to fix:**
-1. Auto-preview shown when loading (should not)
-2. Spinner stays if song has no MP3
-3. Video continues playing during pause
-4. Beamers show video at different positions
+**Known issues / notes:**
+- ~90ms beamer-to-beamer offset is IPC latency (two separate WebView processes) — not fixable without complex sync protocol
+- `#VIDEOGAP` support needed for precise audio/video alignment per song (planned for pitch detection sprint)
 
 ---
 

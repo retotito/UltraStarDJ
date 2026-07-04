@@ -44,16 +44,18 @@
 
   // Non-video backgrounds are instantly ready
   onMount(() => {
+    const t = performance.now().toFixed(0)
     if (bgType !== 'video') {
-      console.log('[BeamerBackground] ready instantly, bgType:', bgType)
+      console.log(`[BeamerBackground ${t}ms] bgType:${bgType} — ready instantly, sending beamer-ready`)
       sendBeamerReady()
     } else {
-      console.log('[BeamerBackground] video detected, waiting for canplaythrough…', song.videoPath)
+      console.log(`[BeamerBackground ${t}ms] bgType:video — waiting for canplaythrough…`, song.videoPath)
     }
   })
 
   function onVideoCanPlay() {
-    console.log('[BeamerBackground] canplaythrough fired — sending beamer-ready')
+    const t = performance.now().toFixed(0)
+    console.log(`[BeamerBackground ${t}ms] canplaythrough fired — sending beamer-ready`)
     sendBeamerReady()
   }
 </script>

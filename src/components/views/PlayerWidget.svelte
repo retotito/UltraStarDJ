@@ -124,6 +124,8 @@
   }
 
   function loadIntoPlayer() {
+    const t = performance.now().toFixed(0)
+    console.log(`[PlayerWidget ${t}ms] loadIntoPlayer() — song:${player.song?.title} canLoad:${playback.canLoad}`)
     if (player.song && playback.canLoad) playback.load(player.song)
   }
 </script>

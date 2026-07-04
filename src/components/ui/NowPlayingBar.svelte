@@ -154,12 +154,12 @@
         <button
           class="ctrl-btn ctrl-play"
           class:is-blocked={!playback.canPlay}
-          class:is-buffering={playback.isLoaded && !playback.beamerReady}
-          disabled={!playback.canPlay}
-          title={!playback.canPlay && !playback.beamerReady ? 'Buffering video…' : !playback.canPlay ? 'Open a display first' : 'Play'}
+          class:is-buffering={playback.isBuffering}
+          disabled={!playback.canPlay || playback.isBuffering}
+          title={playback.isBuffering ? 'Buffering video…' : !playback.canPlay ? 'Open a display first' : 'Play'}
           onclick={() => playback.play()}
         >
-          {#if playback.isLoaded && !playback.beamerReady}
+          {#if playback.isBuffering}
             <span class="icon spin">progress_activity</span>
           {:else}
             <span class="icon">play_arrow</span>
