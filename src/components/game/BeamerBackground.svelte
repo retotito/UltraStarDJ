@@ -24,15 +24,76 @@
 
   // Video element ref for seek-sync
   let videoEl: HTMLVideoElement | undefined
+  // YouTube IFrame API player instance
+  let ytPlayer: any = null
+  let ytDiv: HTMLDivElement | undefined
+  let ytReady = $state(false)
+
+  // Desired play state while ytPlayer initialises
+  let ytPendingPlay = false
+
+  function initYTPlayer(videoId: string) {
+    if (!ytDiv) return
+    const t = performance.now().toFixed(0)
+    console.log(`[BeamerBackground ${t}ms] initYTPlayer — ytDiv:${!!ytDiv}`)
+    ytPlayer = new (window as any).YT.Player(ytDiv, {
+      videoId,
+      playerVars: {
+        autoplay: 1, mute: 1, controls: 0, rel: 0, fs: 0,
+        disablekb: 1, modestbranding: 1, playsinline: 1,
+      },
+      events: {
+        onReady: (e: any) => {
+          const t2 = performance.now().toFixed(0)
+          console.log(`[BeamerBackground ${t2}ms] YT.Player onReady`)
+          ytReady = true
+          if (ytPendingPlay) e.target.playVideo()
+        },
+        onStateChange: (e: any) => {
+          const t2 = performance.now().toFixed(0)
+          console.log(`[BeamerBackground ${t2}ms] YT.Player stateChange:${e.data}`)
+        },
+      },
+    })
+  }
+
+  function loadYTAPI(videoId: string) {
+    if ((window as any).YT?.Player) {
+      initYTPlayer(videoId)
+      return
+    }
+    const existing = document.getElementById('yt-api-script')
+    if (!existing) {
+      const script = document.createElement('script')
+      script.id = 'yt-api-script'
+      script.src = 'https://www.youtube.com/iframe_api'
+      document.head.appendChild(script)
+    }
+    ;(window as any).onYouTubeIframeAPIReady = () => initYTPlayer(videoId)
+  }
 
   // Control video playback based on playing/paused props
   $effect(() => {
-    if (!videoEl || bgType !== 'video') return
+    if (bgType !== 'video') return
+    if (!videoEl) return
     if (paused) {
       videoEl.pause()
     } else if (playing && videoEl.paused) {
       videoEl.play().catch(() => {})
     }
+  })
+
+  // Control YouTube playback via YT.Player API
+  $effect(() => {
+    if (bgType !== 'youtube') return
+    const t = performance.now().toFixed(0)
+    console.log(`[BeamerBackground ${t}ms] yt effect — playing:${playing} paused:${paused} ready:${ytReady}`)
+    if (!ytReady) {
+      ytPendingPlay = playing
+      return
+    }
+    if (paused) ytPlayer?.pauseVideo()
+    else if (playing) ytPlayer?.playVideo()
   })
 
   // Sync video to currentTime when drift > 0.5s
@@ -42,10 +103,27 @@
     if (drift > 0.5) videoEl.currentTime = currentTime
   })
 
+  // Sync YouTube to currentTime when drift > 0.5s
+  $effect(() => {
+    if (!ytReady || bgType !== 'youtube' || paused) return
+    const ytTime: number = ytPlayer?.getCurrentTime() ?? currentTime
+    const drift = Math.abs(ytTime - currentTime)
+    const t = performance.now().toFixed(0)
+    console.log(`[BeamerBackground ${t}ms] yt-sync currentTime:${currentTime.toFixed(2)} ytTime:${ytTime.toFixed(2)} drift:${drift.toFixed(2)}`)
+    if (drift > 0.5) {
+      console.log(`[BeamerBackground ${t}ms] yt-sync SEEK → ${currentTime.toFixed(2)}`)
+      ytPlayer?.seekTo(currentTime, true)
+    }
+  })
+
   // Non-video backgrounds are instantly ready
   onMount(() => {
     const t = performance.now().toFixed(0)
-    if (bgType !== 'video') {
+    if (bgType === 'youtube' && song.youtubeId) {
+      console.log(`[BeamerBackground ${t}ms] bgType:youtube — loading YT API`)
+      loadYTAPI(song.youtubeId)
+      sendBeamerReady()
+    } else if (bgType !== 'video') {
       console.log(`[BeamerBackground ${t}ms] bgType:${bgType} — ready instantly, sending beamer-ready`)
       sendBeamerReady()
     } else {
@@ -72,13 +150,7 @@
   ></video>
 
 {:else if bgType === 'youtube' && song.youtubeId}
-  <iframe
-    class="bg-media"
-    src="https://www.youtube-nocookie.com/embed/{song.youtubeId}?autoplay=1&mute=1&controls=0&iv_load_policy=3&modestbranding=1&playsinline=1&rel=0&enablejsapi=1"
-    title="background video"
-    allow="autoplay"
-    referrerpolicy="no-referrer"
-  ></iframe>
+  <div bind:this={ytDiv} class="bg-media yt-container"></div>
 
 {:else if bgType === 'image' && song.backgroundPath}
   <img
@@ -112,6 +184,15 @@
 
   .bg-image {
     object-fit: cover;
+  }
+
+  /* YT IFrame API replaces the div with an iframe — ensure it fills */
+  .yt-container :global(iframe) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
   }
 
   .bg-cover {

@@ -10,7 +10,13 @@ Buffering happens entirely on the DJ side — independent of the beamer.
 ```
 User hits "Load" (PlayerWidget → playback.load())
   │
-  ├─ song has videoPath?
+  ├─ song has videoPath + needsTranscode? (MPG, AVI, MKV, WMV, FLV)
+  │     YES → set isBuffering = true
+  │           await transcodeToMp4(song.videoPath)  ← FFmpeg, ~1-3s
+  │           song.videoPath = tempMp4Path           ← mutate working copy
+  │           (on error: clear videoPath, continue audio-only)
+  │
+  ├─ song has videoPath (now always MP4)?
   │     YES → set isBuffering = true
   │           mount hidden <video> element in NowPlayingBar (or AppShell)
   │           video starts preloading in background (no sound, display:none)

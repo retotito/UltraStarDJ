@@ -25,7 +25,7 @@
       "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; img-src 'self' asset: media: https: data: blob:; media-src 'self' asset: media: blob:; style-src 'self' 'unsafe-inline'",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$HOME/**", "/Volumes/**"]
+        "scope": ["$HOME/**", "/Volumes/**", "$TEMP/**"]
       }
     }
   },

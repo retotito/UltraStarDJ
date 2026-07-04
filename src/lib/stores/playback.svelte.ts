@@ -8,7 +8,7 @@ import { player } from '$lib/stores/player.svelte'
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
 import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, onBeamerReady } from '$lib/ipc/tauri'
-import { readFile } from '$lib/ipc/tauri'
+import { readFile, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
 import { parseSongNotes } from '$lib/ultrastar/parser'
 import { convertFileSrc } from '@tauri-apps/api/core'
 
@@ -23,6 +23,7 @@ let state = $state<PlaybackState>({ status: 'idle', song: null })
 let showClearBeamers = $state(false)
 let beamerReady = $state(true)
 let isBuffering = $state(false)
+let _transcodedPath: string | null = null  // temp MP4 to delete on dismiss
 
 // Listen for beamer-ready events from beamer windows
 onBeamerReady(() => {
@@ -83,10 +84,32 @@ export const playback = {
   unregisterTimeProvider() { console.log('[playback] unregisterTimeProvider called'); getTime = null },
 
   /** Load a song into the player without starting playback */
-  load(song: Song) {
+  async load(song: Song) {
     if (!playback.canLoad) return
-    isBuffering = !!(song.videoPath)  // block buttons until VideoPreloader fires canplaythrough
+    // Clean up any previous transcoded temp file
+    if (_transcodedPath) { deleteTempFile(_transcodedPath).catch(() => {}); _transcodedPath = null }
+
+    // Block buttons for the entire load sequence (transcode + buffer)
+    isBuffering = !!(song.videoPath)
     beamerReady = true
+
+    // Transcode unsupported video formats (MPG, AVI, MKV…) to MP4 before buffering
+    if (song.videoPath && needsTranscode(song.videoPath)) {
+      const t = performance.now().toFixed(0)
+      console.log(`[playback ${t}ms] load() transcoding ${song.videoPath}`)
+      try {
+        const tempPath = await transcodeToMp4(song.videoPath)
+        _transcodedPath = tempPath
+        song = { ...song, videoPath: tempPath }
+        console.log(`[playback ${performance.now().toFixed(0)}ms] load() transcode done → ${tempPath}`)
+      } catch (e) {
+        console.error('[playback] transcode failed:', e)
+        isBuffering = false
+        // Proceed without video — song still playable with audio only
+        song = { ...song, videoPath: undefined }
+      }
+    }
+
     const t = performance.now().toFixed(0)
     console.log(`[playback ${t}ms] load() song:"${song.title}" videoPath:${song.videoPath ?? 'none'} → isBuffering=${isBuffering}`)
     state = { status: 'loaded', song }
@@ -180,5 +203,6 @@ export const playback = {
   dismiss() {
     state = { status: 'idle', song: null }
     showClearBeamers = false
+    if (_transcodedPath) { deleteTempFile(_transcodedPath).catch(() => {}); _transcodedPath = null }
   },
 }

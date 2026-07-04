@@ -10,7 +10,7 @@
     const result = await validateSong(song)
     if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
     songQueue.remove(songId)
-    playback.load(result.song)
+    await playback.load(result.song)
   }
 </script>
 
