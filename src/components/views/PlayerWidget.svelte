@@ -13,8 +13,12 @@
 
   type MediaType = 'video' | 'youtube' | 'audio' | 'none'
 
+  // When a song is loaded into playback, use that for Plyr (audio master clock).
+  // Otherwise fall back to the preview player song.
+  const plyrSong = $derived(playback.isLoaded ? playback.song : player.song)
+
   const mediaType = $derived.by((): MediaType => {
-    const s = player.song
+    const s = plyrSong
     if (!s) return 'none'
     if (s.audioPath) return 'audio'          // MP3 always preferred for audio
     if (s.videoPath) return 'video'          // MP4 audio fallback (no MP3)
@@ -42,6 +46,7 @@
 
   // Listen for beamer countdown-done event to start audio at the right moment
   const unlistenCountdown = onCountdownDone(() => {
+    if (!playback.isLoaded) return   // ignore if preview player is active
     if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
     plyrPlay()
   })
@@ -54,14 +59,14 @@
     if (p instanceof Promise) p.catch(e => console.error('[PlayerWidget] plyr.play() rejected:', e))
   }
 
-  // Drive Plyr from playback store status
+  // Drive Plyr from playback store status — ONLY when a game song is loaded.
+  // When playback is idle, plyrRef is the preview player and must not be controlled here.
   $effect(() => {
     const s = playback.status
-    console.log('[PlayerWidget] status effect fired, status:', s, 'plyrRef:', plyrRef ? 'set' : 'null', 'player.song:', player.song?.title ?? 'null', 'mediaType:', mediaType)
     if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
-    if (!plyrRef) return
+    if (!plyrRef || !playback.isLoaded) return
     if (s === 'playing') {
-      // Wait for beamer countdown-done IPC — do nothing here, plyrPlay() fires from listener
+      // Wait for beamer countdown-done IPC — plyrPlay() fires from listener
     }
     else if (s === 'paused') plyrRef.pause()
     else if (s === 'loaded' || s === 'idle') { try { plyrRef.stop() } catch {} }
@@ -70,7 +75,7 @@
   // Reset transcoding state BEFORE the DOM update so {#if transcodedPath}
   // never renders with a stale value from the previous song.
   $effect.pre(() => {
-    player.song  // track song changes
+    plyrSong  // track plyrSong changes (playback.song when loaded, else player.song)
     untrack(() => {
       const prev = transcodedPath
       transcodedPath = null
@@ -81,18 +86,18 @@
   })
 
   $effect(() => {
-    const song = player.song
+    const song = plyrSong
     if (!song) return
     if (song.videoPath && needsTranscode(song.videoPath)) {
       transcoding = true
       transcodeToMp4(song.videoPath)
         .then(p => {
-          if (player.song !== song) return  // song changed while transcoding — discard
+          if (plyrSong !== song) return  // song changed while transcoding — discard
           transcodedPath = p
           transcoding = false
         })
         .catch(e => {
-          if (player.song !== song) return
+          if (plyrSong !== song) return
           transcodeError = String(e)
           transcoding = false
         })
@@ -106,8 +111,8 @@
     })
     playback.registerTimeProvider(() => instance.currentTime)
     plyrRef = instance
-    console.log('[PlayerWidget] plyrYoutubeAction mounted — audio source: YouTube', player.song?.youtubeId)
-    // countdown-done IPC will trigger plyrPlay() when beamer countdown finishes
+    console.log('[PlayerWidget] plyrYoutubeAction mounted — audio source: YouTube', plyrSong?.youtubeId)
+    // countdown-done IPC will trigger plyrPlay() when beamer countdown finishes (only if playback.isLoaded)
 
     return {
       destroy() {
@@ -131,9 +136,10 @@
       resetOnEnd: true,
     })
 
-    playback.registerTimeProvider(() => instance.currentTime)
+    // Only register as time provider when mounted as the game audio (not preview player)
+    if (playback.isLoaded) playback.registerTimeProvider(() => instance.currentTime)
     plyrRef = instance
-    console.log('[PlayerWidget] plyrAction mounted, plyrRef set')
+    console.log('[PlayerWidget] plyrAction mounted — isLoaded:', playback.isLoaded)
 
     function mimeForPath(path: string): string {
       const ext = path.split('.').pop()?.toLowerCase() ?? ''
@@ -192,9 +198,9 @@
 <div class="player-widget">
   {#if player.song}
     <div class="media-area">
-      {#key player.song}
-      {#if mediaType === 'video' && player.song.videoPath}
-        {#if needsTranscode(player.song.videoPath)}
+      {#key plyrSong}
+      {#if mediaType === 'video' && plyrSong?.videoPath}
+        {#if needsTranscode(plyrSong.videoPath)}
           {#if transcoding}
             <!-- Converting MPEG-2/AVI → MP4, usually takes 1-3 seconds -->
             <div class="transcode-overlay">
@@ -207,25 +213,25 @@
             </div>
           {:else if transcodedPath}
             <!-- svelte-ignore a11y_media_has_caption -->
-            <video use:plyrAction={{ song: player.song, type: 'video', src: transcodedPath, poster: coverSrc }} playsinline></video>
+            <video use:plyrAction={{ song: plyrSong, type: 'video', src: transcodedPath, poster: coverSrc }} playsinline></video>
           {/if}
         {:else}
           <!-- svelte-ignore a11y_media_has_caption -->
-          <video use:plyrAction={{ song: player.song, type: 'video', poster: coverSrc }} playsinline></video>
+          <video use:plyrAction={{ song: plyrSong, type: 'video', poster: coverSrc }} playsinline></video>
         {/if}
 
-      {:else if mediaType === 'youtube' && player.song.youtubeId}
+      {:else if mediaType === 'youtube' && plyrSong?.youtubeId}
         <div
           class="yt-embed"
           data-plyr-provider="youtube"
-          data-plyr-embed-id={player.song.youtubeId}
-          use:plyrYoutubeAction={player.song.youtubeId}
+          data-plyr-embed-id={plyrSong.youtubeId}
+          use:plyrYoutubeAction={plyrSong.youtubeId}
         ></div>
 
-      {:else if mediaType === 'audio' && player.song.audioPath}
+      {:else if mediaType === 'audio' && plyrSong?.audioPath}
         <div class="audio-backdrop">
           <img class="cover-img" src={coverSrc} alt="cover" />
-          <audio use:plyrAction={{ song: player.song, type: 'audio' }}></audio>
+          <audio use:plyrAction={{ song: plyrSong, type: 'audio' }}></audio>
         </div>
 
       {:else if isOfflineYoutube}

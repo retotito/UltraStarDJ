@@ -70,29 +70,12 @@ export const playback = {
   unregisterTimeProvider() { console.log('[playback] unregisterTimeProvider called'); getTime = null },
 
   /** Load a song into the player without starting playback */
-  async load(song: Song) {
+  load(song: Song) {
     if (!playback.canLoad) return
     console.log('[playback] load() called, song:', song.title, 'audioPath:', song.audioPath, 'videoPath:', song.videoPath)
-    player.load(song)
     state = { status: 'loaded', song }
     showClearBeamers = false
     layout.showNowPlaying || layout.toggleNowPlaying()
-
-    // Send preview to all open beamers so they start buffering media immediately
-    const assetBase = convertFileSrc('')
-    const openDisplays = [displaysStore.display1, displaysStore.display2].filter(d => d.open)
-    if (openDisplays.length > 0) {
-      console.log('[playback] beamers open, waiting for beamer-ready before enabling play')
-      beamerReady = false  // disable play until beamer signals ready
-      for (const display of openDisplays) {
-        await sendPreviewSong({
-          song,
-          assetBase,
-          playerIds: [...display.playerIds].sort((a, b) => a - b),
-          windowLabel: display.label,
-        })
-      }
-    }
   },
 
   /** Send preview-song to beamers — show get-ready screen without starting audio */
