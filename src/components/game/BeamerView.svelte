@@ -112,7 +112,7 @@
 
   {:else if (screen === 'playing' || screen === 'paused') && payload}
     <div class="playing-screen">
-      <BeamerBackground song={payload.song} assetBase={payload.assetBase} {currentTime} />
+      <BeamerBackground song={payload.song} assetBase={payload.assetBase} {currentTime} playing={screen === 'playing'} paused={screen === 'paused'} />
       <div class="playing-overlay">
         <div class="now-playing-header">
           <span class="np-artist">{payload.song.artist}</span>

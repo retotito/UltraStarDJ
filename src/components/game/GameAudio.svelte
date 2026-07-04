@@ -34,10 +34,10 @@
   $effect(() => {
     const s = playback.status
     if (s === 'playing') {
-      // Resume case — countdown-done handles the initial start,
-      // but resume from pause must call play() directly
-      if (audioEl && audioEl.paused) {
-        console.log('[GameAudio] status → playing (resume), calling play()')
+      // Only resume if we've already started (currentTime > 0).
+      // Initial start must wait for countdown-done IPC, not this effect.
+      if (audioEl && audioEl.paused && audioEl.currentTime > 0) {
+        console.log('[GameAudio] status → playing (resume from pause), calling play()')
         audioEl.play().catch(e => console.error('[GameAudio] resume play() rejected:', e))
       }
     } else if (s === 'paused') {

@@ -3,10 +3,12 @@
   import type { Song } from '$lib/ultrastar/types'
   import { sendBeamerReady } from '$lib/ipc/tauri'
 
-  let { song, assetBase, currentTime }: {
+  let { song, assetBase, currentTime, playing = false, paused = false }: {
     song: Song
     assetBase: string
     currentTime: number
+    playing?: boolean
+    paused?: boolean
   } = $props()
 
   // Priority: videoPath > youtubeId > backgroundPath > coverPath > placeholder
@@ -23,9 +25,19 @@
   // Video element ref for seek-sync
   let videoEl: HTMLVideoElement | undefined
 
-  // Sync video to currentTime when drift > 0.5s
+  // Control video playback based on playing/paused props
   $effect(() => {
     if (!videoEl || bgType !== 'video') return
+    if (paused) {
+      videoEl.pause()
+    } else if (playing && videoEl.paused) {
+      videoEl.play().catch(() => {})
+    }
+  })
+
+  // Sync video to currentTime when drift > 0.5s
+  $effect(() => {
+    if (!videoEl || bgType !== 'video' || paused) return
     const drift = Math.abs(videoEl.currentTime - currentTime)
     if (drift > 0.5) videoEl.currentTime = currentTime
   })
@@ -54,7 +66,6 @@
     src="{assetBase}{song.videoPath}"
     muted
     playsinline
-    autoplay
     oncanplaythrough={onVideoCanPlay}
   ></video>
 
