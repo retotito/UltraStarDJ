@@ -33,13 +33,21 @@
   // React to playback status changes
   $effect(() => {
     const s = playback.status
-    if (s === 'paused') {
+    if (s === 'playing') {
+      // Resume case — countdown-done handles the initial start,
+      // but resume from pause must call play() directly
+      if (audioEl && audioEl.paused) {
+        console.log('[GameAudio] status → playing (resume), calling play()')
+        audioEl.play().catch(e => console.error('[GameAudio] resume play() rejected:', e))
+      }
+    } else if (s === 'paused') {
+      console.log('[GameAudio] status → paused')
       audioEl?.pause()
     } else if (s === 'loaded' || s === 'idle') {
+      console.log('[GameAudio] status → stopped/reset')
       audioEl?.pause()
       if (audioEl) audioEl.currentTime = 0
     }
-    // 'playing' is handled by the countdown-done listener
   })
 
   onMount(async () => {
