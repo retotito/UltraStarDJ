@@ -49,8 +49,10 @@
 
   function closeMenu() { menuSongId = null }
 
-  function handleRowClick(song: Song) {
-    player.clear()   // destroy current player first
+  async function previewSong(song: Song) {
+    const result = await validateSong(song)
+    if (!result.valid) { errorStore.show('Song cannot be previewed', result.errors.map(e => e.message)); return }
+    player.clear()
     player.load(song)
   }
 
@@ -113,7 +115,7 @@
           class="song-row"
           class:selected={player.song?.id === song.id}
           class:hovered={hoveredId === song.id}
-          onclick={() => handleRowClick(song)}
+          ondblclick={() => previewSong(song)}
           onmouseenter={() => hoveredId = song.id}
           onmouseleave={() => hoveredId = null}
           oncontextmenu={(e) => { e.preventDefault(); openMenu(e, song) }}
@@ -166,7 +168,7 @@
     style="left: {menuPos.x}px; top: {menuPos.y}px"
     role="menu"
   >
-    <button class="menu-item" role="menuitem" onclick={() => { player.clear(); player.load(menuSong); closeMenu() }}>
+    <button class="menu-item" role="menuitem" onclick={() => { previewSong(menuSong); closeMenu() }}>
       <span class="icon icon-sm">play_arrow</span> Preview
     </button>
     <button class="menu-item" role="menuitem" onclick={() => { if (playback.canLoad) loadSong(menuSong) }} class:disabled={!playback.canLoad}>
