@@ -111,6 +111,58 @@ _none so far_
 
 ---
 
+## Case 5 — MP3 + Cover Only (no background, no video)
+
+**Song folder setup:**
+```
+#TITLE:Test-MP3-Cover
+#ARTIST:Test
+#MP3:song.mp3
+#COVER:cover.jpg
+#BPM:120
+#GAP:0
+```
+
+**Expected behavior:**
+- [ ] Loading song does NOT change beamer screen
+- [ ] Hitting Preview shows preview screen on beamer (cover + artist/title)
+- [ ] Play button is enabled immediately (no spinner — image is instant)
+- [ ] After countdown: blurred cover fills beamer background, lyrics overlay on top
+- [ ] Pause: audio pauses, image stays
+- [ ] Resume: audio resumes
+- [ ] Time counter in DJ modal advances correctly
+
+**Known issues / notes:**
+_none so far_
+
+---
+
+## Case 6 — MP4 Only (no MP3)
+
+**Song folder setup:**
+```
+#TITLE:Test-MP4-Only
+#ARTIST:Test
+#VIDEO:video.mp4
+#BPM:120
+#GAP:0
+```
+
+**Expected behavior:**
+- [ ] Loading song does NOT change beamer screen
+- [ ] Hitting Preview: spinner on play button while video buffers
+- [ ] Spinner disappears when video is ready (canplaythrough)
+- [ ] After countdown: video plays fullscreen muted on beamer, lyrics overlay
+- [ ] DJ audio plays from the MP4 file (browser extracts audio track)
+- [ ] Video is in sync with audio (< 0.5s drift)
+- [ ] Pause: audio AND video both pause
+- [ ] Resume: both resume from same position
+
+**Known issues / notes:**
+_none so far_
+
+---
+
 ## Issue Log
 
 | # | Case | Issue | Status |

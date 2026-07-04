@@ -9,7 +9,7 @@
   import { playback } from '$lib/stores/playback.svelte'
   import { onCountdownDone, toAssetUrl } from '$lib/ipc/tauri'
 
-  let audioEl: HTMLAudioElement | undefined
+  let audioEl = $state<HTMLAudioElement | undefined>(undefined)
   let unlistenCountdown: (() => void) | null = null
 
   const audioSrc = $derived.by(() => {
@@ -32,13 +32,12 @@
 
   // React to playback status changes
   $effect(() => {
-    if (!audioEl) return
     const s = playback.status
     if (s === 'paused') {
-      audioEl.pause()
+      audioEl?.pause()
     } else if (s === 'loaded' || s === 'idle') {
-      audioEl.pause()
-      audioEl.currentTime = 0
+      audioEl?.pause()
+      if (audioEl) audioEl.currentTime = 0
     }
     // 'playing' is handled by the countdown-done listener
   })
@@ -59,7 +58,7 @@
   })
 </script>
 
-<!-- Hidden audio element — no visual output -->
+<!-- Only mount when there is a real audio source (YouTube-only songs have none) -->
 {#if audioSrc}
   <audio
     bind:this={audioEl}
