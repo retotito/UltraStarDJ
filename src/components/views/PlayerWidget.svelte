@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte'
   import Plyr from 'plyr'
   import 'plyr/dist/plyr.css'
   import { untrack } from 'svelte'
@@ -7,26 +6,21 @@
   import { songQueue } from '$lib/stores/queue.svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { network } from '$lib/stores/network.svelte'
-  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, onCountdownDone } from '$lib/ipc/tauri'
+  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
 
   type MediaType = 'video' | 'youtube' | 'audio' | 'none'
 
-  // When a song is loaded into playback, use that for Plyr (audio master clock).
-  // Otherwise fall back to the preview player song.
-  const plyrSong = $derived(playback.isLoaded ? playback.song : player.song)
-
   const mediaType = $derived.by((): MediaType => {
-    const s = plyrSong
+    const s = player.song
     if (!s) return 'none'
-    if (s.audioPath) return 'audio'          // MP3 always preferred for audio
-    if (s.videoPath) return 'video'          // MP4 audio fallback (no MP3)
+    if (s.videoPath) return 'video'          // show video if available (preview player prefers visual)
     if (s.youtubeId && network.isOnline) return 'youtube'
+    if (s.audioPath) return 'audio'          // audio-only fallback
     return 'none'
   })
 
-  // Cover: synchronous media:// URL — no async, no timing issues
   const coverSrc = $derived(
     player.song?.coverPath ? toAssetUrl(player.song.coverPath) : placeholderSrc
   )
@@ -40,42 +34,9 @@
   let transcoding = $state(false)
   let transcodeError = $state<string | null>(null)
 
-  // Plyr instance ref — set by the action so $effect can drive play/pause/stop
-  let plyrRef: Plyr | null = null
-  let playDelayTimer: ReturnType<typeof setTimeout> | null = null
-
-  // Listen for beamer countdown-done event to start audio at the right moment
-  const unlistenCountdown = onCountdownDone(() => {
-    if (!playback.isLoaded) return   // ignore if preview player is active
-    if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
-    plyrPlay()
-  })
-  onDestroy(async () => (await unlistenCountdown)())
-
-  function plyrPlay() {
-    if (!plyrRef) { console.warn('[PlayerWidget] plyrPlay called but plyrRef is null'); return }
-    console.log('[PlayerWidget] plyrPlay() — starting audio')
-    const p = plyrRef.play()
-    if (p instanceof Promise) p.catch(e => console.error('[PlayerWidget] plyr.play() rejected:', e))
-  }
-
-  // Drive Plyr from playback store status — ONLY when a game song is loaded.
-  // When playback is idle, plyrRef is the preview player and must not be controlled here.
-  $effect(() => {
-    const s = playback.status
-    if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
-    if (!plyrRef || !playback.isLoaded) return
-    if (s === 'playing') {
-      // Wait for beamer countdown-done IPC — plyrPlay() fires from listener
-    }
-    else if (s === 'paused') plyrRef.pause()
-    else if (s === 'loaded' || s === 'idle') { try { plyrRef.stop() } catch {} }
-  })
-
-  // Reset transcoding state BEFORE the DOM update so {#if transcodedPath}
-  // never renders with a stale value from the previous song.
+  // Reset transcoding state before DOM update when song changes
   $effect.pre(() => {
-    plyrSong  // track plyrSong changes (playback.song when loaded, else player.song)
+    player.song
     untrack(() => {
       const prev = transcodedPath
       transcodedPath = null
@@ -86,46 +47,35 @@
   })
 
   $effect(() => {
-    const song = plyrSong
+    const song = player.song
     if (!song) return
     if (song.videoPath && needsTranscode(song.videoPath)) {
       transcoding = true
       transcodeToMp4(song.videoPath)
         .then(p => {
-          if (plyrSong !== song) return  // song changed while transcoding — discard
+          if (player.song !== song) return
           transcodedPath = p
           transcoding = false
         })
         .catch(e => {
-          if (plyrSong !== song) return
+          if (player.song !== song) return
           transcodeError = String(e)
           transcoding = false
         })
     }
   })
 
+  // Plyr action — preview player only, no connection to game playback
   function plyrYoutubeAction(node: HTMLDivElement, youtubeId: string) {
     const instance = new Plyr(node, {
       controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume'],
       autoplay: false,
     })
-    playback.registerTimeProvider(() => instance.currentTime)
-    plyrRef = instance
-    console.log('[PlayerWidget] plyrYoutubeAction mounted — audio source: YouTube', plyrSong?.youtubeId)
-    // countdown-done IPC will trigger plyrPlay() when beamer countdown finishes (only if playback.isLoaded)
-
     return {
-      destroy() {
-        if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
-        playback.unregisterTimeProvider()
-        plyrRef = null
-        try { instance.destroy() } catch {}
-      },
+      destroy() { try { instance.destroy() } catch {} },
     }
   }
 
-  // Svelte action — attached to the media element itself so Plyr lifecycle
-  // is tied to element lifetime, not component effects.
   function plyrAction(
     node: HTMLAudioElement | HTMLVideoElement,
     params: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }
@@ -135,11 +85,6 @@
       autoplay: false,
       resetOnEnd: true,
     })
-
-    // Only register as time provider when mounted as the game audio (not preview player)
-    if (playback.isLoaded) playback.registerTimeProvider(() => instance.currentTime)
-    plyrRef = instance
-    console.log('[PlayerWidget] plyrAction mounted — isLoaded:', playback.isLoaded)
 
     function mimeForPath(path: string): string {
       const ext = path.split('.').pop()?.toLowerCase() ?? ''
@@ -154,35 +99,23 @@
     function load(p: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }) {
       const filePath = p.src ?? (p.type === 'audio' ? p.song.audioPath : p.song.videoPath)
       if (!filePath) return
-      if (filePath === loadedSrc) return  // poster-only update — skip reload
+      if (filePath === loadedSrc) return
       loadedSrc = filePath
-      const src = toAssetUrl(filePath)
-      const type = mimeForPath(filePath)
       instance.source = {
         type: p.type,
-        sources: [{ src, type }],
+        sources: [{ src: toAssetUrl(filePath), type: mimeForPath(filePath) }],
         ...(p.type === 'video' && p.poster ? { poster: p.poster } : {}),
       }
     }
 
     let loadedSrc: string | undefined
     load(params)
-    console.log('[PlayerWidget] plyrAction mounted — audio source:', params.type, '→', params.src ?? (params.type === 'audio' ? params.song.audioPath : params.song.videoPath))
 
-    instance.on('error', () => {
-      console.warn('[PlayerWidget] media load error — format may be unsupported')
-    })
+    instance.on('error', () => console.warn('[PreviewPlayer] media load error'))
 
     return {
-      update(newParams: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }) {
-        load(newParams)
-      },
-      destroy() {
-        if (playDelayTimer) { clearTimeout(playDelayTimer); playDelayTimer = null }
-        playback.unregisterTimeProvider()
-        plyrRef = null
-        try { instance.destroy() } catch {}
-      },
+      update(p: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }) { load(p) },
+      destroy() { try { instance.destroy() } catch {} },
     }
   }
 
@@ -198,9 +131,9 @@
 <div class="player-widget">
   {#if player.song}
     <div class="media-area">
-      {#key plyrSong}
-      {#if mediaType === 'video' && plyrSong?.videoPath}
-        {#if needsTranscode(plyrSong.videoPath)}
+      {#key player.song}
+      {#if mediaType === 'video' && player.song.videoPath}
+        {#if needsTranscode(player.song.videoPath)}
           {#if transcoding}
             <!-- Converting MPEG-2/AVI → MP4, usually takes 1-3 seconds -->
             <div class="transcode-overlay">
@@ -213,25 +146,25 @@
             </div>
           {:else if transcodedPath}
             <!-- svelte-ignore a11y_media_has_caption -->
-            <video use:plyrAction={{ song: plyrSong, type: 'video', src: transcodedPath, poster: coverSrc }} playsinline></video>
+            <video use:plyrAction={{ song: player.song, type: 'video', src: transcodedPath, poster: coverSrc }} playsinline></video>
           {/if}
         {:else}
           <!-- svelte-ignore a11y_media_has_caption -->
-          <video use:plyrAction={{ song: plyrSong, type: 'video', poster: coverSrc }} playsinline></video>
+          <video use:plyrAction={{ song: player.song, type: 'video', poster: coverSrc }} playsinline></video>
         {/if}
 
-      {:else if mediaType === 'youtube' && plyrSong?.youtubeId}
+      {:else if mediaType === 'youtube' && player.song.youtubeId}
         <div
           class="yt-embed"
           data-plyr-provider="youtube"
-          data-plyr-embed-id={plyrSong.youtubeId}
-          use:plyrYoutubeAction={plyrSong.youtubeId}
+          data-plyr-embed-id={player.song.youtubeId}
+          use:plyrYoutubeAction={player.song.youtubeId}
         ></div>
 
-      {:else if mediaType === 'audio' && plyrSong?.audioPath}
+      {:else if mediaType === 'audio' && player.song.audioPath}
         <div class="audio-backdrop">
           <img class="cover-img" src={coverSrc} alt="cover" />
-          <audio use:plyrAction={{ song: plyrSong, type: 'audio' }}></audio>
+          <audio use:plyrAction={{ song: player.song, type: 'audio' }}></audio>
         </div>
 
       {:else if isOfflineYoutube}

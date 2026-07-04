@@ -3,6 +3,7 @@
   import { appSettings } from '$lib/stores/settings.svelte'
   import { songLibrary } from '$lib/stores/songs.svelte'
   import AppShell from '$components/AppShell.svelte'
+  import GameAudio from '$components/game/GameAudio.svelte'
 
   let stopWatcher: (() => void) | null = null
 
@@ -17,4 +18,5 @@
   })
 </script>
 
+<GameAudio />
 <AppShell />
