@@ -76,9 +76,15 @@
   $effect(() => {
     if (bgType !== 'video') return
     if (!videoEl) return
+    const videoGapSecs = song.videoGap ?? 0
     if (paused) {
       videoEl.pause()
     } else if (playing && videoEl.paused) {
+      // Seek to correct position before starting (videoGap offset + current audio time)
+      const targetTime = currentTime + videoGapSecs
+      if (Math.abs(videoEl.currentTime - targetTime) > 0.1) {
+        videoEl.currentTime = targetTime
+      }
       videoEl.play().catch(() => {})
     }
   })
@@ -97,22 +103,27 @@
   })
 
   // Sync video to currentTime when drift > 0.5s
+  // videoGap (seconds) = how far into the video to be when audio is at 0s
   $effect(() => {
     if (!videoEl || bgType !== 'video' || paused) return
-    const drift = Math.abs(videoEl.currentTime - currentTime)
-    if (drift > 0.5) videoEl.currentTime = currentTime
+    const videoGapSecs = song.videoGap ?? 0
+    const targetTime = currentTime + videoGapSecs
+    const drift = Math.abs(videoEl.currentTime - targetTime)
+    if (drift > 0.5) videoEl.currentTime = targetTime
   })
 
   // Sync YouTube to currentTime when drift > 0.5s
   $effect(() => {
     if (!ytReady || bgType !== 'youtube' || paused) return
-    const ytTime: number = ytPlayer?.getCurrentTime() ?? currentTime
-    const drift = Math.abs(ytTime - currentTime)
+    const videoGapSecs = song.videoGap ?? 0
+    const targetTime = currentTime + videoGapSecs
+    const ytTime: number = ytPlayer?.getCurrentTime() ?? targetTime
+    const drift = Math.abs(ytTime - targetTime)
     const t = performance.now().toFixed(0)
-    console.log(`[BeamerBackground ${t}ms] yt-sync currentTime:${currentTime.toFixed(2)} ytTime:${ytTime.toFixed(2)} drift:${drift.toFixed(2)}`)
+    console.log(`[BeamerBackground ${t}ms] yt-sync currentTime:${currentTime.toFixed(2)} ytTime:${ytTime.toFixed(2)} target:${targetTime.toFixed(2)} drift:${drift.toFixed(2)}`)
     if (drift > 0.5) {
-      console.log(`[BeamerBackground ${t}ms] yt-sync SEEK → ${currentTime.toFixed(2)}`)
-      ytPlayer?.seekTo(currentTime, true)
+      console.log(`[BeamerBackground ${t}ms] yt-sync SEEK → ${targetTime.toFixed(2)}`)
+      ytPlayer?.seekTo(targetTime, true)
     }
   })
 

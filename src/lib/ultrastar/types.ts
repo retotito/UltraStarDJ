@@ -31,7 +31,7 @@ export interface Song {
   youtubeId?: string
 
   /* --- Video timing --- */
-  videoGap?: number    // ms offset for video vs audio
+  videoGap?: number    // seconds offset for video vs audio (UltraStar #VIDEOGAP)
 
   /* --- Parsed notes (loaded on demand, not at library scan) --- */
   notes?: NoteTrack[]

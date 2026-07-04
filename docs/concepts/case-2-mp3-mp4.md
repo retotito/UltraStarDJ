@@ -85,7 +85,15 @@ export async function transcodeToMp4(input: string): Promise<string> { … }
 export async function deleteTempFile(path: string): Promise<void> { … }
 ```
 
-## Known issues / open work
+### Video/audio alignment (`#VIDEOGAP`)
+`#VIDEOGAP` (in seconds) defines where in the video file to start when audio starts at 0s.
+Example: `#VIDEOGAP:19.5` → video starts at frame 19.5s, audio starts at 0s.
+
+Implementation in `BeamerBackground`:
+- On play start: `videoEl.currentTime = currentTime + videoGap` before `play()`
+- Drift-sync: target = `currentTime + videoGap` (not just `currentTime`)
+
+> Note: `#GAP` is in milliseconds (audio offset before first note). `#VIDEOGAP` is in seconds. These are independent.
 
 | Issue | Status |
 |---|---|

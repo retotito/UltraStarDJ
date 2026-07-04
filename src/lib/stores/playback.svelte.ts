@@ -154,15 +154,18 @@ export const playback = {
       try {
         const txt = await readFile(song.txtPath)
         song.notes = parseSongNotes(txt)
+        console.log(`[playback] play() notes parsed — tracks:${song.notes?.length} txtPath:${song.txtPath}`)
       } catch (e) {
         console.warn('[playback] failed to parse notes', e)
       }
+    } else {
+      console.log(`[playback] play() notes — already:${!!song.notes} txtPath:${song.txtPath}`)
     }
 
     for (const display of [displaysStore.display1, displaysStore.display2]) {
       if (display.open) {
         await sendPlaySong({
-          song,
+          song: $state.snapshot(song) as Song,
           assetBase,
           playerIds: [...display.playerIds].sort((a, b) => a - b),
           windowLabel: display.label,

@@ -128,7 +128,6 @@
               {currentTime}
               bpm={payload.song.bpm}
               gap={payload.song.gap}
-              videoGap={payload.song.videoGap ?? 0}
             />
           {:else}
             <span class="lyrics-placeholder">♪ No lyrics available ♪</span>

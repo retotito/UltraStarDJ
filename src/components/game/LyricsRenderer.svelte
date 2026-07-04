@@ -1,18 +1,17 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
 
-  let { tracks, currentTime, bpm, gap, videoGap = 0 }: {
+  let { tracks, currentTime, bpm, gap }: {
     tracks: NoteTrack[]
     currentTime: number
     bpm: number
     gap: number       // ms offset before first note
-    videoGap?: number // seconds
   } = $props()
 
   // UltraStar beat formula:
-  // beat = (currentTime - videoGap - gap/1000) * (bpm / 60) * 4
+  // beat = (currentTime - gap/1000) * (bpm / 60) * 4
   const currentBeat = $derived(
-    Math.max(0, (currentTime - videoGap - gap / 1000) * (bpm / 60) * 4)
+    Math.max(0, (currentTime - gap / 1000) * (bpm / 60) * 4)
   )
 
   /** Find the line currently being sung in a track */

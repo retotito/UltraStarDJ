@@ -63,6 +63,14 @@ reliable `canplaythrough` equivalent. See `video-preload.md`.
 | Resume | Audio resumes, `ytPlayer.playVideo()` called, sync re-checked on next tick |
 | 2 beamers | Both sync to same `currentTime` → < 0.5s difference |
 
+### Video/audio alignment (`#VIDEOGAP`)
+`#VIDEOGAP` (in seconds) defines where in the YouTube video to start when audio starts at 0s.
+Example: `#VIDEOGAP:19.5` → YouTube seeks to 19.5s when audio starts at 0s.
+
+Implementation: the YouTube seek-sync target is `currentTime + videoGap` (not just `currentTime`).
+
+> Note: `#GAP` is in milliseconds (audio offset before first note). `#VIDEOGAP` is in seconds.
+
 ## Known limitations
 
 - No `canplaythrough` equivalent → no preload spinner, first playback may buffer briefly
