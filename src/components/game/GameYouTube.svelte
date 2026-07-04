@@ -71,6 +71,7 @@
       events: {
         onReady: () => {
           console.log('[GameYouTube] YT.Player ready')
+          ytPlayer?.setPlaybackQuality('tiny')  // lowest quality — audio source only
           ytReady = true
           playback.registerTimeProvider(() => ytPlayer?.getCurrentTime() ?? 0)
         },

@@ -73,6 +73,13 @@
       controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume'],
       autoplay: false,
     })
+    // Set lowest quality once the IFrame player is ready (preview — no need for HD)
+    instance.once('ready', () => {
+      try {
+        const yt = (instance as any).getInternalPlayer()
+        yt?.setPlaybackQuality?.('tiny')
+      } catch {}
+    })
     return {
       destroy() { try { instance.destroy() } catch {} },
     }

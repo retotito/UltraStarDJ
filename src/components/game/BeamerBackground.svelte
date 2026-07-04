@@ -46,6 +46,7 @@
         onReady: (e: any) => {
           const t2 = performance.now().toFixed(0)
           console.log(`[BeamerBackground ${t2}ms] YT.Player onReady`)
+          e.target.setPlaybackQuality('hd720')  // cap at 720p — sufficient for projectors
           ytReady = true
           if (ytPendingPlay) e.target.playVideo()
         },
