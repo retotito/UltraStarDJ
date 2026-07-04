@@ -106,6 +106,7 @@
   // videoGap (seconds) = how far into the video to be when audio is at 0s
   $effect(() => {
     if (!videoEl || bgType !== 'video' || paused) return
+    if (currentTime === 0) return  // time provider not active yet — don't seek to 0
     const videoGapSecs = song.videoGap ?? 0
     const targetTime = currentTime + videoGapSecs
     const drift = Math.abs(videoEl.currentTime - targetTime)
@@ -115,6 +116,7 @@
   // Sync YouTube to currentTime when drift > 0.5s
   $effect(() => {
     if (!ytReady || bgType !== 'youtube' || paused) return
+    if (currentTime === 0) return  // time provider not active yet — don't seek to 0
     const videoGapSecs = song.videoGap ?? 0
     const targetTime = currentTime + videoGapSecs
     const ytTime: number = ytPlayer?.getCurrentTime() ?? targetTime

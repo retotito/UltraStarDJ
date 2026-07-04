@@ -104,15 +104,16 @@ _none_
 ```
 
 **Expected behavior:**
-- [ ] DJ player plays YouTube WITH sound (via Plyr YouTube)
-- [ ] Beamer shows YouTube video MUTED as background
-- [ ] Both DJ and beamer YouTube videos start at countdown-done
-- [ ] Time counter in DJ modal advances from YouTube Plyr currentTime
-- [ ] Pause: DJ YouTube pauses, beamer YouTube pauses
-- [ ] Resume: both resume
-
-**Known issues to fix:**
-- Beamer YouTube needs to stay in sync with DJ YouTube via time-tick seeks
+- [x] DJ player plays YouTube WITH sound (via Plyr YouTube)
+- [x] Beamer shows YouTube video MUTED as background
+- [x] Both DJ and beamer YouTube videos start at countdown-done
+- [x] Time counter in DJ modal advances from YouTube Plyr currentTime
+- [x] Lyrics advance in sync with music (negative beat values supported)
+- [x] Pause: DJ YouTube pauses, beamer YouTube pauses
+- [x] Resume: both resume
+- [ ] Song ends: playback stops automatically (natural end via Plyr ended event)
+- [ ] Song ends at #END: playback stops at specified time
+- [ ] `#VIDEOGAP` supported: beamer YouTube starts at offset seconds
 
 ---
 

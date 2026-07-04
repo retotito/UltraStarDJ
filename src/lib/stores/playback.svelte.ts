@@ -113,6 +113,7 @@ export const playback = {
     const t = performance.now().toFixed(0)
     console.log(`[playback ${t}ms] load() song:"${song.title}" videoPath:${song.videoPath ?? 'none'} → isBuffering=${isBuffering}`)
     state = { status: 'loaded', song }
+    player.load(song)   // keep preview player in sync with loaded song
     showClearBeamers = false
     layout.showNowPlaying || layout.toggleNowPlaying()
   },

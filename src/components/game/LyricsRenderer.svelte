@@ -8,20 +8,21 @@
     gap: number       // ms offset before first note
   } = $props()
 
-  // UltraStar beat formula:
-  // beat = (currentTime - gap/1000) * (bpm / 60) * 4
+  // UltraStar beat formula — negative beats are valid (pre-GAP notes)
   const currentBeat = $derived(
-    Math.max(0, (currentTime - gap / 1000) * (bpm / 60) * 4)
+    (currentTime - gap / 1000) * (bpm / 60) * 4
   )
 
   /** Find the line currently being sung in a track */
   function getActiveLine(lines: LyricLine[]): LyricLine | null {
     let active: LyricLine | null = null
     for (const line of lines) {
+      const firstNote = line.notes[0]
       const lastNote = line.notes[line.notes.length - 1]
-      if (!lastNote) continue
+      if (!firstNote || !lastNote) continue
+      const lineStart = firstNote.startBeat
       const lineEnd = lastNote.startBeat + lastNote.lengthBeats
-      if (line.startBeat <= currentBeat && currentBeat <= lineEnd + 8) {
+      if (lineStart <= currentBeat && currentBeat <= lineEnd + 8) {
         active = line
       }
     }
@@ -31,7 +32,7 @@
   /** Find the next line after the active one */
   function getNextLine(lines: LyricLine[], active: LyricLine | null): LyricLine | null {
     if (!active) {
-      return lines.find(l => l.startBeat > currentBeat) ?? null
+      return lines.find(l => (l.notes[0]?.startBeat ?? l.startBeat) > currentBeat) ?? null
     }
     const idx = lines.indexOf(active)
     return idx >= 0 && idx + 1 < lines.length ? lines[idx + 1] : null

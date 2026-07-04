@@ -6,7 +6,7 @@
   import { songQueue } from '$lib/stores/queue.svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { network } from '$lib/stores/network.svelte'
-  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
+  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, onCountdownDone } from '$lib/ipc/tauri'
   import { validateSong } from '$lib/ultrastar/validate_song'
   import { errorStore } from '$lib/stores/error.svelte'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
@@ -67,14 +67,75 @@
     }
   })
 
-  // Plyr action — preview player only, no connection to game playback
+  // YouTube-only game player (Case 4) — tracks the Plyr instance so a $effect can react to status
+  let ytGamePlyr = $state<Plyr | null>(null)
+
+  // React to playback transport when a YouTube-only song is active
+  $effect(() => {
+    if (!ytGamePlyr) return
+    const s = playback.status
+    if (s === 'paused') {
+      ytGamePlyr.pause()
+    } else if (s === 'playing') {
+      // Only resume if already started (currentTime > 0). Initial start is handled by countdown-done.
+      if (ytGamePlyr.paused && ytGamePlyr.currentTime > 0) Promise.resolve(ytGamePlyr.play()).catch(() => {})
+    } else if (s === 'loaded' || s === 'idle') {
+      ytGamePlyr.stop()
+    }
+  })
+
+  // Plyr action — YouTube embed
+  // For YouTube-only songs (no audioPath, no videoPath) this also drives game playback:
+  // registers the time provider, listens for countdown-done, handles ended/#END.
   function plyrYoutubeAction(node: HTMLDivElement, youtubeId: string) {
     const instance = new Plyr(node, {
       controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume'],
       autoplay: false,
     })
+
+    // Use player.song for detection since playback.song isn't set yet at action mount time
+    const isYoutubeOnly = !!player.song?.youtubeId && !player.song?.audioPath && !player.song?.videoPath
+    let unlistenCountdown: (() => void) | null = null
+
+    if (isYoutubeOnly) {
+      ytGamePlyr = instance
+
+      // Register time provider and start Plyr exactly when beamer countdown finishes.
+      // Check playback.song here (guaranteed set by countdown-done time) as a fallback guard.
+      console.log('[PlayerWidget] plyrYoutubeAction: isYoutubeOnly=true, registering countdown-done listener')
+      onCountdownDone(() => {
+        const song = playback.song
+        if (!song?.youtubeId || song?.audioPath || song?.videoPath) return
+        console.log('[PlayerWidget] countdown-done — registering time provider + playing YouTube')
+        playback.registerTimeProvider(() => instance.currentTime)
+        Promise.resolve(instance.play()).catch(e => console.error('[PlayerWidget] YouTube play() rejected:', e))
+      }).then(fn => { unlistenCountdown = fn })
+
+      // Auto-stop when YouTube video ends naturally
+      instance.on('ended', () => {
+        console.log('[PlayerWidget] YouTube ended — calling playback.stop()')
+        playback.stop()
+      })
+
+      // Stop at #END if defined
+      instance.on('timeupdate', () => {
+        const end = playback.song?.end
+        if (end && instance.currentTime >= end / 1000) {
+          console.log('[PlayerWidget] reached #END — calling playback.stop()')
+          playback.stop()
+        }
+      })
+    }
+
     return {
-      destroy() { try { instance.destroy() } catch {} },
+      destroy() {
+        unlistenCountdown?.()
+        if (isYoutubeOnly) {
+          playback.unregisterTimeProvider()
+          ytGamePlyr = null
+        }
+        try { instance.destroy() } catch {}
+      },
     }
   }
 

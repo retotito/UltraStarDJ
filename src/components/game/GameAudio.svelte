@@ -57,7 +57,8 @@
       console.log('[GameAudio] countdown-done — starting audio')
       audioEl.play().catch(e => console.error('[GameAudio] play() rejected:', e))
     })
-    playback.registerTimeProvider(() => audioEl?.currentTime ?? 0)
+    // Only register if audio element is actually mounted (not YouTube-only songs)
+    if (audioEl) playback.registerTimeProvider(() => audioEl!.currentTime)
   })
 
   // Auto-stop when audio finishes — must be a $effect so it runs after audioEl mounts
