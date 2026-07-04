@@ -7,6 +7,9 @@
   import { playback } from '$lib/stores/playback.svelte'
   import { network } from '$lib/stores/network.svelte'
   import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
+  import { validateSong, type SongValidationError } from '$lib/ultrastar/validate_song'
+  import Modal from '$components/ui/Modal.svelte'
+  import SongValidationDialog from '$components/dialogs/SongValidationDialog.svelte'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
 
@@ -28,6 +31,10 @@
   const isOfflineYoutube = $derived(
     !!player.song?.youtubeId && !player.song?.videoPath && !player.song?.audioPath && !network.isOnline
   )
+
+  // Validation state
+  let validationErrors = $state<SongValidationError[]>([])
+  let showValidationModal = $state(false)
 
   // Transcoded temp file state
   let transcodedPath = $state<string | null>(null)
@@ -119,14 +126,30 @@
     }
   }
 
-  function addToQueue() {
-    if (player.song) songQueue.add(player.song)
+  async function addToQueue() {
+    const song = player.song
+    if (!song) return
+    const result = await validateSong(song)
+    if (!result.valid) {
+      validationErrors = result.errors
+      showValidationModal = true
+      return
+    }
+    songQueue.add(song)
   }
 
-  function loadIntoPlayer() {
+  async function loadIntoPlayer() {
+    const song = player.song
+    if (!song || !playback.canLoad) return
     const t = performance.now().toFixed(0)
-    console.log(`[PlayerWidget ${t}ms] loadIntoPlayer() — song:${player.song?.title} canLoad:${playback.canLoad}`)
-    if (player.song && playback.canLoad) playback.load(player.song)
+    console.log(`[PlayerWidget ${t}ms] loadIntoPlayer() — song:${song.title}`)
+    const result = await validateSong(song)
+    if (!result.valid) {
+      validationErrors = result.errors
+      showValidationModal = true
+      return
+    }
+    playback.load(song)
   }
 </script>
 
@@ -201,7 +224,6 @@
         Load
       </button>
     </div>
-
   {:else}
     <div class="empty-state">
       <img src={placeholderSrc} alt="" class="empty-placeholder" />
@@ -209,6 +231,10 @@
     </div>
   {/if}
 </div>
+
+<Modal open={showValidationModal} title="Song Validation" onclose={() => showValidationModal = false}>
+  <SongValidationDialog errors={validationErrors} onclose={() => showValidationModal = false} />
+</Modal>
 
 <style>
   .player-widget {
