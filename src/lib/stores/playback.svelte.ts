@@ -4,7 +4,6 @@
  */
 
 import type { Song } from '$lib/ultrastar/types'
-import { player } from '$lib/stores/player.svelte'
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
 import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, onBeamerReady } from '$lib/ipc/tauri'
@@ -113,7 +112,6 @@ export const playback = {
     const t = performance.now().toFixed(0)
     console.log(`[playback ${t}ms] load() song:"${song.title}" videoPath:${song.videoPath ?? 'none'} → isBuffering=${isBuffering}`)
     state = { status: 'loaded', song }
-    player.load(song)   // keep preview player in sync with loaded song
     showClearBeamers = false
     layout.showNowPlaying || layout.toggleNowPlaying()
   },

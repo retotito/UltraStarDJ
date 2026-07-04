@@ -4,6 +4,7 @@
   import { songLibrary } from '$lib/stores/songs.svelte'
   import AppShell from '$components/AppShell.svelte'
   import GameAudio from '$components/game/GameAudio.svelte'
+  import GameYouTube from '$components/game/GameYouTube.svelte'
   import VideoPreloader from '$components/game/VideoPreloader.svelte'
   import Modal from '$components/ui/Modal.svelte'
   import SongValidationDialog from '$components/dialogs/SongValidationDialog.svelte'
@@ -23,6 +24,7 @@
 </script>
 
 <GameAudio />
+<GameYouTube />
 <VideoPreloader />
 <AppShell />
 
