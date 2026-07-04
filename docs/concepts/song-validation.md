@@ -11,9 +11,16 @@ Never block the song list scan — validation is lazy (on demand only).
 
 | Trigger | Validation |
 |---|---|
-| "Load" button (PlayerWidget) | Full validation |
-| "Add to Queue" | Full validation |
-| (Optional later) Song list scan | Light validation only (no file-exist checks — keeps scan fast) |
+| Double-click song row | Full validation |
+| Right-click → Preview | Full validation |
+| Right-click → Add to Queue | Full validation |
+| Right-click → Load into player | Full validation |
+| Load button (PlayerWidget) | Full validation |
+| Add to Queue button (PlayerWidget) | Full validation |
+| Load from Queue (QueueWidget) | Full validation |
+| Song list scan | None — validation is lazy (on demand only) |
+
+No distinction between preview and load/queue — if a song can't play, don't load it at all.
 
 ---
 
@@ -36,45 +43,64 @@ interface SongValidationError {
 
 ---
 
-## Checks per song type
+## Checks
 
-### TXT format checks (all songs — fast, no I/O)
+### TXT format checks (fast, no I/O — from parsed Song fields)
 
-These run first, before any file-existence checks. Based on allkaraoke's `validate-ultrastar.ts` and the official UltraStar format spec.
-
-| Check | Field | Error message |
+| Check | Blocks? | Reason |
 |---|---|---|
-| `#TITLE` tag present in txt | `title` | "Missing required tag: #TITLE" |
-| `#ARTIST` tag present in txt | `artist` | "Missing required tag: #ARTIST" |
-| `#BPM` tag present and > 0 | `bpm` | "Missing or invalid #BPM — notes cannot be timed" |
-| At least one note line (`:`) exists | `notes` | "Song has no singable notes" |
-| All note values parse to finite numbers | `notes` | "Song has malformed note data (NaN or Infinity)" |
+| `#TITLE` present | ✓ | Can't identify song |
+| `#ARTIST` present | ✓ | Can't identify song |
+| `#BPM` present and > 0 | ✓ | Notes can't be timed without it |
+| At least one note line (`:`) in txt | ✓ | No lyrics = not singable |
 
-> Source: [allkaraoke/validate-ultrastar.ts](https://github.com/Asvarox/allkaraoke/blob/master/src/modules/songs/utils/validate-ultrastar.ts)
+### File existence checks (async, Tauri `pathExists()`)
+
+| Check | Blocks? | Reason |
+|---|---|---|
+| At least one audio source exists (`audioPath` file on disk, or `videoPath` file on disk, or `youtubeId`) | ✓ | Nothing to play |
+| `audioPath` set but file missing, AND no `videoPath`/`youtubeId` fallback | ✓ | Audio broken, no fallback |
+| `videoPath` set, file missing, AND it is the sole audio source (no `audioPath`, no `youtubeId`) | ✓ | Only audio source is gone |
+| `videoPath` missing when `audioPath` also present | ✗ | Falls back to audio-only gracefully |
+| `backgroundPath` missing | ✗ | Cosmetic — song still plays |
+| `coverPath` missing | ✗ | Cosmetic — song still plays |
+| `txtPath` missing | ✗ | Can't happen — song wouldn't appear in library |
+
+### Notes on `#VIDEOGAP`
+`#VIDEOGAP` is already parsed and passed to `LyricsRenderer` and `BeamerView` — video sync works automatically. No extra validation needed.
+
+### Remote paths
+Paths starting with `http://` or `https://` skip all file-existence checks.
 
 ---
 
-### Local songs (source: `local-folder`)
+## Song patching
 
-| Check | Field | Error message |
-|---|---|---|
-| Has at least one audio source | `audioPath` or `youtubeId` | "No audio source — song has no MP3 and no YouTube link" |
-| `audioPath` file exists on disk | `audioPath` | "Audio file not found: {path}" |
-| `videoPath` file exists (if set, local path only) | `videoPath` | "Video file not found: {path}" |
-| `backgroundPath` file exists (if set) | `backgroundPath` | "Background image not found: {path}" |
-| `coverPath` file exists (if set) | `coverPath` | "Cover image not found: {path}" |
-| `txtPath` file exists | `txtPath` | "Song file (.txt) not found: {path}" |
+`validateSong()` returns a **patched copy** of the song alongside the result.
+The patch nulls out any fields that point to missing files — so the loader's
+fallback chain kicks in automatically without extra logic.
 
-YouTube video paths (start with `http`) are NOT checked for file existence.
+```ts
+interface SongValidationResult {
+  valid: boolean
+  errors: SongValidationError[]
+  song: Song   // patched copy — safe to pass directly to playback.load()
+}
+```
 
-### Remote/streamed songs (USDB, Animux, future sources)
+**Example:** `audioPath` is set but the file is missing on disk, `videoPath` exists:
+```
+Original: { audioPath: "/songs/foo.mp3", videoPath: "/songs/foo.mp4" }
+Patched:  { audioPath: undefined,        videoPath: "/songs/foo.mp4" }
+```
+`GameAudio` skips `audioPath` (undefined), falls back to `videoPath` automatically.
 
-| Check | Field | Error message |
-|---|---|---|
-| Has `youtubeId` or stream URL | `youtubeId` | "No stream source defined" |
-| Network is online | — | "No internet connection — cannot stream this song" |
-
-No file-exist checks for remote songs (no local files to check).
+Callers always use `result.song` (not the original) when proceeding:
+```ts
+const result = await validateSong(song)
+if (!result.valid) { errorStore.show(...); return }
+playback.load(result.song)   // ← patched copy
+```
 
 ---
 

@@ -38,11 +38,14 @@ export async function validateSong(song: Song): Promise<SongValidationResult> {
   }
 
   // ── Audio source check ──────────────────────────────────────────────────
-  if (!song.audioPath && !song.youtubeId) {
-    errors.push({ field: 'audio', message: 'No audio source — song has no audio file and no YouTube link' })
+  if (!song.audioPath && !song.youtubeId && !song.videoPath) {
+    errors.push({ field: 'audio', message: 'No audio source — song has no audio file, no video file and no YouTube link' })
   }
 
-  // ── File existence checks (local paths only) ───────────────────────────
+  // ── File existence checks ───────────────────────────────────────────────
+  // Only check files that directly affect playback. Cosmetic files (cover,
+  // background) are skipped — a song plays fine without them.
+
   if (song.txtPath) {
     const ok = await pathExists(song.txtPath).catch((e) => { console.warn('[validateSong] pathExists threw:', e); return false })
     console.log(`[validateSong] txtPath exists=${ok} — ${song.txtPath}`)
@@ -55,22 +58,12 @@ export async function validateSong(song: Song): Promise<SongValidationResult> {
     if (!ok) errors.push({ field: 'audioPath', message: `Audio file not found: ${song.audioPath}` })
   }
 
-  if (song.videoPath && !isRemotePath(song.videoPath)) {
+  // Only check videoPath existence when it is the sole audio source (no audioPath, no youtubeId).
+  // If audioPath or youtubeId is present, a missing video just means no video background — still playable.
+  if (song.videoPath && !isRemotePath(song.videoPath) && !song.audioPath && !song.youtubeId) {
     const ok = await pathExists(song.videoPath).catch((e) => { console.warn('[validateSong] pathExists threw:', e); return false })
-    console.log(`[validateSong] videoPath exists=${ok} — ${song.videoPath}`)
-    if (!ok) errors.push({ field: 'videoPath', message: `Video file not found: ${song.videoPath}` })
-  }
-
-  if (song.backgroundPath && !isRemotePath(song.backgroundPath)) {
-    const ok = await pathExists(song.backgroundPath).catch((e) => { console.warn('[validateSong] pathExists threw:', e); return false })
-    console.log(`[validateSong] backgroundPath exists=${ok} — ${song.backgroundPath}`)
-    if (!ok) errors.push({ field: 'backgroundPath', message: `Background image not found: ${song.backgroundPath}` })
-  }
-
-  if (song.coverPath && !isRemotePath(song.coverPath)) {
-    const ok = await pathExists(song.coverPath).catch((e) => { console.warn('[validateSong] pathExists threw:', e); return false })
-    console.log(`[validateSong] coverPath exists=${ok} — ${song.coverPath}`)
-    if (!ok) errors.push({ field: 'coverPath', message: `Cover image not found: ${song.coverPath}` })
+    console.log(`[validateSong] videoPath (sole audio source) exists=${ok} — ${song.videoPath}`)
+    if (!ok) errors.push({ field: 'videoPath', message: `Video file not found (sole audio source): ${song.videoPath}` })
   }
 
   const result = { valid: errors.length === 0, errors }
