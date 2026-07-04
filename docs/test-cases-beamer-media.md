@@ -72,16 +72,17 @@ _none_
 ```
 
 **Expected behavior:**
-- [ ] Loading song does NOT change beamer screen
-- [ ] Hitting Preview: no spinner (YouTube can't reliably signal canplaythrough)
-- [ ] After countdown: YouTube video plays muted as background, lyrics overlay
-- [ ] YouTube video roughly in sync with MP3 audio
-- [ ] DJ player plays from MP3 (not YouTube)
-- [ ] Pause: audio pauses, YouTube video pauses
-- [ ] Resume: audio resumes from correct position, YouTube video resumes
+- [x] Loading song does NOT change beamer screen
+- [x] Hitting Preview: no spinner (YouTube can't reliably signal canplaythrough)
+- [x] After countdown: YouTube video plays muted as background, lyrics overlay
+- [x] YouTube video roughly in sync with MP3 audio
+- [x] DJ player plays from MP3 (not YouTube)
+- [x] Pause: audio pauses, YouTube video pauses
+- [x] Resume: audio resumes from correct position, YouTube video resumes
 
-**Known issues to fix:**
-- YouTube iframe pause/resume via postMessage API
+**Known issues / notes:**
+- Two separate YouTube streams (one per beamer) — sync via seekTo(currentTime + videoGap) each tick
+- `#VIDEOGAP` supported: video seeks to videoGap seconds at start and stays in sync
 
 ---
 

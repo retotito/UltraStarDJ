@@ -60,6 +60,17 @@
     playback.registerTimeProvider(() => audioEl?.currentTime ?? 0)
   })
 
+  // Auto-stop when audio finishes — must be a $effect so it runs after audioEl mounts
+  $effect(() => {
+    if (!audioEl) return
+    const onEnded = () => {
+      console.log('[GameAudio] ended — calling playback.stop()')
+      playback.stop()
+    }
+    audioEl.addEventListener('ended', onEnded)
+    return () => audioEl?.removeEventListener('ended', onEnded)
+  })
+
   onDestroy(() => {
     unlistenCountdown?.()
     playback.unregisterTimeProvider()
