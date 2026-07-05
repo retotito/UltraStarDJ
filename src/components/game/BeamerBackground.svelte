@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import type { Song } from '$lib/ultrastar/types'
   import { sendBeamerReady } from '$lib/ipc/tauri'
 
@@ -73,7 +73,9 @@
     ;(window as any).onYouTubeIframeAPIReady = () => initYTPlayer(videoId)
   }
 
-  // Control video playback based on playing/paused props
+  // Control video playback based on playing/paused props.
+  // currentTime is read via untrack() — the drift-sync effect below handles
+  // ongoing corrections; this effect only needs to fire on playing/paused changes.
   $effect(() => {
     if (bgType !== 'video') return
     if (!videoEl) return
@@ -82,7 +84,7 @@
       videoEl.pause()
     } else if (playing && videoEl.paused) {
       // Seek to correct position before starting (videoGap offset + current audio time)
-      const targetTime = currentTime + videoGapSecs
+      const targetTime = untrack(() => currentTime) + videoGapSecs
       if (Math.abs(videoEl.currentTime - targetTime) > 0.1) {
         videoEl.currentTime = targetTime
       }

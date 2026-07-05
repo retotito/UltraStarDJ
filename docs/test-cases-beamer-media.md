@@ -130,22 +130,23 @@ _none_
 ```
 
 **Expected behavior:**
-- [ ] Loading song does NOT change beamer screen
-- [ ] Hitting Preview shows preview screen on beamer (cover + artist/title)
-- [ ] Play button is enabled immediately (no spinner — image is instant)
-- [ ] After countdown: blurred cover fills beamer background, lyrics overlay on top
-- [ ] Pause: audio pauses, image stays
-- [ ] Resume: audio resumes
-- [ ] Time counter in DJ modal advances correctly
+- [x] Loading song does NOT change beamer screen
+- [x] Hitting Preview shows preview screen on beamer (cover + artist/title)
+- [x] Play button is enabled immediately (no spinner — image is instant)
+- [x] After countdown: blurred cover fills beamer background, lyrics overlay on top
+- [x] Pause: audio pauses, image stays
+- [x] Resume: audio resumes
+- [x] Time counter in DJ modal advances correctly
+- [x] `#END` tag: song stops at specified time
 
 **Known issues / notes:**
-_none so far_
+_none_
 
 ---
 
 ## Case 6 — MP4 Only (no MP3)
 
-**Song folder setup:**
+**Song folder setup (native MP4):**
 ```
 #TITLE:Test-MP4-Only
 #ARTIST:Test
@@ -154,18 +155,28 @@ _none so far_
 #GAP:0
 ```
 
+**Song folder setup (needs transcoding — MPG / AVI / MKV):**
+```
+#VIDEO:video.mpg   ← or .avi / .mkv
+```
+
 **Expected behavior:**
-- [ ] Loading song does NOT change beamer screen
-- [ ] Hitting Preview: spinner on play button while video buffers
-- [ ] Spinner disappears when video is ready (canplaythrough)
-- [ ] After countdown: video plays fullscreen muted on beamer, lyrics overlay
-- [ ] DJ audio plays from the MP4 file (browser extracts audio track)
-- [ ] Video is in sync with audio (< 0.5s drift)
-- [ ] Pause: audio AND video both pause
-- [ ] Resume: both resume from same position
+- [x] Loading song does NOT change beamer screen
+- [x] Hitting Preview: spinner on play button while video buffers
+- [x] Spinner disappears when video is ready (canplaythrough)
+- [x] After countdown: video plays fullscreen muted on beamer, lyrics overlay
+- [x] DJ audio plays from the video file (browser extracts audio track)
+- [x] Video is in sync with audio (< 0.5s drift)
+- [x] Pause: audio AND video both pause
+- [x] Resume: both resume from same position
+- [x] Time counter in DJ modal advances correctly
+- [x] Song ends naturally: score screen shown
+- [x] `#END` tag: song stops at specified game time
+- [x] `#VIDEOGAP` supported: both audio and video skip videoGap seconds at start (Mode B)
+- [x] MPG/AVI/MKV source: transcoding spinner visible, then plays as MP4
 
 **Known issues / notes:**
-_none so far_
+_none_
 
 ---
 

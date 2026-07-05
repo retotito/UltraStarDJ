@@ -20,11 +20,20 @@
     return null
   })
 
+  // videoGap offset: only applies when audio comes from a video file (no separate audioPath).
+  // In that case, both audio and visual skip the first videoGap seconds of the file,
+  // and currentTime is reported as (file position - videoGap) so the game clock starts at 0.
+  const videoGapOffset = $derived.by(() => {
+    const s = playback.song
+    if (!s || s.audioPath) return 0   // separate audio file — no offset
+    return s.videoGap ?? 0            // video-as-audio (Case 6): skip intro
+  })
+
   // Register/unregister as time provider when song is loaded/unloaded
   $effect(() => {
     if (playback.isLoaded && audioEl) {
-      console.log('[GameAudio] registering time provider, src:', audioSrc)
-      playback.registerTimeProvider(() => audioEl!.currentTime, 'GameAudio')
+      console.log('[GameAudio] registering time provider, src:', audioSrc, 'videoGapOffset:', videoGapOffset)
+      playback.registerTimeProvider(() => audioEl!.currentTime - videoGapOffset, 'GameAudio')
     } else {
       playback.unregisterTimeProvider('GameAudio')
     }
@@ -34,9 +43,9 @@
   $effect(() => {
     const s = playback.status
     if (s === 'playing') {
-      // Only resume if we've already started (currentTime > 0).
-      // Initial start must wait for countdown-done IPC, not this effect.
-      if (audioEl && audioEl.paused && audioEl.currentTime > 0) {
+      // Only resume if we've already started playing past the start position.
+      // audioEl.currentTime > videoGapOffset means audio has actually played (not just seeked to start).
+      if (audioEl && audioEl.paused && audioEl.currentTime > videoGapOffset) {
         console.log('[GameAudio] status → playing (resume from pause), calling play()')
         audioEl.play().catch(e => console.error('[GameAudio] resume play() rejected:', e))
       }
@@ -46,7 +55,7 @@
     } else if (s === 'loaded' || s === 'idle') {
       console.log('[GameAudio] status → stopped/reset')
       audioEl?.pause()
-      if (audioEl) audioEl.currentTime = 0
+      if (audioEl) audioEl.currentTime = videoGapOffset  // reset to start position
     }
   })
 
@@ -54,11 +63,12 @@
     // Start audio exactly when the beamer countdown finishes
     unlistenCountdown = await onCountdownDone(() => {
       if (!audioEl || !playback.isLoaded) return
-      console.log('[GameAudio] countdown-done — starting audio')
+      console.log('[GameAudio] countdown-done — starting audio, videoGapOffset:', videoGapOffset)
+      if (videoGapOffset > 0) audioEl.currentTime = videoGapOffset
       audioEl.play().catch(e => console.error('[GameAudio] play() rejected:', e))
     })
     // Only register if audio element is actually mounted (not YouTube-only songs)
-    if (audioEl) playback.registerTimeProvider(() => audioEl!.currentTime, 'GameAudio')
+    if (audioEl) playback.registerTimeProvider(() => audioEl!.currentTime - videoGapOffset, 'GameAudio')
   })
 
   // Auto-stop when audio finishes — must be a $effect so it runs after audioEl mounts
@@ -79,7 +89,8 @@
     if (!song?.end) return
     const endSecs = song.end / 1000
     const onTimeUpdate = () => {
-      if (audioEl && audioEl.currentTime >= endSecs) {
+      // Compare game time (file position minus videoGap offset) against #END value
+      if (audioEl && (audioEl.currentTime - videoGapOffset) >= endSecs) {
         console.log('[GameAudio] reached #END — calling playback.stop()')
         playback.stop()
       }
