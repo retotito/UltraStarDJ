@@ -24,9 +24,9 @@
   $effect(() => {
     if (playback.isLoaded && audioEl) {
       console.log('[GameAudio] registering time provider, src:', audioSrc)
-      playback.registerTimeProvider(() => audioEl!.currentTime)
+      playback.registerTimeProvider(() => audioEl!.currentTime, 'GameAudio')
     } else {
-      playback.unregisterTimeProvider()
+      playback.unregisterTimeProvider('GameAudio')
     }
   })
 
@@ -58,7 +58,7 @@
       audioEl.play().catch(e => console.error('[GameAudio] play() rejected:', e))
     })
     // Only register if audio element is actually mounted (not YouTube-only songs)
-    if (audioEl) playback.registerTimeProvider(() => audioEl!.currentTime)
+    if (audioEl) playback.registerTimeProvider(() => audioEl!.currentTime, 'GameAudio')
   })
 
   // Auto-stop when audio finishes — must be a $effect so it runs after audioEl mounts
@@ -90,7 +90,7 @@
 
   onDestroy(() => {
     unlistenCountdown?.()
-    playback.unregisterTimeProvider()
+    playback.unregisterTimeProvider('GameAudio')
   })
 </script>
 

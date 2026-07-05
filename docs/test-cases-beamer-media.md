@@ -111,9 +111,9 @@ _none_
 - [x] Lyrics advance in sync with music (negative beat values supported)
 - [x] Pause: DJ YouTube pauses, beamer YouTube pauses
 - [x] Resume: both resume
-- [ ] Song ends: playback stops automatically (natural end via Plyr ended event)
-- [ ] Song ends at #END: playback stops at specified time
-- [ ] `#VIDEOGAP` supported: beamer YouTube starts at offset seconds
+- [x] Song ends: playback stops automatically (natural end via Plyr ended event)
+- [x] Song ends at #END: playback stops at specified time
+- [x] `#VIDEOGAP` supported: beamer YouTube starts at offset seconds
 
 ---
 

@@ -73,7 +73,7 @@
           console.log('[GameYouTube] YT.Player ready')
           ytPlayer?.setPlaybackQuality('tiny')  // lowest quality — audio source only
           ytReady = true
-          playback.registerTimeProvider(() => ytPlayer?.getCurrentTime() ?? 0)
+          playback.registerTimeProvider(() => ytPlayer?.getCurrentTime() ?? 0, 'GameYouTube')
         },
         onStateChange: (e: any) => {
           const YT = (window as any).YT
@@ -92,7 +92,7 @@
       ytPlayer = null
       ytReady = false
     }
-    playback.unregisterTimeProvider()
+    playback.unregisterTimeProvider('GameYouTube')
     if (containerEl) containerEl.innerHTML = ''
   }
 

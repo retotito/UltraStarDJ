@@ -33,6 +33,7 @@ onBeamerReady(() => {
 
 // ── Time-tick loop ────────────────────────────────────────────
 let getTime: (() => number) | null = null
+let _timeProviderToken: string | null = null
 let tickInterval: ReturnType<typeof setInterval> | null = null
 let _currentTime = $state(0)
 
@@ -78,9 +79,22 @@ export const playback = {
     isBuffering = false
   },
 
-  /** Called by PlayerWidget to register how to get current playback time */
-  registerTimeProvider(fn: () => number) { console.log('[playback] registerTimeProvider called'); getTime = fn },
-  unregisterTimeProvider() { console.log('[playback] unregisterTimeProvider called'); getTime = null },
+  /** Called by GameAudio/GameYouTube to register how to get current playback time.
+   * token identifies the owner — unregister only works when the same token matches. */
+  registerTimeProvider(fn: () => number, token: string) {
+    console.log(`[playback] registerTimeProvider called — token:${token}`)
+    getTime = fn
+    _timeProviderToken = token
+  },
+  unregisterTimeProvider(token: string) {
+    if (_timeProviderToken !== token) {
+      console.log(`[playback] unregisterTimeProvider ignored — token:${token} active:${_timeProviderToken}`)
+      return
+    }
+    console.log(`[playback] unregisterTimeProvider called — token:${token}`)
+    getTime = null
+    _timeProviderToken = null
+  },
 
   /** Load a song into the player without starting playback */
   async load(song: Song) {
@@ -205,6 +219,9 @@ export const playback = {
   dismiss() {
     state = { status: 'idle', song: null }
     showClearBeamers = false
+    getTime = null
+    _timeProviderToken = null
+    _currentTime = 0
     if (_transcodedPath) { deleteTempFile(_transcodedPath).catch(() => {}); _transcodedPath = null }
   },
 }
