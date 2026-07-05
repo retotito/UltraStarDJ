@@ -213,6 +213,7 @@ export const playback = {
   /** Send a second stop to clear the score screen and return beamers to idle */
   async clearBeamers() {
     showClearBeamers = false
+    if (state.status === 'preview') state.status = 'loaded'
     await sendStopSong()
   },
 

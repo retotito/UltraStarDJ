@@ -15,6 +15,8 @@
     [...new Set([...displaysStore.display1.playerIds, ...displaysStore.display2.playerIds])].sort((a, b) => a - b)
   )
 
+  const hasDisplay = $derived(displaysStore.display1.open || displaysStore.display2.open)
+
   // Dragging state — null = CSS default (bottom-center)
   let x = $state<number | null>(null)
   let y = $state<number | null>(null)
@@ -133,31 +135,45 @@
     {:else}
     <div class="empty-section">
       <span class="icon" style="font-size:32px; opacity:0.3">queue_music</span>
-      <span class="text-muted text-sm">No song loaded — pick one from the queue</span>
+      <span class="text-muted text-sm">No song loaded</span>
     </div>
     {/if}
 
-    <!-- Transport controls -->
-    {#if playback.isLoaded}
+    <!-- Transport controls — always shown -->
     <div class="controls">
-      {#if playback.status === 'loaded' || playback.status === 'preview'}
-        <button
-          class="ctrl-btn ctrl-preview"
-          class:is-blocked={!playback.canPlay}
-          class:is-active={playback.status === 'preview'}
-          disabled={!playback.canPlay}
-          title={!playback.canPlay ? 'Open a display first' : playback.status === 'preview' ? 'Preview active' : 'Show preview on beamers'}
-          onclick={() => playback.preview()}
-        >
-          <span class="icon">tv</span>
+      <!-- Home Screen -->
+      <button
+        class="ctrl-btn ctrl-clear"
+        disabled={!hasDisplay || playback.isActive || (playback.status !== 'preview' && !playback.showClearBeamers)}
+        title={!hasDisplay ? 'Open a display first' : playback.isActive ? 'Cannot clear while playing' : playback.status !== 'preview' && !playback.showClearBeamers ? 'Already on home screen' : 'Home Screen'}
+        onclick={() => playback.clearBeamers()}
+      >
+        <span class="icon">tv_off</span>
+      </button>
+
+      <!-- Preview button -->
+      <button
+        class="ctrl-btn ctrl-preview"
+        class:is-active={playback.status === 'preview'}
+        disabled={!playback.isLoaded || playback.isActive || !hasDisplay || playback.status === 'preview'}
+        title={!playback.isLoaded ? 'No song selected' : playback.isActive ? 'Cannot preview while playing' : !hasDisplay ? 'Open a display first' : playback.status === 'preview' ? 'Already showing preview' : 'Show preview on beamers'}
+        onclick={() => playback.preview()}
+      >
+        <span class="icon">tv</span>
+      </button>
+
+      <!-- Play / Pause — swap on same spot -->
+      {#if playback.status === 'playing'}
+        <button class="ctrl-btn ctrl-pause" title="Pause" onclick={() => playback.pause()}>
+          <span class="icon">pause</span>
         </button>
+      {:else}
         <button
           class="ctrl-btn ctrl-play"
-          class:is-blocked={!playback.canPlay}
           class:is-buffering={playback.isBuffering}
-          disabled={!playback.canPlay || playback.isBuffering}
-          title={playback.isBuffering ? 'Buffering video…' : !playback.canPlay ? 'Open a display first' : 'Play'}
-          onclick={() => playback.play()}
+          disabled={!playback.isLoaded || (playback.status === 'paused' ? false : (!playback.canPlay || playback.isBuffering))}
+          title={!playback.isLoaded ? 'No song selected' : playback.isBuffering ? 'Buffering video…' : playback.status === 'paused' ? 'Resume' : !playback.canPlay ? 'Open a display first' : 'Play'}
+          onclick={() => playback.status === 'paused' ? playback.resume() : playback.play()}
         >
           {#if playback.isBuffering}
             <span class="icon spin">progress_activity</span>
@@ -165,32 +181,18 @@
             <span class="icon">play_arrow</span>
           {/if}
         </button>
-        {#if playback.showClearBeamers}
-        <button
-          class="ctrl-btn ctrl-clear"
-          title="Clear beamer screens — back to home"
-          onclick={() => playback.clearBeamers()}
-        >
-          <span class="icon">tv_off</span>
-        </button>
-        {/if}
-      {:else if playback.status === 'playing'}
-        <button class="ctrl-btn ctrl-pause" title="Pause" onclick={() => playback.pause()}>
-          <span class="icon">pause</span>
-        </button>
-        <button class="ctrl-btn ctrl-stop" title="Stop" onclick={() => playback.stop()}>
-          <span class="icon">stop</span>
-        </button>
-      {:else if playback.status === 'paused'}
-        <button class="ctrl-btn ctrl-play" title="Resume" onclick={() => playback.resume()}>
-          <span class="icon">play_arrow</span>
-        </button>
-        <button class="ctrl-btn ctrl-stop" title="Stop" onclick={() => playback.stop()}>
-          <span class="icon">stop</span>
-        </button>
       {/if}
+
+      <!-- Stop -->
+      <button
+        class="ctrl-btn ctrl-stop"
+        disabled={!playback.isActive}
+        title={playback.isActive ? 'Stop' : 'Not playing'}
+        onclick={() => playback.stop()}
+      >
+        <span class="icon">stop</span>
+      </button>
     </div>
-    {/if}
   </div>
 {/if}
 
@@ -342,6 +344,13 @@
   }
   .ctrl-btn :global(.icon) { font-size: 36px; }
   .ctrl-btn:active { transform: scale(0.93); }
+  .ctrl-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    filter: none;
+    transform: none;
+  }
+  .ctrl-btn:disabled:active { transform: none; }
 
   .ctrl-play {
     background: var(--md-sys-color-primary);
@@ -362,21 +371,21 @@
     background: var(--md-sys-color-secondary-container);
     color: var(--md-sys-color-on-secondary-container);
   }
-  .ctrl-pause:hover { filter: brightness(1.15); }
+  .ctrl-pause:hover:not(:disabled) { filter: brightness(1.15); }
 
   .ctrl-stop {
     background: rgba(247, 95, 95, 0.15);
     color: #f75f5f;
     border: 2px solid rgba(247, 95, 95, 0.4);
   }
-  .ctrl-stop:hover { background: rgba(247, 95, 95, 0.25); }
+  .ctrl-stop:hover:not(:disabled) { background: rgba(247, 95, 95, 0.25); }
 
   .ctrl-clear {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
     color: var(--md-sys-color-on-surface-variant);
     border: 2px solid color-mix(in srgb, var(--md-sys-color-outline) 30%, transparent);
   }
-  .ctrl-clear:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); }
+  .ctrl-clear:hover:not(:disabled) { background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); }
 
   .ctrl-preview {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
