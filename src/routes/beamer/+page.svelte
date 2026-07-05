@@ -32,14 +32,9 @@
       onStopSong(() => {
         if (screen === 'playing' || screen === 'paused' || screen === 'countdown') {
           screen = 'score'
-        } else if (screen === 'preview') {
+        } else if (screen === 'preview' || screen === 'score') {
           screen = 'idle'
           currentPayload = null
-          assignedPlayerIds = []
-        } else if (screen === 'score') {
-          screen = 'idle'
-          currentPayload = null
-          assignedPlayerIds = []
         }
       }),
       onPauseSong(() => { if (screen === 'playing') screen = 'paused' }),
