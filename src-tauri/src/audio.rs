@@ -266,6 +266,12 @@ pub fn list_audio_output_devices() -> Vec<AudioOutputDevice> {
         .collect()
 }
 
+/// Return the name of the current system default output device.
+#[tauri::command]
+pub fn get_default_output_device_name() -> Option<String> {
+    host().default_output_device()?.name().ok()
+}
+
 /// Open (or reopen) an output channel on the given device.
 /// channel: "game" | "preview"
 /// device_id: device unique ID from list_audio_output_devices, or "" for system default.

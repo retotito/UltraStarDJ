@@ -155,6 +155,7 @@ pub fn run() {
             audio::start_mic_monitor,
             audio::stop_mic_monitor,
             audio::list_audio_output_devices,
+            audio::get_default_output_device_name,
             audio::open_output_channel,
             audio::push_audio_pcm,
             audio::close_output_channel,

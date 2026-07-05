@@ -11,10 +11,11 @@
   onMount(() => { loadAudioOutputDevices() })
 
   const devices = $derived(audioOutputDevices.list)
+  const defaultName = $derived(audioOutputDevices.defaultName)
   const hasSecondDevice = $derived(devices.length > 0)
 
   const previewDeviceOptions = $derived([
-    { value: '', label: 'System default' },
+    { value: '', label: defaultName ? `System default (${defaultName})` : 'System default' },
     ...devices.map(d => ({ value: d.id, label: d.name })),
   ])
 
@@ -49,7 +50,7 @@
         <label class="field-label">Output device</label>
         <div class="device-fixed">
           <span class="icon" style="font-size:16px">volume_up</span>
-          System default
+          {defaultName ?? 'System default'}
           <span class="device-fixed-hint">Set in system sound settings</span>
         </div>
       </div>
@@ -76,7 +77,12 @@
       </div>
 
       <div class="field">
-        <label class="field-label">Output device</label>
+        <div class="field-label-row">
+          <label class="field-label">Output device</label>
+          <button class="btn-refresh" onclick={() => loadAudioOutputDevices()} title="Refresh device list — connect BT or USB first, then refresh">
+            <span class="icon" style="font-size:16px">refresh</span>
+          </button>
+        </div>
         {#if hasSecondDevice}
           <Select
             value={previewChannel.deviceId ?? ''}
@@ -206,6 +212,25 @@
     font-weight: 600;
     letter-spacing: 0.04em;
   }
+
+  .field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .btn-refresh {
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    color: var(--md-sys-color-on-surface-variant);
+    opacity: 0.6;
+    border-radius: var(--radius-sm);
+  }
+  .btn-refresh:hover { opacity: 1; }
 
   .device-fixed {
     display: flex;

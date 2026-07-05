@@ -33,7 +33,7 @@ YouTube audio plays inside a cross-origin `<iframe>`. JavaScript cannot intercep
 
 Current behaviour:
 - Volume: controlled via YouTube Player API (`player.setVolume()`) — fader works
-- Level meter: not available
+- Level meter: not available — meter segments are visually grayed out
 - Device routing: not available — always plays on system default
 
 > **Future sprint:** Extract YouTube stream URL via yt-dlp, load into native `<audio>` element, full Web Audio control applies.
@@ -59,12 +59,18 @@ The DJ needs **two separate audio outputs** for private headphone cueing. Any of
 - **DJ preview** → USB audio dongle → headphones
 - Best for laptop DJs without internal speakers ✅
 
-### Option 4 — macOS Aggregate Device (two outputs as one 4-channel device) *(free, built-in)*
+### Option 4 — macOS Aggregate Device *(free, built-in — advanced)*
 - Open **Audio MIDI Setup** (`/Applications/Utilities/`)
 - Create an aggregate device combining two physical outputs
-- Channels 1–2 → main speakers, channels 3–4 → headphones
-- Our app routes game to ch 1–2 and preview to ch 3–4
-- Useful when only one USB port is available ✅
+- The aggregate device appears as a single device in the OS
+- ⚠️ UltrastarDJ cannot route to specific channels of an aggregate device — both channels get the same audio
+- **Not recommended** — use a USB dongle (Option 2/3) instead
+
+### Option 4b — Bluetooth headphones *(€0 extra, with caveat)*
+- Connect BT headphones → macOS sets them as system default automatically
+- Go to **System Settings → Sound → Output** → set speakers back as default
+- ⚠️ Known macOS/cpal limitation: BT headphones may disappear from the preview selector when they are not the system default
+- **Workaround**: keep BT as system default and select your speakers as the preview device instead (reversed roles) — or use a USB dongle for reliable routing
 
 ### Option 5 — Dedicated DJ USB audio interface *(€80–200)*
 - e.g. Native Instruments Traktor Audio 2 MK2, Pioneer DJ interface
@@ -101,7 +107,7 @@ The **Preview** device selector in the Audio Output panel lists all audio output
 | Level metering (mp3/mp4) | ✅ AnalyserNode | ✅ AnalyserNode |
 | Device routing (YouTube) | ❌ iframe limitation | ❌ iframe limitation |
 | Volume control (YouTube) | ⚠️ YT Player API only | ⚠️ YT Player API only |
-| Level metering (YouTube) | ❌ not possible | ❌ not possible |
+| Level metering (YouTube) | ❌ meter grayed out | ❌ meter grayed out |
 | Aggregate device support | ✅ Audio MIDI Setup | ✅ Windows built-in |
 | WASAPI loopback (future) | n/a | 🔶 planned |
 | CoreAudio tap (future) | 🔶 macOS 14+, planned | n/a |
