@@ -12,9 +12,16 @@
   let showPlayers = $state(false)
   let showDisplays = $state(false)
   let showAudioOutput = $state(false)
+
+  function closeAll() {
+    showLayoutMenu = false
+    showPlayers = false
+    showDisplays = false
+    showAudioOutput = false
+  }
 </script>
 
-<aside class="sidebar">
+<aside class="sidebar" onclick={(e) => { if (e.target === e.currentTarget) closeAll() }}>
   <nav class="sidebar-nav">
     <button class="btn btn-icon is-active" data-tooltip="Library" aria-label="Library">
       <span class="icon">library_music</span>
@@ -25,7 +32,7 @@
       class:is-active={layout.showNowPlaying && playback.isLoaded}
       data-tooltip="Now Playing"
       aria-label="Toggle now playing"
-      onclick={() => layout.toggleNowPlaying()}
+      onclick={() => { closeAll(); layout.toggleNowPlaying() }}
     >
       <span class="icon">play_circle</span>
       {#if playback.isLoaded && !layout.showNowPlaying}
@@ -38,7 +45,7 @@
       class:is-active={showLayoutMenu}
       data-tooltip="Layout"
       aria-label="Toggle layout options"
-      onclick={() => { showLayoutMenu = !showLayoutMenu; showPlayers = false; showDisplays = false }}
+      onclick={() => { const v = !showLayoutMenu; closeAll(); showLayoutMenu = v }}
     >
       <span class="icon">dashboard</span>
     </button>
@@ -48,29 +55,17 @@
       class:is-active={showPlayers}
       data-tooltip="Players"
       aria-label="Player & mic settings"
-      onclick={() => { showPlayers = !showPlayers; showLayoutMenu = false; showDisplays = false }}
+      onclick={() => { const v = !showPlayers; closeAll(); showPlayers = v }}
     >
       <span class="icon">group</span>
     </button>
-
-    <!-- Queue toggle (hidden for now — accessible via Layout panel)
-    <button
-      class="btn btn-icon"
-      class:is-active={layout.showQueue}
-      data-tooltip="Queue"
-      aria-label="Toggle queue"
-      onclick={() => layout.toggleQueue()}
-    >
-      <span class="icon">queue_music</span>
-    </button>
-    -->
 
     <button
       class="btn btn-icon"
       class:is-active={showDisplays}
       data-tooltip="Displays"
       aria-label="Open Displays"
-      onclick={() => { showDisplays = !showDisplays; showPlayers = false; showLayoutMenu = false; showAudioOutput = false }}
+      onclick={() => { const v = !showDisplays; closeAll(); showDisplays = v }}
     >
       <span class="icon">tv_displays</span>
     </button>
@@ -80,7 +75,7 @@
       class:is-active={showAudioOutput}
       data-tooltip="Audio Output"
       aria-label="Audio output routing"
-      onclick={() => { showAudioOutput = !showAudioOutput; showDisplays = false; showPlayers = false; showLayoutMenu = false }}
+      onclick={() => { const v = !showAudioOutput; closeAll(); showAudioOutput = v }}
     >
       <span class="icon">speaker</span>
     </button>
@@ -91,7 +86,7 @@
       class="btn btn-icon"
       data-tooltip="Settings"
       aria-label="Settings"
-      onclick={() => showSettings = true}
+      onclick={() => { closeAll(); showSettings = true }}
     >
       <span class="icon">settings</span>
     </button>
@@ -180,7 +175,7 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--space-2) 0;
-    z-index: var(--z-overlay);
+    z-index: var(--z-modal);
   }
 
   .sidebar-nav,

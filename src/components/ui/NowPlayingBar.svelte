@@ -211,7 +211,7 @@
     bottom: var(--space-6);
     left: 50%;
     translate: -50% 0;
-    z-index: 200;
+    z-index: 50;
     background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 88%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
