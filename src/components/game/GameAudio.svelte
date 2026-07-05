@@ -75,6 +75,13 @@
     }
   })
 
+  // Re-connect channel when song changes (audioSrc changes → new element binding)
+  $effect(() => {
+    if (audioEl && audioSrc) {
+      gameChannel.connectElement(audioEl).catch(e => console.warn('[GameAudio] channel reconnect failed', e))
+    }
+  })
+
   // Auto-stop when audio finishes — must be a $effect so it runs after audioEl mounts
   $effect(() => {
     if (!audioEl) return

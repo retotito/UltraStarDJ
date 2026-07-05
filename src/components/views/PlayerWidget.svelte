@@ -11,6 +11,8 @@
   import { errorStore } from '$lib/stores/error.svelte'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
+  import HorizontalFader from '$components/ui/HorizontalFader.svelte'
+  import { previewChannel } from '$lib/audio/channels.svelte'
 
   type MediaType = 'video' | 'youtube' | 'audio' | 'none'
 
@@ -70,7 +72,7 @@
   // Plyr action — YouTube embed (preview only)
   function plyrYoutubeAction(node: HTMLDivElement, youtubeId: string) {
     const instance = new Plyr(node, {
-      controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume'],
+      controls: ['play', 'progress', 'current-time', 'duration'],
       autoplay: false,
     })
     // Set lowest quality once the IFrame player is ready (preview — no need for HD)
@@ -90,7 +92,7 @@
     params: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }
   ) {
     const instance = new Plyr(node, {
-      controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume'],
+      controls: ['play', 'progress', 'current-time', 'duration'],
       autoplay: false,
       resetOnEnd: true,
     })
@@ -122,9 +124,28 @@
 
     instance.on('error', () => console.warn('[PreviewPlayer] media load error'))
 
+    // Connect to Web Audio on first play via Plyr's event system.
+    // Using instance.on() because Plyr intercepts native media events.
+    let channelConnected = false
+    instance.on('playing', () => {
+      const media = instance.media as HTMLMediaElement | null
+      const el = media ?? node
+      const src = el.currentSrc || el.src
+      if (!src || src.includes('blank') || src.includes('cdn.plyr.io')) return
+      if (channelConnected) return
+      channelConnected = true
+      previewChannel.connectElement(el).catch(e => console.warn('[PlayerWidget] previewChannel connect failed', e))
+    })
+
     return {
-      update(p: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }) { load(p) },
-      destroy() { try { instance.destroy() } catch {} },
+      update(p: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }) {
+        channelConnected = false  // reset so reconnect happens on next play after song change
+        load(p)
+      },
+      destroy() {
+        previewChannel.disconnect()
+        try { instance.destroy() } catch {}
+      },
     }
   }
 
@@ -219,6 +240,10 @@
       {#if player.song.year}
         <p class="text-xs text-muted">{player.song.year}{player.song.language ? ` · ${player.song.language}` : ''}</p>
       {/if}
+    </div>
+
+    <div class="preview-fader">
+      <HorizontalFader label="Preview" level={previewChannel.level} gain={previewChannel.gain} ongainchange={(v) => previewChannel.setGain(v)} />
     </div>
 
     <div class="actions">
@@ -375,6 +400,10 @@
     font-weight: var(--font-weight-semibold);
     font-size: var(--text-sm);
     color: var(--md-sys-color-on-surface);
+  }
+
+  .preview-fader {
+    padding: 0 var(--space-1);
   }
 
   .actions {

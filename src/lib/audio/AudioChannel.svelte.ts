@@ -46,6 +46,8 @@ export class AudioChannel {
     this.disconnect()
 
     this.ctx = new AudioContext()
+    if (this.ctx.state === 'suspended') await this.ctx.resume()
+
     this.gainNode = this.ctx.createGain()
     this.analyserNode = this.ctx.createAnalyser()
     this.analyserNode.fftSize = 256
@@ -53,22 +55,23 @@ export class AudioChannel {
 
     this.gainNode.gain.value = this.gain
 
-    this.sourceNode = this.ctx.createMediaElementSource(el)
+    try {
+      this.sourceNode = this.ctx.createMediaElementSource(el)
+    } catch (err) {
+      console.error(`[AudioChannel:${this.name}] createMediaElementSource failed:`, err)
+      return
+    }
     this.sourceNode.connect(this.gainNode)
     this.gainNode.connect(this.analyserNode)
 
-    // Start metering loop
     this._startMeterLoop()
 
-    // macOS: set up Rust cpal routing if a device is selected
-    if (!SUPPORTS_SINK_ID) {
-      await this._connectWorklet()
-    } else {
-      // Windows: route directly on the element
+    if (SUPPORTS_SINK_ID) {
       this.analyserNode.connect(this.ctx.destination)
-      if (this.deviceId) {
-        await this._applySinkId(el, this.deviceId)
-      }
+      if (this.deviceId) await this._applySinkId(el, this.deviceId)
+    } else {
+      this.analyserNode.connect(this.ctx.destination)
+      if (this.deviceId) await this._connectWorklet()
     }
   }
 
@@ -105,9 +108,16 @@ export class AudioChannel {
       return
     }
 
-    // macOS: reopen cpal output stream on new device
-    if (this.ctx && this.workletNode) {
-      await this._openCpalChannel(deviceId ?? '')
+    // macOS: open/close cpal channel based on whether a specific device is selected
+    if (!this.ctx || !this.analyserNode) return
+    if (deviceId) {
+      await this._connectWorklet()
+    } else {
+      // Back to system default — disconnect worklet, use ctx.destination only
+      this.workletNode?.port.postMessage('stop')
+      this.workletNode?.disconnect()
+      this.workletNode = null
+      invoke('close_output_channel', { channel: this.name }).catch(() => {})
     }
   }
 
@@ -136,10 +146,8 @@ export class AudioChannel {
       }
 
       this.analyserNode.connect(this.workletNode)
-      // Do NOT connect workletNode → ctx.destination: audio goes to cpal, not default output.
-      // Connect analyserNode → destination for monitoring in the same app window (optional).
-      // Comment out next line to send audio ONLY to cpal (selected device), not default:
-      // this.analyserNode.connect(this.ctx.destination)
+      // workletNode sends PCM to Rust/cpal on the selected device.
+      // ctx.destination handles the default/fallback output (already connected above).
     } catch (err) {
       console.warn(`[AudioChannel:${this.name}] WorkletNode setup failed, falling back to default output`, err)
       this.analyserNode?.connect(this.ctx.destination)
