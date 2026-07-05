@@ -289,7 +289,10 @@
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
-    width: 380px;
+    width: 500px;
+    max-height: calc(100vh - 256px);
+    display: flex;
+    flex-direction: column;
     z-index: var(--z-overlay);
     box-shadow: var(--elevation-2);
     overflow: hidden;

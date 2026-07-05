@@ -3,16 +3,19 @@
   import { loadAudioOutputDevices, audioOutputDevices } from '$lib/audio/devices.svelte'
   import { gameChannel, previewChannel } from '$lib/audio/channels.svelte'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
+  import Select from '$components/ui/Select.svelte'
 
   let { onclose }: { onclose?: () => void } = $props()
 
   onMount(() => { loadAudioOutputDevices() })
 
   const devices = $derived(audioOutputDevices.list)
+  const hasSecondDevice = $derived(devices.length > 0)
 
-  async function setGameDevice(id: string) {
-    await gameChannel.setDevice(id || null)
-  }
+  const previewDeviceOptions = $derived([
+    { value: '', label: 'System default' },
+    ...devices.map(d => ({ value: d.id, label: d.name })),
+  ])
 
   async function setPreviewDevice(id: string) {
     await previewChannel.setDevice(id || null)
@@ -41,16 +44,11 @@
 
       <div class="field">
         <label class="field-label">Output device</label>
-        <select
-          class="device-select"
-          value={gameChannel.deviceId ?? ''}
-          onchange={(e) => setGameDevice((e.target as HTMLSelectElement).value)}
-        >
-          <option value="">System default</option>
-          {#each devices as d (d.id)}
-            <option value={d.id}>{d.name}</option>
-          {/each}
-        </select>
+        <div class="device-fixed">
+          <span class="icon" style="font-size:16px">volume_up</span>
+          System default
+          <span class="device-fixed-hint">Set in system sound settings</span>
+        </div>
       </div>
 
       <div class="field">
@@ -73,16 +71,19 @@
 
       <div class="field">
         <label class="field-label">Output device</label>
-        <select
-          class="device-select"
-          value={previewChannel.deviceId ?? ''}
-          onchange={(e) => setPreviewDevice((e.target as HTMLSelectElement).value)}
-        >
-          <option value="">System default</option>
-          {#each devices as d (d.id)}
-            <option value={d.id}>{d.name}</option>
-          {/each}
-        </select>
+        {#if hasSecondDevice}
+          <Select
+            value={previewChannel.deviceId ?? ''}
+            options={previewDeviceOptions}
+            onchange={(v) => setPreviewDevice(v)}
+          />
+        {:else}
+          <div class="device-fixed device-fixed--warn">
+            <span class="icon" style="font-size:16px">headphones</span>
+            System default
+            <span class="device-fixed-hint">Connect a second output for DJ cueing</span>
+          </div>
+        {/if}
       </div>
 
       <div class="field">
@@ -108,9 +109,11 @@
     gap: var(--space-4);
     padding: var(--space-4);
     min-width: 320px;
+    overflow: hidden;
   }
 
   .view-header {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -148,6 +151,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+    overflow-y: auto;
+    flex: 1;
   }
 
   .output-card {
@@ -196,19 +201,25 @@
     letter-spacing: 0.04em;
   }
 
-  .device-select {
-    width: 100%;
-    background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 80%, transparent);
-    border: 1px solid var(--md-sys-color-outline-variant);
-    border-radius: var(--radius-sm);
-    color: var(--md-sys-color-on-surface);
+  .device-fixed {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
     font-size: var(--text-sm);
-    cursor: pointer;
+    background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 50%, transparent);
+    border: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
+    color: var(--md-sys-color-on-surface-variant);
   }
-  .device-select:focus {
-    outline: 2px solid var(--md-sys-color-primary);
-    outline-offset: 1px;
+  .device-fixed--warn {
+    border-color: color-mix(in srgb, #ffb300 30%, transparent);
+    color: #ffb300;
+  }
+  .device-fixed-hint {
+    margin-left: auto;
+    font-size: var(--text-xs);
+    opacity: 0.7;
   }
 
   .no-devices {
