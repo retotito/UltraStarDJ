@@ -11,6 +11,7 @@
   import { onMount, onDestroy } from 'svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { onCountdownDone } from '$lib/ipc/tauri'
+  import { gameChannel } from '$lib/audio/channels.svelte'
 
   let containerEl = $state<HTMLDivElement | undefined>(undefined)
   let ytPlayer: any = null
@@ -133,6 +134,12 @@
       }
     }, 200)
     return () => clearInterval(interval)
+  })
+
+  // Sync gameChannel gain → YouTube player volume (0–1 → 0–100)
+  $effect(() => {
+    const vol = Math.round(gameChannel.gain * 100)
+    if (ytReady) ytPlayer?.setVolume(vol)
   })
 
   onMount(async () => {

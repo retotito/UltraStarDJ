@@ -4,6 +4,7 @@
   import { gameChannel, previewChannel } from '$lib/audio/channels.svelte'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
   import Select from '$components/ui/Select.svelte'
+  import { playback } from '$lib/stores/playback.svelte'
 
   let { onclose }: { onclose?: () => void } = $props()
 
@@ -16,6 +17,8 @@
     { value: '', label: 'System default' },
     ...devices.map(d => ({ value: d.id, label: d.name })),
   ])
+
+  const isYoutubeSong = $derived(!!playback.song?.youtubeId)
 
   async function setPreviewDevice(id: string) {
     await previewChannel.setDevice(id || null)
@@ -57,11 +60,14 @@
           level={gameChannel.level}
           gain={gameChannel.gain}
           ongainchange={(v) => gameChannel.setGain(v)}
+          dimmed={isYoutubeSong}
         />
+        {#if isYoutubeSong}
+          <span class="no-meter-note">No audio metering for YouTube</span>
+        {/if}
       </div>
     </div>
 
-    <!-- Preview channel card -->
     <div class="output-card">
       <div class="card-header">
         <span class="icon card-icon">headphones</span>
@@ -220,6 +226,12 @@
     margin-left: auto;
     font-size: var(--text-xs);
     opacity: 0.7;
+  }
+
+  .no-meter-note {
+    font-size: var(--text-xs);
+    color: var(--md-sys-color-on-surface-variant);
+    opacity: 0.6;
   }
 
   .no-devices {

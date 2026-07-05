@@ -21,12 +21,14 @@
     gain       = 1,
     ongainchange = (_: number) => {},
     color      = 'var(--md-sys-color-primary)',
+    dimmed     = false,
   }: {
     label?:        string
     level?:        number
     gain?:         number
     ongainchange?: (v: number) => void
     color?:        string
+    dimmed?:       boolean
   } = $props()
 
   // ── Segments ──────────────────────────────────────────────
@@ -96,7 +98,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="track" bind:this={trackEl} onclick={onTrackClick} role="presentation">
     <!-- Meter segments -->
-    <div class="segments">
+    <div class="segments" class:segments--dimmed={dimmed}>
       {#each segments as seg}
         <div class="seg seg-{seg.color}" class:lit={seg.lit}></div>
       {/each}
@@ -134,6 +136,13 @@
     height: 28px;
     user-select: none;
   }
+
+  .fader-row.is-dimmed {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .segments--dimmed .seg { opacity: 0.25; }
 
   .label {
     min-width: 72px;

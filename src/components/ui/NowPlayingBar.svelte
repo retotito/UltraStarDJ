@@ -143,7 +143,7 @@
 
     <!-- Transport controls — always shown -->
     <div class="mixer">
-      <HorizontalFader label="Song" level={gameChannel.level} gain={gameChannel.gain} ongainchange={(v) => gameChannel.setGain(v)} />
+      <HorizontalFader label="Song" level={gameChannel.level} gain={gameChannel.gain} ongainchange={(v) => gameChannel.setGain(v)} dimmed={!!playback.song?.youtubeId} />
     </div>
 
     <!-- Transport controls — always shown -->
