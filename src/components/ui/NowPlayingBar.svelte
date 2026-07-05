@@ -4,6 +4,7 @@
   import { displaysStore } from '$lib/stores/displays.svelte'
   import { layout } from '$lib/stores/layout.svelte'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
+  import { gameChannel } from '$lib/audio/channels.svelte'
 
   const PLAYER_COLORS: Record<number, string> = {
     1: 'var(--player-1)',
@@ -15,9 +16,6 @@
   const allPlayerIds = $derived(
     [...new Set([...displaysStore.display1.playerIds, ...displaysStore.display2.playerIds])].sort((a, b) => a - b)
   )
-
-  let demoGain = $state(0.8)
-  let demoLevel = $state(0.55)
 
   const hasDisplay = $derived(displaysStore.display1.open || displaysStore.display2.open)
 
@@ -145,7 +143,7 @@
 
     <!-- Transport controls — always shown -->
     <div class="mixer">
-      <HorizontalFader label="Song" level={demoLevel} gain={demoGain} ongainchange={(v) => demoGain = v} />
+      <HorizontalFader label="Song" level={gameChannel.level} gain={gameChannel.gain} ongainchange={(v) => gameChannel.setGain(v)} />
     </div>
 
     <!-- Transport controls — always shown -->

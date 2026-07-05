@@ -8,6 +8,7 @@
   import { onMount, onDestroy } from 'svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { onCountdownDone, toAssetUrl } from '$lib/ipc/tauri'
+  import { gameChannel } from '$lib/audio/channels.svelte'
 
   let audioEl = $state<HTMLAudioElement | undefined>(undefined)
   let unlistenCountdown: (() => void) | null = null
@@ -68,7 +69,10 @@
       audioEl.play().catch(e => console.error('[GameAudio] play() rejected:', e))
     })
     // Only register if audio element is actually mounted (not YouTube-only songs)
-    if (audioEl) playback.registerTimeProvider(() => audioEl!.currentTime - videoGapOffset, 'GameAudio')
+    if (audioEl) {
+      playback.registerTimeProvider(() => audioEl!.currentTime - videoGapOffset, 'GameAudio')
+      gameChannel.connectElement(audioEl).catch(e => console.warn('[GameAudio] channel connect failed', e))
+    }
   })
 
   // Auto-stop when audio finishes — must be a $effect so it runs after audioEl mounts
@@ -102,6 +106,7 @@
   onDestroy(() => {
     unlistenCountdown?.()
     playback.unregisterTimeProvider('GameAudio')
+    gameChannel.disconnect()
   })
 </script>
 

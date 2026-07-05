@@ -154,6 +154,10 @@ pub fn run() {
             audio::list_audio_input_devices,
             audio::start_mic_monitor,
             audio::stop_mic_monitor,
+            audio::list_audio_output_devices,
+            audio::open_output_channel,
+            audio::push_audio_pcm,
+            audio::close_output_channel,
         ])
         .setup(move |app| {
             audio::start_hotplug_watcher(app.handle().clone(), audio_state);
