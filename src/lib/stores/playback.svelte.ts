@@ -6,7 +6,7 @@
 import type { Song } from '$lib/ultrastar/types'
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
-import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, onBeamerReady } from '$lib/ipc/tauri'
+import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, onBeamerReady, onCountdownDone } from '$lib/ipc/tauri'
 import { readFile, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
 import { parseSongNotes } from '$lib/ultrastar/parser'
 import { convertFileSrc } from '@tauri-apps/api/core'
@@ -22,6 +22,7 @@ let state = $state<PlaybackState>({ status: 'idle', song: null })
 let showClearBeamers = $state(false)
 let beamerReady = $state(true)
 let isBuffering = $state(false)
+let isCountingDown = $state(false)
 let _transcodedPath: string | null = null  // temp MP4 to delete on dismiss
 
 // Listen for beamer-ready events from beamer windows
@@ -30,6 +31,9 @@ onBeamerReady(() => {
   console.log(`[playback ${t}ms] beamer-ready received — enabling play button`)
   beamerReady = true
 })
+
+// Clear countdown flag when beamer fires countdown-done
+onCountdownDone(() => { isCountingDown = false })
 
 // ── Time-tick loop ────────────────────────────────────────────
 let getTime: (() => number) | null = null
@@ -70,6 +74,7 @@ export const playback = {
   get showClearBeamers() { return showClearBeamers },
   get beamerReady() { return beamerReady },
   get isBuffering() { return isBuffering },
+  get isCountingDown() { return isCountingDown },
   get currentTime() { return _currentTime },
 
   /** Called by VideoPreloader when video canplaythrough fires */
@@ -159,6 +164,7 @@ export const playback = {
     if ((state.status !== 'loaded' && state.status !== 'preview') || !state.song) return
     const song = state.song
     state.status = 'playing'
+    isCountingDown = true
     startTick()
     const assetBase = convertFileSrc('')
 
@@ -190,6 +196,7 @@ export const playback = {
   async pause() {
     if (state.status !== 'playing') return
     state.status = 'paused'
+    isCountingDown = false
     stopTick()
     await sendPauseSong()
   },
@@ -204,6 +211,7 @@ export const playback = {
   /** Stop playback — song stays loaded in the bar */
   async stop() {
     if (state.status === 'idle') return
+    isCountingDown = false
     stopTick()
     state.status = 'loaded'
     showClearBeamers = true

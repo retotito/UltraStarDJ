@@ -164,7 +164,9 @@
 
       <!-- Play / Pause — swap on same spot -->
       {#if playback.status === 'playing'}
-        <button class="ctrl-btn ctrl-pause" title="Pause" onclick={() => playback.pause()}>
+        <button class="ctrl-btn ctrl-pause" disabled={playback.isCountingDown}
+          title={playback.isCountingDown ? 'Countdown in progress' : 'Pause'}
+          onclick={() => playback.pause()}>
           <span class="icon">pause</span>
         </button>
       {:else}
