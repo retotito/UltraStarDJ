@@ -343,3 +343,7 @@ export function onMicReconnected(cb: (e: MicReconnectedEvent) => void): Promise<
 export function onDevicesChanged(cb: (devices: AudioInputDevice[]) => void): Promise<UnlistenFn> {
   return listen<AudioInputDevice[]>(MIC_EVENTS.DEVICES_CHANGED, e => cb(e.payload))
 }
+
+export function onOutputDevicesChanged(cb: () => void): Promise<UnlistenFn> {
+  return listen('audio:output-devices-changed', () => cb())
+}

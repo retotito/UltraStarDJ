@@ -44,6 +44,7 @@ pub const EVT_MIC_LEVEL: &str = "mic:level";
 pub const EVT_MIC_DISCONNECTED: &str = "mic:disconnected";
 pub const EVT_MIC_RECONNECTED: &str = "mic:reconnected";
 pub const EVT_DEVICES_CHANGED: &str = "mic:devices-changed";
+pub const EVT_OUTPUT_DEVICES_CHANGED: &str = "audio:output-devices-changed";
 
 // ── Input stream state ────────────────────────────────────────────────────────
 
@@ -85,6 +86,8 @@ pub struct AudioState {
     output_channels: Mutex<HashMap<String, OutputChannel>>,
     /// Snapshot of input device names for hot-plug detection
     known_devices: Mutex<Vec<String>>,
+    /// Snapshot of output device names for hot-plug detection
+    known_output_devices: Mutex<Vec<String>>,
 }
 
 unsafe impl Sync for AudioState {}
@@ -93,10 +96,12 @@ impl AudioState {
     pub fn new() -> Self {
         let host = cpal::default_host();
         let known = device_ids(&host);
+        let known_out = enumerate_output_devices(&host).into_iter().map(|(id, _)| id).collect();
         AudioState {
             streams: Mutex::new(HashMap::new()),
             output_channels: Mutex::new(HashMap::new()),
             known_devices: Mutex::new(known),
+            known_output_devices: Mutex::new(known_out),
         }
     }
 }
@@ -464,6 +469,17 @@ pub fn start_hotplug_watcher(app: AppHandle, state: Arc<AudioState>) {
 
                 let all = list_audio_input_devices();
                 let _ = app.emit(EVT_DEVICES_CHANGED, all);
+
+                // Also re-check output devices
+                let current_out: Vec<String> = enumerate_output_devices(&host).into_iter().map(|(id, _)| id).collect();
+                let mut known_out = state.known_output_devices.lock().unwrap();
+                if current_out != *known_out {
+                    *known_out = current_out;
+                    drop(known_out);
+                    let _ = app.emit(EVT_OUTPUT_DEVICES_CHANGED, ());
+                } else {
+                    drop(known_out);
+                }
 
                 let streams = state.streams.lock().unwrap();
                 for (player_id, active) in streams.iter() {
