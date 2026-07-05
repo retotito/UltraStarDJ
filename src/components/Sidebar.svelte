@@ -5,11 +5,13 @@
   import SettingsDialog from '$components/dialogs/SettingsDialog.svelte'
   import PlayersView from '$components/views/PlayersView.svelte'
   import DisplaysView from '$components/views/DisplaysView.svelte'
+  import AudioOutputView from '$components/views/AudioOutputView.svelte'
 
   let showSettings = $state(false)
   let showLayoutMenu = $state(false)
   let showPlayers = $state(false)
   let showDisplays = $state(false)
+  let showAudioOutput = $state(false)
 </script>
 
 <aside class="sidebar">
@@ -68,9 +70,19 @@
       class:is-active={showDisplays}
       data-tooltip="Displays"
       aria-label="Open Displays"
-      onclick={() => { showDisplays = !showDisplays; showPlayers = false; showLayoutMenu = false }}
+      onclick={() => { showDisplays = !showDisplays; showPlayers = false; showLayoutMenu = false; showAudioOutput = false }}
     >
       <span class="icon">tv_displays</span>
+    </button>
+
+    <button
+      class="btn btn-icon"
+      class:is-active={showAudioOutput}
+      data-tooltip="Audio Output"
+      aria-label="Audio output routing"
+      onclick={() => { showAudioOutput = !showAudioOutput; showDisplays = false; showPlayers = false; showLayoutMenu = false }}
+    >
+      <span class="icon">speaker</span>
     </button>
   </nav>
 
@@ -142,6 +154,14 @@
   <div class="popover-backdrop" onclick={() => showDisplays = false}></div>
   <div class="displays-popover">
     <DisplaysView onclose={() => showDisplays = false} />
+  </div>
+{/if}
+
+{#if showAudioOutput}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="popover-backdrop" onclick={() => showAudioOutput = false}></div>
+  <div class="audio-output-popover">
+    <AudioOutputView onclose={() => showAudioOutput = false} />
   </div>
 {/if}
 
@@ -257,6 +277,19 @@
     width: 660px;
     display: flex;
     flex-direction: column;
+    z-index: var(--z-overlay);
+    box-shadow: var(--elevation-2);
+    overflow: hidden;
+  }
+
+  .audio-output-popover {
+    position: fixed;
+    left: 64px;
+    top: 240px;
+    background: var(--md-sys-color-surface-container-high);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--radius-lg);
+    width: 380px;
     z-index: var(--z-overlay);
     box-shadow: var(--elevation-2);
     overflow: hidden;
