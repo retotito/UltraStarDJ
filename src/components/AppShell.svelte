@@ -24,7 +24,9 @@
   onMount(async () => {
     // Global mic level listener — always active, independent of popup state
     unlistenMicLevel = await onMicLevel(e => {
-      playersStore.setLevel(e.player_id, e.rms)
+      if (playersStore.monitoringIds.has(e.player_id)) {
+        playersStore.setLevel(e.player_id, e.rms)
+      }
     })
 
     unlistenMicDisconnected = await onMicDisconnected(async e => {

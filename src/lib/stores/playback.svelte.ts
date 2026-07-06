@@ -33,8 +33,28 @@ onBeamerReady(() => {
   beamerReady = true
 })
 
-// Clear countdown flag when beamer fires countdown-done
-onCountdownDone(() => { isCountingDown = false })
+// Clear countdown flag when beamer fires countdown-done, then start mics
+onCountdownDone(async () => {
+  isCountingDown = false
+  console.log('[playback] countdown done — song started')
+
+  const playersWithMic = playersStore.all.filter(p => p.mic)
+  if (playersWithMic.length > 0) {
+    await openMicMixChannel().catch(e => console.warn('[playback] openMicMixChannel failed:', e))
+    for (const p of playersWithMic) {
+      if (!playersStore.monitoringIds.has(p.id)) {
+        try {
+          await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id)
+          playersStore.setMonitoring(p.id, true)
+          playersStore.setDisconnected(p.id, false)
+          console.log(`[playback] mic started — player ${p.id} device:${p.mic!.deviceId} ch:${p.mic!.channel}`)
+        } catch (e) {
+          console.warn(`[playback] mic start failed — player ${p.id}:`, e)
+        }
+      }
+    }
+  }
+})
 
 // ── Time-tick loop ────────────────────────────────────────────
 let getTime: (() => number) | null = null
@@ -194,22 +214,8 @@ export const playback = {
     }
 
     // Auto-start mic monitoring for all players with a mic assigned
-    const playersWithMic = playersStore.all.filter(p => p.mic)
-    if (playersWithMic.length > 0) {
-      // Open a dedicated cpal output channel for mic→speaker routing
-      await openMicMixChannel().catch(e => console.warn('[playback] openMicMixChannel failed:', e))
-      for (const p of playersWithMic) {
-        if (!playersStore.monitoringIds.has(p.id)) {
-          try {
-            await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id)
-            playersStore.setMonitoring(p.id, true)
-            playersStore.setDisconnected(p.id, false)
-          } catch (e) {
-            console.warn(`[playback] auto-start mic failed for player ${p.id}:`, e)
-          }
-        }
-      }
-    }
+    // NOTE: actual mic start is deferred to onCountdownDone so recording begins
+    // only when the song actually starts playing (after the countdown screen).
   },
 
   async pause() {
@@ -218,6 +224,15 @@ export const playback = {
     isCountingDown = false
     stopTick()
     await sendPauseSong()
+    // Stop mic monitors on pause (mic output also closes so no audio bleed)
+    for (const id of [...playersStore.monitoringIds]) {
+      await stopMicMonitor(id).catch(() => {})
+      playersStore.setMonitoring(id, false)
+      playersStore.setLevel(id, 0)
+      console.log(`[playback] mic stopped — player ${id} (pause)`)
+    }
+    await closeMicMixChannel().catch(() => {})
+    console.log('[playback] paused')
   },
 
   async resume() {
@@ -225,6 +240,24 @@ export const playback = {
     state.status = 'playing'
     startTick()
     await sendResumeSong()
+    // Restart mic monitors after resume
+    const playersWithMic = playersStore.all.filter(p => p.mic)
+    if (playersWithMic.length > 0) {
+      await openMicMixChannel().catch(e => console.warn('[playback] openMicMixChannel failed:', e))
+      for (const p of playersWithMic) {
+        if (!playersStore.monitoringIds.has(p.id)) {
+          try {
+            await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id)
+            playersStore.setMonitoring(p.id, true)
+            playersStore.setDisconnected(p.id, false)
+            console.log(`[playback] mic started — player ${p.id} (resume)`)
+          } catch (e) {
+            console.warn(`[playback] mic start failed — player ${p.id}:`, e)
+          }
+        }
+      }
+    }
+    console.log('[playback] resumed')
   },
 
   /** Stop playback — song stays loaded in the bar */
@@ -241,8 +274,10 @@ export const playback = {
       await stopMicMonitor(id).catch(() => {})
       playersStore.setMonitoring(id, false)
       playersStore.setLevel(id, 0)
+      console.log(`[playback] mic stopped — player ${id}`)
     }
     await closeMicMixChannel().catch(() => {})
+    console.log('[playback] song stopped')
   },
 
   /** Send a second stop to clear the score screen and return beamers to idle */

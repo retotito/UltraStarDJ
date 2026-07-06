@@ -325,7 +325,9 @@ export async function startMicMonitor(
 }
 
 export async function stopMicMonitor(playerId: number): Promise<void> {
+  console.log(`[ipc] stopMicMonitor → player ${playerId}`)
   await invoke('stop_mic_monitor', { playerId })
+  console.log(`[ipc] stopMicMonitor ✓ player ${playerId}`)
 }
 
 export async function setMicMixGain(playerId: number, gain: number): Promise<void> {

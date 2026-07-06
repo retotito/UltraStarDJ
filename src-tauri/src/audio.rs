@@ -282,7 +282,10 @@ pub fn stop_mic_monitor(
     state: tauri::State<Arc<AudioState>>,
     player_id: u8,
 ) -> Result<(), String> {
-    state.streams.lock().unwrap().remove(&player_id);
+    let mut streams = state.streams.lock().unwrap();
+    let had = streams.remove(&player_id).is_some();
+    eprintln!("[stop_mic_monitor] player={player_id} stream_removed={had} remaining={}", streams.len());
+    drop(streams);
     // Remove the player's dedicated ring from all output channels
     let channels = state.output_channels.lock().unwrap();
     for ch in channels.values() {
@@ -476,7 +479,6 @@ fn route_to_output(mono: &[f32], gain: f32, ring: &Option<RingBuffer>, in_rate: 
     };
 
     let mut buf = ring.lock().unwrap();
-    let fill_before = buf.len();
 
     // Push all new samples as stereo
     for &s in samples {
@@ -484,24 +486,20 @@ fn route_to_output(mono: &[f32], gain: f32, ring: &Option<RingBuffer>, in_rate: 
         buf.push_back(out); // L
         buf.push_back(out); // R
     }
-
     // Gentle drift correction: if ring grew beyond ~40ms, drop only 2 samples (one frame)
-    // per input callback. This corrects drift ~0.2% at a time — inaudible, no jump cuts.
     let max_stereo = (out_rate / 25) as usize * 2; // 40ms ceiling
-    let did_drain = buf.len() > max_stereo;
-    if did_drain {
-        buf.drain(..2); // drop one stereo frame
+    if buf.len() > max_stereo {
+        buf.drain(..2);
     }
 
-    // Log stats every 100 callbacks (~1s at 10ms input buffers)
+    // Log stats every 500 callbacks (~25s) — remove once stable
     let n = call_count.fetch_add(1, Ordering::Relaxed);
-    if n % 100 == 0 {
-        let ms_before = fill_before as f32 / (out_rate as f32 * 2.0) * 1000.0;
-        let ms_after  = buf.len()    as f32 / (out_rate as f32 * 2.0) * 1000.0;
+    if n == 0 {
+        let ms_after = buf.len() as f32 / (out_rate as f32 * 2.0) * 1000.0;
         eprintln!(
-            "[mic-route] cb={n} in_rate={in_rate} out_rate={out_rate} \
-             input_frames={} pushed_stereo={} ring_before={:.1}ms ring_after={:.1}ms drain={did_drain}",
-            mono.len(), samples.len() * 2, ms_before, ms_after
+            "[mic-route] first callback: in_rate={in_rate} out_rate={out_rate} \
+             input_frames={} pushed_stereo={} ring_after={:.1}ms",
+            mono.len(), samples.len() * 2, ms_after
         );
     }
 }
