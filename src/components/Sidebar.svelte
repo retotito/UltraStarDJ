@@ -6,9 +6,11 @@
   import PlayersView from '$components/views/PlayersView.svelte'
   import DisplaysView from '$components/views/DisplaysView.svelte'
   import AudioOutputView from '$components/views/AudioOutputView.svelte'
+  import SongSourcesPanel from '$components/SongSourcesPanel.svelte'
 
   let showSettings = $state(false)
   let showLayoutMenu = $state(false)
+  let showSources = $state(false)
   let showPlayers = $state(false)
   let showDisplays = $state(false)
   let showAudioOutput = $state(false)
@@ -23,6 +25,7 @@
 
   function closeAll() {
     showLayoutMenu = false
+    showSources = false
     showPlayers = false
     showDisplays = false
     showAudioOutput = false
@@ -40,6 +43,16 @@
       onclick={() => { const v = !showLayoutMenu; closeAll(); showLayoutMenu = v }}
     >
       <span class="icon">table_chart</span>
+    </button>
+
+    <button
+      class="btn btn-icon"
+      class:is-active={showSources}
+      data-tooltip="Song Sources"
+      aria-label="Song Sources"
+      onclick={() => { const v = !showSources; closeAll(); showSources = v }}
+    >
+      <span class="icon">library_music</span>
     </button>
 
     <button
@@ -124,6 +137,22 @@
       </label>
     {/each}
     </div><!-- /popover-content -->
+  </div>
+{/if}
+
+{#if showSources}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="popover-backdrop" onclick={() => showSources = false}></div>
+  <div class="sources-popover">
+    <div class="popover-header">
+      <span class="popover-title">Song Sources</span>
+      <button class="btn btn-icon" onclick={() => showSources = false} aria-label="Close">
+        <span class="icon">close</span>
+      </button>
+    </div>
+    <div class="popover-content">
+      <SongSourcesPanel />
+    </div>
   </div>
 {/if}
 
@@ -235,6 +264,22 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sources-popover {
+    position: fixed;
+    left: 74px;
+    top: 60px;
+    background: var(--md-sys-color-surface-container-high);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--radius-lg);
+    width: 420px;
+    max-height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+    z-index: var(--z-overlay);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     overflow: hidden;
   }
 

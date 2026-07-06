@@ -1,7 +1,6 @@
 <script lang="ts">
   import { appSettings } from '$lib/stores/settings.svelte'
   import Select from '$components/ui/Select.svelte'
-  import SongSourcesPanel from '$components/SongSourcesPanel.svelte'
 </script>
 
 <div class="settings-dialog">
@@ -15,12 +14,6 @@
         onchange={(v) => appSettings.setTheme(v as 'dark' | 'light')}
       />
     </div>
-  </section>
-
-  <div class="divider"></div>
-
-  <section class="section">
-    <SongSourcesPanel />
   </section>
 </div>
 

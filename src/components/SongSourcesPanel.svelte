@@ -57,7 +57,6 @@
 
 <div class="sources-panel">
   <div class="section-header">
-    <span class="section-title">Song Sources</span>
     {#if songLibrary.scanStatus === 'error'}
       <span class="scan-status error">
         <span class="icon icon-sm">error</span>
