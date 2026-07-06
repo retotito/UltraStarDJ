@@ -13,6 +13,14 @@
   let showDisplays = $state(false)
   let showAudioOutput = $state(false)
 
+  // Lock audio config popups while a song is playing or paused
+  const audioLocked = $derived(playback.status === 'playing' || playback.status === 'paused')
+
+  // Auto-close audio/display popups when playback starts
+  $effect(() => {
+    if (audioLocked) { showPlayers = false; showAudioOutput = false; showDisplays = false }
+  })
+
   function closeAll() {
     showLayoutMenu = false
     showPlayers = false
@@ -53,8 +61,9 @@
     <button
       class="btn btn-icon"
       class:is-active={showDisplays}
-      data-tooltip="Displays"
+      data-tooltip={audioLocked ? 'Displays (song active)' : 'Displays'}
       aria-label="Open Displays"
+      disabled={audioLocked}
       onclick={() => { const v = !showDisplays; closeAll(); showDisplays = v }}
     >
       <span class="icon">tv_displays</span>
@@ -63,8 +72,9 @@
     <button
       class="btn btn-icon"
       class:is-active={showPlayers}
-      data-tooltip="Audio Input"
+      data-tooltip={audioLocked ? 'Audio Input (song active)' : 'Audio Input'}
       aria-label="Audio Input"
+      disabled={audioLocked}
       onclick={() => { const v = !showPlayers; closeAll(); showPlayers = v }}
     >
       <span class="icon">mic_external_on</span>
@@ -73,8 +83,9 @@
     <button
       class="btn btn-icon"
       class:is-active={showAudioOutput}
-      data-tooltip="Audio Output"
+      data-tooltip={audioLocked ? 'Audio Output (song active)' : 'Audio Output'}
       aria-label="Audio output routing"
+      disabled={audioLocked}
       onclick={() => { const v = !showAudioOutput; closeAll(); showAudioOutput = v }}
     >
       <span class="icon">speaker</span>
