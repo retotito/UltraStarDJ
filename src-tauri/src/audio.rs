@@ -3,6 +3,7 @@ use cpal::{Device, Host, SampleFormat, StreamConfig};
 use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter};
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -70,6 +71,9 @@ const RING_BUFFER_CAPACITY: usize = 44100;
 struct OutputChannel {
     _stream: cpal::Stream, // kept alive; drop = stop playback
     ring: RingBuffer,
+    /// Per-player mic rings: each active mic writes to its own ring.
+    /// Output callback sums all of them so N mics don't flood a shared buffer.
+    mic_rings: Arc<Mutex<HashMap<u8, RingBuffer>>>,
     sample_rate: u32,
     out_channels: u16,
 }
@@ -84,6 +88,9 @@ pub struct AudioState {
     streams: Mutex<HashMap<u8, ActiveStream>>,
     /// Audio output channels: "game" | "preview" → channel
     output_channels: Mutex<HashMap<String, OutputChannel>>,
+    /// Mic output mix gain per player: player_id → 0.0–2.0
+    /// Arc so input stream closures can hold a reference without copying AudioState
+    mic_mix_gains: Arc<Mutex<HashMap<u8, f32>>>,
     /// Snapshot of input device names for hot-plug detection
     known_devices: Mutex<Vec<String>>,
     /// Snapshot of output device names for hot-plug detection
@@ -100,6 +107,7 @@ impl AudioState {
         AudioState {
             streams: Mutex::new(HashMap::new()),
             output_channels: Mutex::new(HashMap::new()),
+            mic_mix_gains: Arc::new(Mutex::new(HashMap::new())),
             known_devices: Mutex::new(known),
             known_output_devices: Mutex::new(known_out),
         }
@@ -232,10 +240,32 @@ pub fn start_mic_monitor(
         buffer_size: cpal::BufferSize::Default,
     };
 
+    // Shared gain map so set_mic_mix_gain can update gain without restarting the stream
+    let gains: Arc<Mutex<HashMap<u8, f32>>> = Arc::clone(&state.mic_mix_gains);
+    // Prefer "mic-mix" channel (dedicated for mic→speaker routing), fall back to "game"
+    // Create a dedicated per-player ring inside the mic-mix (or game) output channel.
+    // The output callback sums all player rings, so N mics don't flood a shared buffer.
+    let (game_ring, out_sample_rate): (Option<RingBuffer>, u32) = {
+        let channels = state.output_channels.lock().unwrap();
+        let ch = channels.get("mic-mix").or_else(|| channels.get("game"));
+        if let Some(ch) = ch {
+            let player_ring: RingBuffer = Arc::new(Mutex::new(VecDeque::with_capacity(RING_BUFFER_CAPACITY)));
+            ch.mic_rings.lock().unwrap().insert(player_id, player_ring.clone());
+            (Some(player_ring), ch.sample_rate)
+        } else {
+            (None, sample_rate.0)
+        }
+    };
+    let in_sample_rate = sample_rate.0;
+    let call_count = Arc::new(AtomicU64::new(0));
+
+    eprintln!("[mic-monitor] player={player_id} in_rate={in_sample_rate} out_rate={out_sample_rate} \
+               ring_found={} ch_idx={ch_index}", game_ring.is_some());
+
     let stream = match default_config.sample_format() {
-        SampleFormat::F32 => build_input_stream_f32(&device, &config, total_channels, ch_index, player_id, app.clone()),
-        SampleFormat::I16 => build_input_stream_i16(&device, &config, total_channels, ch_index, player_id, app.clone()),
-        SampleFormat::U16 => build_input_stream_u16(&device, &config, total_channels, ch_index, player_id, app.clone()),
+        SampleFormat::F32 => build_input_stream_f32(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count),
+        SampleFormat::I16 => build_input_stream_i16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count),
+        SampleFormat::U16 => build_input_stream_u16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count),
         _ => Err("Unsupported sample format".to_string()),
     }?;
 
@@ -253,6 +283,23 @@ pub fn stop_mic_monitor(
     player_id: u8,
 ) -> Result<(), String> {
     state.streams.lock().unwrap().remove(&player_id);
+    // Remove the player's dedicated ring from all output channels
+    let channels = state.output_channels.lock().unwrap();
+    for ch in channels.values() {
+        ch.mic_rings.lock().unwrap().remove(&player_id);
+    }
+    Ok(())
+}
+
+/// Set the output mix gain for a player's mic (0.0 = muted, 1.0 = unity, 2.0 = boost).
+/// Takes effect immediately in the running input stream without restart.
+#[tauri::command]
+pub fn set_mic_mix_gain(
+    state: tauri::State<Arc<AudioState>>,
+    player_id: u8,
+    gain: f32,
+) -> Result<(), String> {
+    state.mic_mix_gains.lock().unwrap().insert(player_id, gain.clamp(0.0, 4.0));
     Ok(())
 }
 
@@ -308,21 +355,36 @@ pub fn open_output_channel(
     let config = StreamConfig {
         channels: out_channels,
         sample_rate: default_config.sample_rate(),
-        buffer_size: cpal::BufferSize::Fixed(1024),
+        buffer_size: cpal::BufferSize::Default,
     };
 
     let ring: RingBuffer = Arc::new(Mutex::new(VecDeque::with_capacity(RING_BUFFER_CAPACITY)));
     let ring_clone = ring.clone();
+    let mic_rings: Arc<Mutex<HashMap<u8, RingBuffer>>> = Arc::new(Mutex::new(HashMap::new()));
+    let mic_rings_clone = mic_rings.clone();
     let out_ch = out_channels as usize;
 
     let stream = device
         .build_output_stream(
             &config,
             move |output: &mut [f32], _| {
-                let mut buf = ring_clone.lock().unwrap();
-                for frame in output.chunks_mut(out_ch) {
-                    for sample in frame.iter_mut() {
-                        *sample = buf.pop_front().unwrap_or(0.0);
+                let mut main_buf = ring_clone.lock().unwrap();
+                let player_map = mic_rings_clone.lock().unwrap();
+                let frame_count = output.len() / out_ch;
+                for frame_idx in 0..frame_count {
+                    // Sum mic contributions for this frame (each ring holds stereo L+R pairs)
+                    let mut mic_l = 0.0f32;
+                    let mut mic_r = 0.0f32;
+                    for player_ring in player_map.values() {
+                        let mut pbuf = player_ring.lock().unwrap();
+                        mic_l += pbuf.pop_front().unwrap_or(0.0);
+                        mic_r += pbuf.pop_front().unwrap_or(0.0);
+                    }
+                    let out_frame = &mut output[frame_idx * out_ch..(frame_idx + 1) * out_ch];
+                    for (ch_i, sample) in out_frame.iter_mut().enumerate() {
+                        let main = main_buf.pop_front().unwrap_or(0.0);
+                        let mic = if ch_i == 0 { mic_l } else if ch_i == 1 { mic_r } else { 0.0 };
+                        *sample = (main + mic).clamp(-1.0, 1.0);
                     }
                 }
             },
@@ -337,6 +399,7 @@ pub fn open_output_channel(
     channels.insert(channel, OutputChannel {
         _stream: stream,
         ring,
+        mic_rings,
         sample_rate: default_config.sample_rate().0,
         out_channels,
     });
@@ -390,15 +453,73 @@ pub fn close_output_channel(
 
 // ── Input stream builders ─────────────────────────────────────────────────────
 
+fn route_to_output(mono: &[f32], gain: f32, ring: &Option<RingBuffer>, in_rate: u32, out_rate: u32, call_count: &Arc<AtomicU64>) {
+    let Some(ring) = ring else { return };
+    if gain == 0.0 { return }
+
+    // Resample first (outside the lock)
+    let resampled: Vec<f32>;
+    let samples: &[f32] = if in_rate == out_rate {
+        mono
+    } else {
+        let ratio = in_rate as f64 / out_rate as f64;
+        let out_len = (mono.len() as f64 / ratio).ceil() as usize;
+        resampled = (0..out_len).map(|i| {
+            let src_pos = i as f64 * ratio;
+            let src_idx = src_pos as usize;
+            let frac = (src_pos - src_idx as f64) as f32;
+            let s0 = mono.get(src_idx).copied().unwrap_or(0.0);
+            let s1 = mono.get(src_idx + 1).copied().unwrap_or(s0);
+            s0 + (s1 - s0) * frac
+        }).collect();
+        &resampled
+    };
+
+    let mut buf = ring.lock().unwrap();
+    let fill_before = buf.len();
+
+    // Push all new samples as stereo
+    for &s in samples {
+        let out = (s * gain).clamp(-1.0, 1.0);
+        buf.push_back(out); // L
+        buf.push_back(out); // R
+    }
+
+    // Gentle drift correction: if ring grew beyond ~40ms, drop only 2 samples (one frame)
+    // per input callback. This corrects drift ~0.2% at a time — inaudible, no jump cuts.
+    let max_stereo = (out_rate / 25) as usize * 2; // 40ms ceiling
+    let did_drain = buf.len() > max_stereo;
+    if did_drain {
+        buf.drain(..2); // drop one stereo frame
+    }
+
+    // Log stats every 100 callbacks (~1s at 10ms input buffers)
+    let n = call_count.fetch_add(1, Ordering::Relaxed);
+    if n % 100 == 0 {
+        let ms_before = fill_before as f32 / (out_rate as f32 * 2.0) * 1000.0;
+        let ms_after  = buf.len()    as f32 / (out_rate as f32 * 2.0) * 1000.0;
+        eprintln!(
+            "[mic-route] cb={n} in_rate={in_rate} out_rate={out_rate} \
+             input_frames={} pushed_stereo={} ring_before={:.1}ms ring_after={:.1}ms drain={did_drain}",
+            mono.len(), samples.len() * 2, ms_before, ms_after
+        );
+    }
+}
+
 fn build_input_stream_f32(
     device: &Device, config: &StreamConfig,
     total_ch: usize, ch_idx: usize, player_id: u8, app: AppHandle,
+    gains: Arc<Mutex<HashMap<u8, f32>>>,
+    game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
+    call_count: Arc<AtomicU64>,
 ) -> Result<cpal::Stream, String> {
     device.build_input_stream(
         config,
         move |data: &[f32], _| {
             let mono: Vec<f32> = data.chunks(total_ch)
                 .filter_map(|frame| frame.get(ch_idx).copied()).collect();
+            let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
+            route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
             let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
         },
         move |_err| {}, None,
@@ -408,12 +529,17 @@ fn build_input_stream_f32(
 fn build_input_stream_i16(
     device: &Device, config: &StreamConfig,
     total_ch: usize, ch_idx: usize, player_id: u8, app: AppHandle,
+    gains: Arc<Mutex<HashMap<u8, f32>>>,
+    game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
+    call_count: Arc<AtomicU64>,
 ) -> Result<cpal::Stream, String> {
     device.build_input_stream(
         config,
         move |data: &[i16], _| {
             let mono: Vec<f32> = data.chunks(total_ch)
                 .filter_map(|frame| frame.get(ch_idx).map(|&s| s as f32 / i16::MAX as f32)).collect();
+            let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
+            route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
             let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
         },
         move |_err| {}, None,
@@ -423,12 +549,17 @@ fn build_input_stream_i16(
 fn build_input_stream_u16(
     device: &Device, config: &StreamConfig,
     total_ch: usize, ch_idx: usize, player_id: u8, app: AppHandle,
+    gains: Arc<Mutex<HashMap<u8, f32>>>,
+    game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
+    call_count: Arc<AtomicU64>,
 ) -> Result<cpal::Stream, String> {
     device.build_input_stream(
         config,
         move |data: &[u16], _| {
             let mono: Vec<f32> = data.chunks(total_ch)
                 .filter_map(|frame| frame.get(ch_idx).map(|&s| (s as f32 - 32768.0) / 32768.0)).collect();
+            let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
+            route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
             let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
         },
         move |_err| {}, None,

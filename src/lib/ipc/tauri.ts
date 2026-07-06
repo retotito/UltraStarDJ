@@ -328,6 +328,20 @@ export async function stopMicMonitor(playerId: number): Promise<void> {
   await invoke('stop_mic_monitor', { playerId })
 }
 
+export async function setMicMixGain(playerId: number, gain: number): Promise<void> {
+  await invoke('set_mic_mix_gain', { playerId, gain })
+}
+
+/** Open a dedicated cpal output channel to the default device for mic→speaker routing. */
+export async function openMicMixChannel(): Promise<void> {
+  await invoke('open_output_channel', { channel: 'mic-mix', deviceId: '', jsSampleRate: 44100, jsChannels: 2 })
+}
+
+/** Close the mic-mix output channel. */
+export async function closeMicMixChannel(): Promise<void> {
+  await invoke('close_output_channel', { channel: 'mic-mix' })
+}
+
 export function onMicLevel(cb: (e: MicLevelEvent) => void): Promise<UnlistenFn> {
   return listen<MicLevelEvent>(MIC_EVENTS.LEVEL, e => cb(e.payload))
 }

@@ -8,7 +8,7 @@ import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
 import { playersStore } from '$lib/stores/players.svelte'
 import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, onBeamerReady, onCountdownDone } from '$lib/ipc/tauri'
-import { readFile, needsTranscode, transcodeToMp4, deleteTempFile, startMicMonitor, stopMicMonitor } from '$lib/ipc/tauri'
+import { readFile, needsTranscode, transcodeToMp4, deleteTempFile, startMicMonitor, stopMicMonitor, openMicMixChannel, closeMicMixChannel } from '$lib/ipc/tauri'
 import { parseSongNotes } from '$lib/ultrastar/parser'
 import { convertFileSrc } from '@tauri-apps/api/core'
 
@@ -194,14 +194,19 @@ export const playback = {
     }
 
     // Auto-start mic monitoring for all players with a mic assigned
-    for (const p of playersStore.all) {
-      if (p.mic && !playersStore.monitoringIds.has(p.id)) {
-        try {
-          await startMicMonitor(p.mic.deviceId, p.mic.channel, p.id)
-          playersStore.setMonitoring(p.id, true)
-          playersStore.setDisconnected(p.id, false)
-        } catch (e) {
-          console.warn(`[playback] auto-start mic failed for player ${p.id}:`, e)
+    const playersWithMic = playersStore.all.filter(p => p.mic)
+    if (playersWithMic.length > 0) {
+      // Open a dedicated cpal output channel for mic→speaker routing
+      await openMicMixChannel().catch(e => console.warn('[playback] openMicMixChannel failed:', e))
+      for (const p of playersWithMic) {
+        if (!playersStore.monitoringIds.has(p.id)) {
+          try {
+            await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id)
+            playersStore.setMonitoring(p.id, true)
+            playersStore.setDisconnected(p.id, false)
+          } catch (e) {
+            console.warn(`[playback] auto-start mic failed for player ${p.id}:`, e)
+          }
         }
       }
     }
@@ -237,6 +242,7 @@ export const playback = {
       playersStore.setMonitoring(id, false)
       playersStore.setLevel(id, 0)
     }
+    await closeMicMixChannel().catch(() => {})
   },
 
   /** Send a second stop to clear the score screen and return beamers to idle */

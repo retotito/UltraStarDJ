@@ -13,7 +13,8 @@
 
   const accent = $derived(COLOR_MAP[player.color] ?? 'var(--player-1)')
   const isMuted = $derived(playersStore.mutedIds.has(player.id))
-  const level = $derived(isMuted ? 0 : Math.min(1, playersStore.levels[player.id] ?? 0))
+  // Show post-gain level so the fader visibly affects the meter
+  const level = $derived(isMuted ? 0 : Math.min(1, (playersStore.levels[player.id] ?? 0) * player.mixGain))
 </script>
 
 <div class="mic-mix-row">

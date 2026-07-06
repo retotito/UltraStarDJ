@@ -5,6 +5,7 @@
  */
 
 import { displaysStore } from '$lib/stores/displays.svelte'
+import { setMicMixGain } from '$lib/ipc/tauri'
 
 export type MicChannel = 'left' | 'right' | 'mono'
 
@@ -99,6 +100,7 @@ export const playersStore = {
   setMixGain(id: number, mixGain: number) {
     players = players.map(p => p.id === id ? { ...p, mixGain: Math.round(mixGain * 100) / 100 } : p)
     playersStore.save()
+    setMicMixGain(id, mixGain).catch(() => {})
   },
 
   setMonitoring(id: number, on: boolean) {
@@ -124,7 +126,14 @@ export const playersStore = {
 
   toggleMute(id: number) {
     const next = new Set(mutedIds)
-    if (next.has(id)) next.delete(id); else next.add(id)
+    if (next.has(id)) {
+      next.delete(id)
+      const p = players.find(p => p.id === id)
+      setMicMixGain(id, p?.mixGain ?? 1.0).catch(() => {})
+    } else {
+      next.add(id)
+      setMicMixGain(id, 0).catch(() => {})
+    }
     mutedIds = next
   },
 
