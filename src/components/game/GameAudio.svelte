@@ -57,6 +57,7 @@
       console.log('[GameAudio] status → stopped/reset')
       audioEl?.pause()
       if (audioEl) audioEl.currentTime = videoGapOffset  // reset to start position
+      gameChannel.resetLevel()
     }
   })
 
@@ -71,7 +72,7 @@
     // Only register if audio element is actually mounted (not YouTube-only songs)
     if (audioEl) {
       playback.registerTimeProvider(() => audioEl!.currentTime - videoGapOffset, 'GameAudio')
-      gameChannel.connectElement(audioEl).catch(e => console.warn('[GameAudio] channel connect failed', e))
+      // Note: connectElement is handled by the audioSrc $effect below
     }
   })
 
@@ -117,12 +118,15 @@
   })
 </script>
 
-<!-- Only mount when there is a real audio source (YouTube-only songs have none) -->
+<!-- Key on song identity so a new <audio> element is created for each song.
+     This guarantees createMediaElementSource always gets a fresh, unassociated element. -->
 {#if audioSrc}
-  <audio
-    bind:this={audioEl}
-    src={audioSrc}
-    preload="auto"
-    style="display:none"
-  ></audio>
+  {#key playback.song?.txtPath ?? playback.song?.audioPath ?? playback.song?.title}
+    <audio
+      bind:this={audioEl}
+      src={audioSrc}
+      preload="auto"
+      style="display:none"
+    ></audio>
+  {/key}
 {/if}

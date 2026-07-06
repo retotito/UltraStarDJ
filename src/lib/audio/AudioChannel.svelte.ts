@@ -31,6 +31,7 @@ export class AudioChannel {
   readonly name: ChannelName
 
   private ctx: AudioContext | null = null
+  private pendingClose: Promise<void> | null = null
   private gainNode: GainNode | null = null
   private analyserNode: AnalyserNode | null = null
   private workletNode: AudioWorkletNode | null = null
@@ -49,7 +50,11 @@ export class AudioChannel {
 
   /** Connect an <audio> element to this channel. Call once on mount. */
   async connectElement(el: HTMLMediaElement): Promise<void> {
-    this.disconnect()
+    const hadCtx = !!this.ctx
+    console.log(`[AudioChannel:${this.name}] connectElement — hadCtx=${hadCtx} pendingClose=${!!this.pendingClose}`)
+    // Always await any in-flight ctx.close() so the element is fully released
+    if (this.pendingClose) await this.pendingClose
+    await this.disconnectAsync()
 
     this.ctx = new AudioContext()
     if (this.ctx.state === 'suspended') await this.ctx.resume()
@@ -59,7 +64,9 @@ export class AudioChannel {
     this.analyserNode.fftSize = 256
     this.analyserData = new Uint8Array(this.analyserNode.frequencyBinCount)
 
-    this.gainNode.gain.value = this.gain
+    // Start silent to avoid the connection pop, ramp to target gain over 30ms
+    this.gainNode.gain.setValueAtTime(0, this.ctx.currentTime)
+    this.gainNode.gain.linearRampToValueAtTime(this.gain, this.ctx.currentTime + 0.03)
 
     try {
       this.sourceNode = this.ctx.createMediaElementSource(el)
@@ -92,10 +99,26 @@ export class AudioChannel {
     this.sourceNode = null
     if (this.rafId !== null) cancelAnimationFrame(this.rafId)
     this.rafId = null
-    if (this.ctx) {
-      this.ctx.close().catch(() => {})
-      this.ctx = null
-    }
+    const ctx = this.ctx
+    this.ctx = null
+    if (ctx) this.pendingClose = ctx.close().catch(() => {}).then(() => { this.pendingClose = null })
+    invoke('close_output_channel', { channel: this.name }).catch(() => {})
+  }
+
+  /** Async version — awaits ctx.close() so the audio element is fully released before reconnecting. */
+  async disconnectAsync(): Promise<void> {
+    this.workletNode?.port.postMessage('stop')
+    this.workletNode?.disconnect()
+    this.workletNode = null
+    this.analyserNode?.disconnect()
+    this.gainNode?.disconnect()
+    this.sourceNode?.disconnect()
+    this.sourceNode = null
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId)
+    this.rafId = null
+    const ctx = this.ctx
+    this.ctx = null
+    if (ctx) { this.pendingClose = null; await ctx.close().catch(() => {}) }
     invoke('close_output_channel', { channel: this.name }).catch(() => {})
   }
 
@@ -181,6 +204,11 @@ export class AudioChannel {
     } catch (err) {
       console.warn(`[AudioChannel:${this.name}] setSinkId failed`, err)
     }
+  }
+
+  /** Zero the level meter immediately (e.g. on stop) without disconnecting the audio graph. */
+  resetLevel(): void {
+    this.level = 0
   }
 
   private _startMeterLoop(): void {
