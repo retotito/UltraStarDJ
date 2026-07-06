@@ -3,7 +3,7 @@
   import type { AudioInputDevice } from '$lib/ipc/tauri'
   import { startMicMonitor, stopMicMonitor } from '$lib/ipc/tauri'
   import Select from '$components/ui/Select.svelte'
-  import MicLevelMeter from '$components/ui/MicLevelMeter.svelte'
+  import HorizontalFader from '$components/ui/HorizontalFader.svelte'
 
   let { player, devices }: { player: PlayerConfig; devices: AudioInputDevice[] } = $props()
 
@@ -133,24 +133,15 @@
       {/if}
     </div>
 
-    <!-- Level meter -->
-    <MicLevelMeter {level} />
-
-    <!-- Gain slider -->
-    <div class="gain-row">
-      <span class="icon gain-icon">tune</span>
-      <input
-        type="range"
-        class="gain-slider"
-        min="0"
-        max="2"
-        step="0.05"
-        value={player.gain}
-        oninput={e => playersStore.setGain(player.id, parseFloat((e.target as HTMLInputElement).value))}
-        aria-label="Mic gain"
-      />
-      <span class="gain-value">{Math.round(player.gain * 100)}%</span>
-    </div>
+    <!-- Fader row: level meter + gain -->
+    <HorizontalFader
+      label=""
+      level={level}
+      gain={player.gain}
+      maxGain={2}
+      color={accent}
+      ongainchange={(v) => playersStore.setGain(player.id, v)}
+    />
     {/if}
 </div>
 

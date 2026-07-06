@@ -19,6 +19,7 @@
     label      = '',
     level      = 0,
     gain       = 1,
+    maxGain    = 1,
     ongainchange = (_: number) => {},
     color      = 'var(--md-sys-color-primary)',
     dimmed     = false,
@@ -26,6 +27,7 @@
     label?:        string
     level?:        number
     gain?:         number
+    maxGain?:      number
     ongainchange?: (v: number) => void
     color?:        string
     dimmed?:       boolean
@@ -54,7 +56,7 @@
   function gainFromPointer(clientX: number): number {
     if (!trackEl) return gain
     const rect = trackEl.getBoundingClientRect()
-    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    return Math.max(0, Math.min(maxGain, (clientX - rect.left) / rect.width * maxGain))
   }
 
   function onKnobPointerDown(e: PointerEvent) {
@@ -84,7 +86,8 @@
     ongainchange(1)
   }
 
-  const gainPct = $derived(`${(gain * 100).toFixed(0)}%`)
+  const gainPct = $derived(`${(gain / maxGain * 100).toFixed(0)}%`)
+  const gainLabel = $derived(`${Math.round(gain * 100)}%`)
 </script>
 
 <div class="fader-row">
@@ -108,7 +111,7 @@
     <div
       class="knob"
       class:dragging
-      style="left: {gain * 100}%; --knob-color: {color};"
+      style="left: {gain / maxGain * 100}%; --knob-color: {color};"
       role="slider"
       aria-label="{label} gain"
       aria-valuenow={Math.round(gain * 100)}
@@ -124,7 +127,7 @@
 
   <!-- Readout: value only -->
   <div class="readout">
-    <span class="value">{gainPct}</span>
+    <span class="value">{gainLabel}</span>
   </div>
 </div>
 
