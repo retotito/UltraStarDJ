@@ -110,12 +110,10 @@
     onmousedown={startResize}
   ></div>
 
-  <!-- Right panel (conditionally rendered, but always takes space when visible) -->
-  {#if layout.showPlayer || layout.showQueue}
-    <aside class="right-area" style="width: {layout.rightPanelWidth}px">
-      <RightPanel />
-    </aside>
-  {/if}
+  <!-- Right panel -->
+  <aside class="right-area" style="width: {layout.rightPanelWidth}px">
+    <RightPanel />
+  </aside>
 </div>
 
 <MicDisconnectedToast />

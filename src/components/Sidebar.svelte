@@ -116,22 +116,6 @@
     </div>
     <div class="popover-content">
 
-    <label class="toggle-row">
-      <span>Player</span>
-      <label class="toggle-switch">
-        <input type="checkbox" checked={layout.showPlayer} onchange={() => layout.togglePlayer()} />
-        <span class="toggle-slider"></span>
-      </label>
-    </label>
-
-    <label class="toggle-row">
-      <span>Queue</span>
-      <label class="toggle-switch">
-        <input type="checkbox" checked={layout.showQueue} onchange={() => layout.toggleQueue()} />
-        <span class="toggle-slider"></span>
-      </label>
-    </label>
-
     <p class="popover-label" style="margin-top: var(--space-3)">Columns</p>
     {#each layout.columns.filter(c => c.key !== 'index') as col (col.key)}
       <label class="toggle-row">

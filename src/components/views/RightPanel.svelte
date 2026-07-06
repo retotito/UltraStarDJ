@@ -1,21 +1,16 @@
 <script lang="ts">
-  import { layout } from '$lib/stores/layout.svelte'
   import PlayerWidget from '$components/views/PlayerWidget.svelte'
   import QueueWidget from '$components/views/QueueWidget.svelte'
 </script>
 
 <div class="right-panel">
-  {#if layout.showPlayer}
-    <div class="player-area">
-      <div class="widget-label">Preview Player</div>
-      <PlayerWidget />
-    </div>
-  {/if}
-  {#if layout.showQueue}
-    <div class="queue-area">
-      <QueueWidget />
-    </div>
-  {/if}
+  <div class="player-area">
+    <div class="widget-label">Preview Player</div>
+    <PlayerWidget />
+  </div>
+  <div class="queue-area">
+    <QueueWidget />
+  </div>
 </div>
 
 <style>
