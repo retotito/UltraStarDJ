@@ -139,6 +139,10 @@ function calcDistance(hz: number, targetPitch: number): number {
 
 Inspired by tuneperfect. Pure CSS Grid — no canvas needed.
 
+**One `NoteLane` instance is rendered per active player assigned to this beamer.**
+Each lane is bound to a specific player's mic input and their track's notes.
+Lanes stack vertically; the number of rows shrinks as more players share the screen.
+
 ### Layout
 
 One grid per player:
@@ -244,7 +248,17 @@ DJ sends only **new** FrequencyRecords each tick (delta). Beamer reconstructs lo
 
 ## Players per Beamer
 
-| Count | Layout |
+Each beamer renders **one note lane per active player assigned to that screen**.
+Players are assigned to beamers in the DJ window (PlayersView). A player is only
+rendered on the beamer they're assigned to — not on all beamers.
+
+Each note lane is independent:
+- Uses the player's assigned mic track (track index from `players.svelte.ts`)
+- Displays the player's color
+- Shows only the notes for that player's voice (track 0 for solo, track 0/1 for duets)
+- Lyrics shown once per beamer at the bottom (shared, track 0 by default)
+
+| Active players on this beamer | Layout |
 |---|---|
 | 1 | Full height — one note lane + lyrics at bottom |
 | 2 | Split: top note lane + lyrics, bottom note lane + lyrics |

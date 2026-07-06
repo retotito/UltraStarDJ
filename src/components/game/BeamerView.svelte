@@ -3,6 +3,7 @@
   import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
   import type { BeamerScreen } from '../../routes/beamer/+page.svelte'
   import LyricsRenderer from '$components/game/LyricsRenderer.svelte'
+  import NoteLane from '$components/game/NoteLane.svelte'
   import BeamerBackground from '$components/game/BeamerBackground.svelte'
 
   let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone }: {
@@ -41,6 +42,9 @@
   })
 
   onDestroy(() => { if (countdownTimer) clearInterval(countdownTimer) })
+
+  // Derived: how many note-lane rows each player gets (shrink for 3-4 players)
+  const laneRowCount = $derived(assignedPlayerIds.length <= 2 ? 16 : 12)
 
   // Placeholder scores for score screen
   const placeholderScores: Record<number, number> = { 1: 8540, 2: 7230, 3: 9100, 4: 6800 }
@@ -121,6 +125,26 @@
             <span class="paused-badge">PAUSED</span>
           {/if}
         </div>
+
+        {#if payload.song.notes && payload.song.notes.length > 0}
+          <!-- One note lane per assigned player, stacked vertically -->
+          <div class="lanes-area">
+            {#each assignedPlayerIds as id, i (id)}
+              <div class="lane-wrap">
+                <NoteLane
+                  tracks={payload.song.notes}
+                  trackIndex={Math.min(i, payload.song.notes.length - 1)}
+                  playerColor={PLAYER_COLORS[id] ?? '#ffffff'}
+                  {currentTime}
+                  bpm={payload.song.bpm}
+                  gap={payload.song.gap}
+                  rowCount={laneRowCount}
+                />
+              </div>
+            {/each}
+          </div>
+        {/if}
+
         <div class="lyrics-area">
           {#if payload.song.notes && payload.song.notes.length > 0}
             <LyricsRenderer
@@ -373,8 +397,27 @@
     letter-spacing: 0.1em;
   }
 
-  .lyrics-area {
+  /* ── Note lanes ── */
+  .lanes-area {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+    gap: var(--space-2);
+    padding: 0 var(--space-4);
+    box-sizing: border-box;
+  }
+
+  .lane-wrap {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+
+  /* ── Lyrics (fixed height at bottom) ── */
+  .lyrics-area {
+    flex-shrink: 0;
     display: flex;
     align-items: flex-end;
     justify-content: center;
