@@ -31,23 +31,7 @@
 
 <aside class="sidebar" onclick={(e) => { if (e.target === e.currentTarget) closeAll() }}>
   <nav class="sidebar-nav">
-    <button class="btn btn-icon is-active" data-tooltip="Library" aria-label="Library">
-      <span class="icon">library_music</span>
-    </button>
-
-    <button
-      class="btn btn-icon now-playing-btn"
-      class:is-active={layout.showNowPlaying && playback.isLoaded}
-      data-tooltip="Now Playing"
-      aria-label="Toggle now playing"
-      onclick={() => { closeAll(); layout.toggleNowPlaying() }}
-    >
-      <span class="icon">play_circle</span>
-      {#if playback.isLoaded && !layout.showNowPlaying}
-        <span class="np-dot"></span>
-      {/if}
-    </button>
-
+    
     <button
       class="btn btn-icon"
       class:is-active={showLayoutMenu}
@@ -55,18 +39,7 @@
       aria-label="Toggle layout options"
       onclick={() => { const v = !showLayoutMenu; closeAll(); showLayoutMenu = v }}
     >
-      <span class="icon">dashboard</span>
-    </button>
-
-    <button
-      class="btn btn-icon"
-      class:is-active={showDisplays}
-      data-tooltip={audioLocked ? 'Displays (song active)' : 'Displays'}
-      aria-label="Open Displays"
-      disabled={audioLocked}
-      onclick={() => { const v = !showDisplays; closeAll(); showDisplays = v }}
-    >
-      <span class="icon">tv_displays</span>
+      <span class="icon">table_chart</span>
     </button>
 
     <button
@@ -89,6 +62,30 @@
       onclick={() => { const v = !showAudioOutput; closeAll(); showAudioOutput = v }}
     >
       <span class="icon">speaker</span>
+    </button>
+
+    <button
+      class="btn btn-icon"
+      class:is-active={showDisplays}
+      data-tooltip={audioLocked ? 'Displays (song active)' : 'Displays'}
+      aria-label="Open Displays"
+      disabled={audioLocked}
+      onclick={() => { const v = !showDisplays; closeAll(); showDisplays = v }}
+    >
+      <span class="icon">tv_displays</span>
+    </button>
+
+    <button
+      class="btn btn-icon now-playing-btn"
+      class:is-active={layout.showNowPlaying && playback.isLoaded}
+      data-tooltip="Now Playing"
+      aria-label="Toggle now playing"
+      onclick={() => { closeAll(); layout.toggleNowPlaying() }}
+    >
+      <span class="icon">play_circle</span>
+      {#if playback.isLoaded && !layout.showNowPlaying}
+        <span class="np-dot"></span>
+      {/if}
     </button>
   </nav>
 
@@ -227,7 +224,7 @@
 
   .layout-popover {
     position: fixed;
-    left: 84px;
+    left: 74px;
     top: 60px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
@@ -243,8 +240,8 @@
 
   .players-popover {
     position: fixed;
-    left: 84px;
-    top: 98px;
+    left: 74px;
+    top: 60px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
@@ -259,8 +256,8 @@
 
   .displays-popover {
     position: fixed;
-    left: 84px;
-    top: 200px;
+    left: 74px;
+    top: 60px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
@@ -274,8 +271,8 @@
 
   .audio-output-popover {
     position: fixed;
-    left: 84px;
-    top: 240px;
+    left: 74px;
+    top: 60px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);

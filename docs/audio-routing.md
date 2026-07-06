@@ -73,7 +73,7 @@ The DJ needs **two separate audio outputs** for private headphone cueing. Any of
 - **Workaround**: keep BT as system default and select your speakers as the preview device instead (reversed roles) — or use a USB dongle for reliable routing
 
 ### Option 5 — Dedicated DJ USB audio interface *(€80–200)*
-- e.g. Native Instruments Traktor Audio 2 MK2, Pioneer DJ interface
+- e.g. Native Instruments  , Pioneer DJ interface
 - Designed for exactly this workflow: separate master + cue outputs
 - Appears as two stereo devices automatically, no setup needed ✅
 - Also provides the most reliable low-latency audio ✅
