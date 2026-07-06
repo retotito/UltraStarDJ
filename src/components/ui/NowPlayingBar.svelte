@@ -135,7 +135,7 @@
         <span class="song-title">{playback.song.title}</span>
         <span class="song-artist">{playback.song.artist}</span>
       </div>
-      {#if allPlayerIds.length > 0}
+      <!-- {#if allPlayerIds.length > 0}
         <div class="player-badges">
           {#each allPlayerIds as id (id)}
             <span class="badge" style="border-color: {PLAYER_COLORS[id] ?? '#888'}; color: {PLAYER_COLORS[id] ?? '#888'}">
@@ -143,7 +143,7 @@
             </span>
           {/each}
         </div>
-      {/if}
+      {/if} -->
     </div>
     {:else}
     <div class="empty-section">
@@ -160,7 +160,6 @@
     <!-- Mic mix section — only players on an OPEN display AND with a mic assigned -->
     {#if activeMicPlayers.length > 0}
       <div class="mic-section">
-        <span class="mic-section-label">Mic Mix</span>
         {#each activeMicPlayers as player (player.id)}
           <MicMixRow {player} />
         {/each}
@@ -239,7 +238,7 @@
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--radius-lg);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    width: 420px;
+    width: 500px;
     user-select: none;
   }
 
@@ -292,9 +291,9 @@
     border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
     border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
   }
-  .status-warn    { color: #ffb300; background: rgba(255,179,0,0.15); }
+  .status-warn    { color: #ff6a00; background: rgba(255,179,0,0.15); }
   .status-playing { color: #4ecb71; background: rgba(78,203,113,0.12); }
-  .status-paused  { color: #ffb300; background: rgba(255,179,0,0.15); }
+  .status-paused  { color: #00ccff; background: rgba(255,179,0,0.15); }
   .status-ready   { color: var(--md-sys-color-on-surface-variant); }
 
   .status-time {
@@ -354,11 +353,13 @@
 
   /* ── Transport controls ── */
   .mixer {
-    padding: var(--space-3) var(--space-5) 0;
+    padding: 14px var(--space-5) 14px 90px;
+    border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
   }
 
   .mic-section {
-    padding: var(--space-3) var(--space-5) 0;
+    padding: 14px var(--space-5) 14px;
     display: flex;
     flex-direction: column;
     gap: var(--space-3);

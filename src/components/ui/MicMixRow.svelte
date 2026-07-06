@@ -18,22 +18,24 @@
 </script>
 
 <div class="mic-mix-row">
-  <div class="row-header">
-    <span class="color-dot" style="background: {accent}"></span>
-    <span class="player-name">{player.name}</span>
+  
+  <div class="mic-mix-row-color-dot color-dot" style="background: {accent}">
+  </div>
+
+  <div class="mic-mix-row-mute">
     <button
-      class="btn btn-icon btn-sm mute-btn"
+      class="btn btn-icon btn-lg mute-btn"
       class:is-muted={isMuted}
       title={isMuted ? 'Unmute' : 'Mute'}
       aria-label={isMuted ? `Unmute ${player.name}` : `Mute ${player.name}`}
       onclick={() => playersStore.toggleMute(player.id)}
     >
-      <span class="icon">{isMuted ? 'mic_off' : 'mic'}</span>
+      <span class="icon icon-xl">{isMuted ? 'mic_off' : 'mic'}</span>
     </button>
   </div>
 
   <HorizontalFader
-    label=""
+    label={player.name}
     level={level}
     gain={isMuted ? 0 : player.mixGain}
     ongainchange={(v) => playersStore.setMixGain(player.id, v)}
@@ -47,7 +49,29 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
+    padding-top: 6px;
+    padding-left: 7ch;
+    position: relative; 
+    height: 40px;
   }
+
+  .mic-mix-row-mute {
+    display: block;
+    position: absolute;
+    width: 40px;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+  } 
+
+  .mic-mix-row-color-dot {
+    display: block;
+    position: absolute;
+    left: 50px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
 
   .row-header {
     display: flex;

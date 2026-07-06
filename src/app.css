@@ -390,6 +390,7 @@ a {
 }
 .icon-sm { font-size: 20px; }
 .icon-lg { font-size: 24px; }
+.icon-xl { font-size: 32px; } 
 
 /* --- Buttons ---
    Base + one variant class on every <button>.
@@ -478,6 +479,11 @@ a {
   background: var(--md-sys-color-surface-container-high);
   color: var(--md-sys-color-on-surface);
 }
+
+/* Size variants */
+.btn-sm { height: 28px; padding: 0 var(--space-3); font-size: var(--text-xs); }
+.btn-lg { height: 44px; padding: 0 var(--space-5); font-size: var(--text-base); }
+.btn-lg .icon { font-size: 24px; }
 
 /* Icon-only button (circle, 40×40) */
 .btn-icon {

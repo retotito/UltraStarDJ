@@ -116,7 +116,7 @@
     {#if player.mic}
     <div class="test-row">
       <button
-        class="btn btn-sm"
+        class="btn btn-lg"
         class:is-active={isMonitoring}
         class:btn-danger={isMonitoring}
         disabled={!player.mic}
@@ -244,17 +244,7 @@
     gap: var(--space-2);
   }
 
-  .btn-sm {
-    font-size: var(--text-xs);
-    padding: 4px 10px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .btn-sm .icon {
-    font-size: 14px;
-  }
+  
 
   .disconnected-badge {
     display: flex;
