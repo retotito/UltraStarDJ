@@ -32,7 +32,35 @@ const DEFAULTS: LayoutState = {
   columns: DEFAULT_COLUMNS
 }
 
-let state = $state<LayoutState>({ ...DEFAULTS, columns: DEFAULT_COLUMNS.map(c => ({ ...c })) })
+const STORAGE_KEY = 'ultrastardj:layout'
+
+function loadState(): LayoutState {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return { ...DEFAULTS, columns: DEFAULT_COLUMNS.map(c => ({ ...c })) }
+    const saved = JSON.parse(raw) as Partial<LayoutState>
+    // Merge saved column visibility into defaults (handles new columns added in future)
+    const columns = DEFAULT_COLUMNS.map(def => {
+      const savedCol = (saved.columns ?? []).find(c => c.key === def.key)
+      return savedCol ? { ...def, visible: savedCol.visible } : { ...def }
+    })
+    return {
+      rightPanelWidth: saved.rightPanelWidth ?? DEFAULTS.rightPanelWidth,
+      showNowPlaying: saved.showNowPlaying ?? DEFAULTS.showNowPlaying,
+      columns,
+    }
+  } catch {
+    return { ...DEFAULTS, columns: DEFAULT_COLUMNS.map(c => ({ ...c })) }
+  }
+}
+
+function persist() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch { /* storage full or unavailable */ }
+}
+
+let state = $state<LayoutState>(loadState())
 
 export const layout = {
   get rightPanelWidth()      { return state.rightPanelWidth },
@@ -42,10 +70,11 @@ export const layout = {
 
   setRightPanelWidth(w: number) {
     state.rightPanelWidth = Math.max(220, Math.min(700, w))
+    persist()
   },
-  toggleNowPlaying() { state.showNowPlaying = !state.showNowPlaying },
+  toggleNowPlaying() { state.showNowPlaying = !state.showNowPlaying; persist() },
   toggleColumn(key: string) {
     const col = state.columns.find(c => c.key === key)
-    if (col) col.visible = !col.visible
+    if (col) { col.visible = !col.visible; persist() }
   }
 }
