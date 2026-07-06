@@ -54,6 +54,7 @@ export const displaysStore = {
   setOpen(id: 1 | 2, open: boolean) {
     const d = displays.find(x => x.id === id)!
     d.open = open
+    console.log(`[displays] beamer${id} open=${open} players=[${d.playerIds}]`)
   },
 
   setPlayerIds(id: 1 | 2, playerIds: number[]) {

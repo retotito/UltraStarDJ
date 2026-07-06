@@ -34,13 +34,22 @@ onBeamerReady(() => {
 })
 
 // Clear countdown flag when beamer fires countdown-done, then start mics
+/** Players that have a mic AND are assigned to an open beamer display */
+function activeMicPlayers() {
+  return playersStore.all.filter(p => {
+    if (!p.mic) return false
+    if (displaysStore.display1.open && displaysStore.display1.playerIds.includes(p.id)) return true
+    if (displaysStore.display2.open && displaysStore.display2.playerIds.includes(p.id)) return true
+    return false
+  })
+}
+
 onCountdownDone(async () => {
   isCountingDown = false
   console.log('[playback] countdown done — song started')
 
-  const playersWithMic = playersStore.all.filter(p => p.mic)
+  const playersWithMic = activeMicPlayers()
   if (playersWithMic.length > 0) {
-    await openMicMixChannel().catch(e => console.warn('[playback] openMicMixChannel failed:', e))
     for (const p of playersWithMic) {
       if (!playersStore.monitoringIds.has(p.id)) {
         try {
@@ -213,9 +222,13 @@ export const playback = {
       }
     }
 
-    // Auto-start mic monitoring for all players with a mic assigned
-    // NOTE: actual mic start is deferred to onCountdownDone so recording begins
-    // only when the song actually starts playing (after the countdown screen).
+    // Open mic-mix output channel now (during countdown) so cpal has time to
+    // initialize before startMicMonitor runs in onCountdownDone.
+    const micCandidates = activeMicPlayers()
+    console.log(`[playback] play() display1={open:${displaysStore.display1.open} players:[${displaysStore.display1.playerIds}]} display2={open:${displaysStore.display2.open} players:[${displaysStore.display2.playerIds}]} activeMicPlayers=[${micCandidates.map(p => p.id)}]`)
+    if (micCandidates.length > 0) {
+      await openMicMixChannel().catch(e => console.warn('[playback] openMicMixChannel failed:', e))
+    }
   },
 
   async pause() {
@@ -241,7 +254,7 @@ export const playback = {
     startTick()
     await sendResumeSong()
     // Restart mic monitors after resume
-    const playersWithMic = playersStore.all.filter(p => p.mic)
+    const playersWithMic = activeMicPlayers()
     if (playersWithMic.length > 0) {
       await openMicMixChannel().catch(e => console.warn('[playback] openMicMixChannel failed:', e))
       for (const p of playersWithMic) {

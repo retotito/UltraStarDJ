@@ -21,6 +21,15 @@
 
   const hasDisplay = $derived(displaysStore.display1.open || displaysStore.display2.open)
 
+  const activeMicPlayers = $derived(
+    playersStore.all.filter(p => {
+      if (!p.mic) return false
+      if (displaysStore.display1.open && displaysStore.display1.playerIds.includes(p.id)) return true
+      if (displaysStore.display2.open && displaysStore.display2.playerIds.includes(p.id)) return true
+      return false
+    })
+  )
+
   // Dragging state — null = CSS default (bottom-center)
   let x = $state<number | null>(null)
   let y = $state<number | null>(null)
@@ -148,11 +157,11 @@
       <HorizontalFader label="Song" level={gameChannel.level} gain={gameChannel.gain} ongainchange={(v) => gameChannel.setGain(v)} dimmed={!!playback.song?.youtubeId} />
     </div>
 
-    <!-- Mic mix section — shown when at least one player has a mic assigned -->
-    {#if playersStore.all.some(p => p.mic)}
+    <!-- Mic mix section — only players on an OPEN display AND with a mic assigned -->
+    {#if activeMicPlayers.length > 0}
       <div class="mic-section">
         <span class="mic-section-label">Mic Mix</span>
-        {#each playersStore.all.filter(p => p.mic) as player (player.id)}
+        {#each activeMicPlayers as player (player.id)}
           <MicMixRow {player} />
         {/each}
       </div>
