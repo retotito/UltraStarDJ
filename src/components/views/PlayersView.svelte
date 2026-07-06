@@ -1,13 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import { playersStore } from '$lib/stores/players.svelte'
+  import { playback } from '$lib/stores/playback.svelte'
   import {
     listAudioInputDevices,
     startMicMonitor,
     stopMicMonitor,
-    onMicLevel,
-    onMicDisconnected,
-    onMicReconnected,
     onDevicesChanged,
     type AudioInputDevice,
   } from '$lib/ipc/tauri'
@@ -16,37 +14,10 @@
   let { onclose }: { onclose?: () => void } = $props()
 
   let devices = $state<AudioInputDevice[]>([])
-
-  let unlistenLevel: (() => void) | null = null
-  let unlistenDisconnected: (() => void) | null = null
-  let unlistenReconnected: (() => void) | null = null
   let unlistenDevices: (() => void) | null = null
 
   onMount(async () => {
     devices = await listAudioInputDevices()
-
-    unlistenLevel = await onMicLevel(e => {
-      if (!playersStore.monitoringIds.has(e.player_id)) return
-      playersStore.setLevel(e.player_id, e.rms)
-    })
-
-    unlistenDisconnected = await onMicDisconnected(async e => {
-      // Stop the dead stream on Rust side; toast handles mic assignment clear
-      playersStore.setMonitoring(e.player_id, false)
-      playersStore.setLevel(e.player_id, 0)
-      await stopMicMonitor(e.player_id).catch(() => {})
-    })
-
-    unlistenReconnected = await onMicReconnected(async e => {
-      // Refresh device list
-      devices = await listAudioInputDevices()
-      // If a player had this device assigned, clear disconnected state
-      for (const p of playersStore.all) {
-        if (p.mic?.deviceId === e.device_id) {
-          playersStore.setDisconnected(p.id, false)
-        }
-      }
-    })
 
     unlistenDevices = await onDevicesChanged(updated => {
       devices = updated
@@ -54,17 +25,15 @@
   })
 
   onDestroy(async () => {
-    // Snapshot first — mutating the set while iterating it skips entries
+    unlistenDevices?.()
+    // Only stop monitors that were started as test — leave song-driven monitors running
+    if (playback.isActive) return
     const activeIds = [...playersStore.monitoringIds]
     for (const id of activeIds) {
       await stopMicMonitor(id).catch(() => {})
       playersStore.setMonitoring(id, false)
       playersStore.setLevel(id, 0)
     }
-    unlistenLevel?.()
-    unlistenDisconnected?.()
-    unlistenReconnected?.()
-    unlistenDevices?.()
   })
 
   let refreshing = $state(false)

@@ -1,8 +1,9 @@
 <script lang="ts">
   import { layout } from '$lib/stores/layout.svelte'
   import { playersStore } from '$lib/stores/players.svelte'
+  import { playback } from '$lib/stores/playback.svelte'
   import { onMount, onDestroy } from 'svelte'
-  import { onOutputDevicesChanged } from '$lib/ipc/tauri'
+  import { onOutputDevicesChanged, onMicLevel, onMicDisconnected, onMicReconnected, onDevicesChanged, listAudioInputDevices, stopMicMonitor } from '$lib/ipc/tauri'
   import { loadAudioOutputDevices, audioOutputDevices } from '$lib/audio/devices.svelte'
   import Sidebar from '$components/Sidebar.svelte'
   import LibraryPanel from '$components/views/LibraryPanel.svelte'
@@ -15,8 +16,35 @@
   let outputToast = $state<{ message: string; sub: string; type: 'connected' | 'disconnected' } | null>(null)
   let outputToastTimer: ReturnType<typeof setTimeout> | null = null
   let unlistenOutput: (() => void) | null = null
+  let unlistenMicLevel: (() => void) | null = null
+  let unlistenMicDisconnected: (() => void) | null = null
+  let unlistenMicReconnected: (() => void) | null = null
+  let unlistenDevicesChanged: (() => void) | null = null
 
   onMount(async () => {
+    // Global mic level listener — always active, independent of popup state
+    unlistenMicLevel = await onMicLevel(e => {
+      playersStore.setLevel(e.player_id, e.rms)
+    })
+
+    unlistenMicDisconnected = await onMicDisconnected(async e => {
+      playersStore.setMonitoring(e.player_id, false)
+      playersStore.setLevel(e.player_id, 0)
+      await stopMicMonitor(e.player_id).catch(() => {})
+    })
+
+    unlistenMicReconnected = await onMicReconnected(async e => {
+      const devices = await listAudioInputDevices()
+      for (const p of playersStore.all) {
+        if (p.mic?.deviceId === e.device_id) {
+          playersStore.setDisconnected(p.id, false)
+        }
+      }
+    })
+
+    unlistenDevicesChanged = await onDevicesChanged(async () => {
+      // Devices list changes handled locally in PlayersView when open
+    })
     unlistenOutput = await onOutputDevicesChanged(async () => {
       const before = audioOutputDevices.list.map(d => d.name)
       await loadAudioOutputDevices()
@@ -35,7 +63,13 @@
     })
   })
 
-  onDestroy(() => { unlistenOutput?.() })
+  onDestroy(() => {
+    unlistenOutput?.()
+    unlistenMicLevel?.()
+    unlistenMicDisconnected?.()
+    unlistenMicReconnected?.()
+    unlistenDevicesChanged?.()
+  })
 
   let isDragging = $state(false)
 

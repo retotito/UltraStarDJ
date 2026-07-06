@@ -3,7 +3,9 @@
   import { playback } from '$lib/stores/playback.svelte'
   import { displaysStore } from '$lib/stores/displays.svelte'
   import { layout } from '$lib/stores/layout.svelte'
+  import { playersStore } from '$lib/stores/players.svelte'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
+  import MicMixRow from '$components/ui/MicMixRow.svelte'
   import { gameChannel } from '$lib/audio/channels.svelte'
 
   const PLAYER_COLORS: Record<number, string> = {
@@ -145,6 +147,16 @@
     <div class="mixer">
       <HorizontalFader label="Song" level={gameChannel.level} gain={gameChannel.gain} ongainchange={(v) => gameChannel.setGain(v)} dimmed={!!playback.song?.youtubeId} />
     </div>
+
+    <!-- Mic mix section — shown when at least one player has a mic assigned -->
+    {#if playersStore.all.some(p => p.mic)}
+      <div class="mic-section">
+        <span class="mic-section-label">Mic Mix</span>
+        {#each playersStore.all.filter(p => p.mic) as player (player.id)}
+          <MicMixRow {player} />
+        {/each}
+      </div>
+    {/if}
 
     <!-- Transport controls — always shown -->
     <div class="controls">
@@ -334,6 +346,21 @@
   /* ── Transport controls ── */
   .mixer {
     padding: var(--space-3) var(--space-5) 0;
+  }
+
+  .mic-section {
+    padding: var(--space-3) var(--space-5) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .mic-section-label {
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--md-sys-color-on-surface-variant);
   }
 
   .controls {

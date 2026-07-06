@@ -6,8 +6,9 @@
 import type { Song } from '$lib/ultrastar/types'
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
+import { playersStore } from '$lib/stores/players.svelte'
 import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, onBeamerReady, onCountdownDone } from '$lib/ipc/tauri'
-import { readFile, needsTranscode, transcodeToMp4, deleteTempFile } from '$lib/ipc/tauri'
+import { readFile, needsTranscode, transcodeToMp4, deleteTempFile, startMicMonitor, stopMicMonitor } from '$lib/ipc/tauri'
 import { parseSongNotes } from '$lib/ultrastar/parser'
 import { convertFileSrc } from '@tauri-apps/api/core'
 
@@ -191,6 +192,19 @@ export const playback = {
         })
       }
     }
+
+    // Auto-start mic monitoring for all players with a mic assigned
+    for (const p of playersStore.all) {
+      if (p.mic && !playersStore.monitoringIds.has(p.id)) {
+        try {
+          await startMicMonitor(p.mic.deviceId, p.mic.channel, p.id)
+          playersStore.setMonitoring(p.id, true)
+          playersStore.setDisconnected(p.id, false)
+        } catch (e) {
+          console.warn(`[playback] auto-start mic failed for player ${p.id}:`, e)
+        }
+      }
+    }
   },
 
   async pause() {
@@ -216,6 +230,13 @@ export const playback = {
     state.status = 'loaded'
     showClearBeamers = true
     await sendStopSong()
+
+    // Auto-stop mic monitoring for all active players
+    for (const id of [...playersStore.monitoringIds]) {
+      await stopMicMonitor(id).catch(() => {})
+      playersStore.setMonitoring(id, false)
+      playersStore.setLevel(id, 0)
+    }
   },
 
   /** Send a second stop to clear the score screen and return beamers to idle */

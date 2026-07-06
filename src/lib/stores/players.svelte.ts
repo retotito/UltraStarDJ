@@ -20,8 +20,10 @@ export interface PlayerConfig {
   /** Tailwind-style color key used for player accent, e.g. 'blue', 'red' */
   color: string
   mic: MicAssignment | null
-  /** Software gain multiplier 0.0–2.0, default 1.0 */
+  /** Mic input sensitivity multiplier 0.0–2.0, default 1.0 */
   gain: number
+  /** Mic output mix volume 0.0–2.0, default 1.0 */
+  mixGain: number
 }
 
 const PLAYER_COLORS = ['blue', 'red', 'green', 'yellow'] as const
@@ -33,6 +35,7 @@ const DEFAULTS: PlayerConfig[] = [1, 2, 3, 4].map((id, i) => ({
   color: PLAYER_COLORS[i],
   mic: null,
   gain: 1.0,
+  mixGain: 1.0,
 }))
 
 let players = $state<PlayerConfig[]>(structuredClone(DEFAULTS))
@@ -48,6 +51,9 @@ let levels = $state<Record<number, number>>({ 1: 0, 2: 0, 3: 0, 4: 0 })
 /** Player IDs whose mic is currently disconnected */
 let disconnectedIds = $state<Set<number>>(new Set())
 
+/** Player IDs whose mic output is muted (fader position preserved) */
+let mutedIds = $state<Set<number>>(new Set())
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const playersStore = {
@@ -55,6 +61,7 @@ export const playersStore = {
   get monitoringIds() { return monitoringIds },
   get levels() { return levels },
   get disconnectedIds() { return disconnectedIds },
+  get mutedIds() { return mutedIds },
 
   /** A player is active when it has a mic assigned and is not disconnected */
   isActive(id: number): boolean {
@@ -89,6 +96,11 @@ export const playersStore = {
     playersStore.save()
   },
 
+  setMixGain(id: number, mixGain: number) {
+    players = players.map(p => p.id === id ? { ...p, mixGain: Math.round(mixGain * 100) / 100 } : p)
+    playersStore.save()
+  },
+
   setMonitoring(id: number, on: boolean) {
     const next = new Set(monitoringIds)
     if (on) next.add(id); else next.delete(id)
@@ -108,6 +120,12 @@ export const playersStore = {
       next.delete(playerId)
     }
     disconnectedIds = next
+  },
+
+  toggleMute(id: number) {
+    const next = new Set(mutedIds)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    mutedIds = next
   },
 
   load() {
