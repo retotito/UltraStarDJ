@@ -2,317 +2,302 @@
 
 ## Overview
 
-This document covers everything needed to implement live karaoke game play on the beamer window:
-pitch detection from microphones, matching sung pitches to notes, scoring, and the Canvas-based
-note lane rendering. The design is heavily inspired by [allkaraoke.party](https://github.com/Asvarox/allkaraoke).
+This document covers everything needed to implement live karaoke game play on the beamer:
+pitch detection from microphones, matching sung pitches to notes, scoring, and rendering.
+
+Reference implementations studied:
+- [allkaraoke.party](https://github.com/Asvarox/allkaraoke) — Canvas-based, React
+- [tuneperfect](https://github.com/ZerNico/tuneperfect) — CSS Grid-based, SolidJS + Tauri (closer to our stack)
+- [UltraStar Format Spec](https://github.com/UltraStar-Deluxe/format) — official format specification
 
 ---
 
-## Terminology (aligned with allkaraoke)
+## Two Separate Visual Elements
 
-| Term | Meaning |
-|---|---|
-| `beat` | UltraStar beat unit — derived from `bpm` and `gap` |
-| `beatLength` | Duration of one beat in ms = `60000 / (bpm / 4)` |
-| `pitch` | Semitone number (MIDI-style), `0` = C0 |
-| `frequency` | Raw Hz value from mic |
-| `distance` | Semitones between sung pitch and target note pitch, **octave-independent** (mod 12) |
-| `frequencyRecord` | `{ timestamp: ms, frequency: Hz }` — one mic sample |
-| `playerNote` | Group of consecutive frequencyRecords matching a note at the same distance |
-| `section` | A lyric line (NotesSection) or instrumental break (PauseSection) |
-| `tolerance` | Allowed distance offset that still counts as a hit (default: 2 semitones) |
+### 1. Lyrics display (already implemented)
+`LyricsRenderer.svelte` — text only, shown at the bottom of the beamer screen.
+- Current phrase: big text, syllables highlight as beat progresses
+- Next phrase: small, dimmed below — so singers can prepare
+- No pitch involved — only timing (beat position vs note start/end)
+- Word spacing comes from leading/trailing spaces in `note-text` (preserved by `line.split(' ')`)
+
+### 2. Note lane / pitch display (to implement)
+A visual grid above the lyrics showing the **pitch and timing** of each note as a bar:
+- Width = note duration in beats
+- Vertical position = note pitch (higher pitch = higher row)
+- Color = note type (normal = white/grey, golden = yellow)
+- One note lane per player, stacked top-to-bottom on the beamer
+- **Syllable text is rendered inside each note bar** — singers read lyrics off the bars
+
+Both use the same `Note[]` data (`startBeat`, `lengthBeats`, `pitch`, `syllable`).
+
+---
+
+## UltraStar Format — Key Facts
+
+### Timing
+- `#BPM` is **implicitly quadrupled**: `#BPM 120` = 480 beats/minute
+- `beatLengthMs = 60000 / (bpm * 4)` — duration of one beat in ms
+- `#GAP` = milliseconds from audio start until beat 0 (all notes are relative to this)
+- `#VIDEOGAP` = seconds to offset video vs audio (negative = skip video start)
+- `#START` / `#END` = audio clip range (don't affect note beat positions)
+
+### Pitch encoding
+- Pitch = **half-steps relative to C4** (middle C = 0)
+  - `pitch 5` = F4, `pitch -2` = A#3, `pitch 12` = C5
+- For scoring: compare **octave-independently** (mod 12) — a singer an octave off still scores
+
+### Note types
+
+| Char | Type | Scoring |
+|---|---|---|
+| `:` | Normal | Full points |
+| `*` | Golden | Double points |
+| `F` | Freestyle | No points, no pitch check |
+| `R` | Rap | Points for any sound (no pitch) |
+| `G` | Golden Rap | Rap + bonus points |
+
+### Phrases (line breaks)
+- `-` marker = end-of-phrase → line break in lyrics display
+- `P1` / `P2` = voice changes for duets (each voice = separate note track)
+- `#RELATIVE yes` = legacy relative beat mode (rare — detect and warn, don't crash)
+
+### Word spacing (spec-compliant)
+A trailing space on a syllable (`"lo "`) or leading space on the next (`" world"`) marks a
+word boundary. The parser MUST NOT strip these spaces. We use `line.split(' ')` (no trim)
+which preserves them, matching the allkaraoke.party approach.
 
 ---
 
 ## Architecture
 
 ```
-Microphone (getUserMedia)
-  → Web Audio AnalyserNode (fftSize 2048)
-  → AubioJS Pitch Detector (YIN algorithm)         ← runs on setInterval ~23ms
-  → frequencyRecord { timestamp, frequency }
-  → PitchEngine (per player)
-      → appendFrequencyToPlayerNotes()              ← groups records into playerNotes
-      → calculateScore()                            ← live score from playerNotes
-  → CanvasDrawing (rAF loop)
-      → drawNotesToSing()   ← target note lane (grey/gold bars)
-      → drawSungNotes()     ← player's sung notes (colored bars)
-      → drawFlare/particles ← visual effects on hit
+DJ Window
+  ├── getUserMedia() → mic streams (one per player)
+  ├── Web Audio: AnalyserNode (fftSize 2048)
+  ├── AubioJS pitch detection → FrequencyRecord { timestamp, frequencyHz }
+  ├── PitchProcessor (per player)
+  │     ├── frequency → UltraStar pitch (Hz → semitone relative to C4)
+  │     ├── distance = |sung - target| mod 12 → folded to [0, 6]
+  │     ├── tolerance check (easy=2, medium=1, hard=0.5 semitones)
+  │     └── joker: one-frame miss forgiveness
+  ├── ScoreLoop: accumulate hit beats → live score
+  └── Tauri IPC → emit FrequencyRecord deltas to Beamer(s) at ~60fps
+
+Beamer Window(s)
+  ├── Receive play-song IPC → Song data + playerIds
+  ├── Receive game-tick IPC → new FrequencyRecords per player
+  ├── Reconstruct sung notes locally
+  ├── Render note lane (CSS Grid) per assigned player
+  ├── Render LyricsRenderer with currentBeat
+  └── On game-end IPC → render score screen
 ```
+
+**Rule: DJ window = game engine. Beamers = dumb displays.**
+Microphones are on the DJ's machine. `getUserMedia()` runs in the DJ WebView only.
 
 ---
 
-## 1. Pitch Detection
+## Pitch Detection
 
-**Library:** [aubiojs](https://github.com/qiuxiang/aubiojs) — WebAssembly port of the Aubio pitch detection library. Uses the YIN algorithm.
+**Library:** [aubiojs](https://github.com/qiuxiang/aubiojs) — WebAssembly YIN algorithm.
 
 ```ts
 import aubiojs from 'aubiojs'
-
 const { Pitch } = await aubiojs()
 const detector = new Pitch('default', 2048, 256, audioContext.sampleRate)
 detector.setTolerance(0.5)
 
-// In setInterval (every ~23ms at 44100Hz / 2048 buffer):
+// setInterval every ~23ms:
 const buffer = new Float32Array(2048)
 analyser.getFloatTimeDomainData(buffer)
-const frequencyHz = detector.do(buffer)  // returns 0 if no pitch detected
+const hz = detector.do(buffer)  // 0 = silence
 ```
 
-**Key facts:**
-- Returns `0` if no singing detected — skip these records
-- Input lag: allkaraoke hardcodes `180ms` — subtract from timestamp when matching beats
-- Two-channel support (stereo mic = two players on one mic) via `ChannelSplitterNode`
-
-**Frequency → pitch (semitone):**
-
+**Frequency → UltraStar pitch (half-steps relative to C4=0):**
 ```ts
-function freqToMidi(hz: number): number {
-  return Math.round(12 * Math.log2(hz / 440) + 69)
+function hzToUsPitch(hz: number): number {
+  return 12 * Math.log2(hz / 261.63)  // 261.63 Hz = C4
 }
 ```
 
-**Distance calculation (octave-independent):**
+**Distance (octave-independent):**
+```ts
+function calcDistance(hz: number, targetPitch: number): number {
+  const sung = hzToUsPitch(hz)
+  const diff = Math.abs(sung - targetPitch) % 12
+  return diff > 6 ? 12 - diff : diff  // fold to [0, 6]
+}
+// hit if distance <= tolerance (easy=2, medium=1, hard=0.5)
+```
+
+**Input lag:** subtract ~180ms from timestamps when matching beats to mic input.
+
+---
+
+## Note Lane Rendering (CSS Grid)
+
+Inspired by tuneperfect. Pure CSS Grid — no canvas needed.
+
+### Layout
+
+One grid per player:
+```
+grid-template-rows:    repeat(ROW_COUNT, 1fr)    // 12–16 pitch rows
+grid-template-columns: repeat(phraseBeats, 1fr)  // one column per beat in phrase
+```
+
+`ROW_COUNT` = 16 for 1–2 players, 12 for 3–4 players (compact).
+
+### Note → grid position
 
 ```ts
-function calcDistance(frequency: number, targetPitch: number): { distance: number, preciseDistance: number } {
-  if (frequency === 0) return { distance: Infinity, preciseDistance: Infinity }
-  const sung = 12 * Math.log2(frequency / 440) + 69
-  const diff = sung - targetPitch
-  // Fold into [-6, +6] range (octave-independent)
-  const mod = ((diff % 12) + 18) % 12 - 6
-  return {
-    distance: Math.round(mod),
-    preciseDistance: mod,
-  }
+const startBeat = phrase.notes[0].startBeat
+// For each note:
+const column  = note.startBeat - startBeat + 1   // 1-indexed
+const colSpan = note.lengthBeats
+const row     = pitchToRow(note.pitch, avgPhrasePitch, ROW_COUNT)
+```
+
+**Pitch → row (with octave wrapping):**
+```ts
+function pitchToRow(pitch: number, avg: number, rowCount: number): number {
+  let p = pitch
+  const min = Math.floor(avg - rowCount / 2)
+  const max = min + rowCount - 1
+  while (p > max) p -= 12
+  while (p < min) p += 12
+  const offset = p - avg
+  return Math.abs(Math.ceil(rowCount / 2 + offset) - rowCount) - 1
 }
+```
+
+### Two grid layers (overlapping, same grid)
+
+**Layer 1 — Target notes** (what to sing):
+- White/grey rounded bar for normal notes
+- Yellow bordered bar for golden notes
+- Dashed border for rap notes
+- Syllable text centered inside each bar
+
+**Layer 2 — Sung notes** (what the player sang, colored):
+- Fills left-to-right as beat progresses through the note
+- SVG bezier curve showing precise pitch accuracy within bar
+- Only shown when `distance <= tolerance`
+
+---
+
+## Lyrics Sweep Animation (upgrade for LyricsRenderer)
+
+Currently: whole syllable snaps color when beat reaches it.
+
+Upgrade (tuneperfect style — gradient sweep):
+```svelte
+<!-- percentage = (currentBeat - note.startBeat) / note.lengthBeats * 100 -->
+<span style="
+  background-image: linear-gradient(to right, {playerColor} {pct}%, white {pct}%);
+  background-clip: text;
+  color: transparent;
+  white-space: pre;
+">{note.syllable}</span>
 ```
 
 ---
 
-## 2. Player Notes — Grouping Frequency Records
+## Scoring
 
-`appendFrequencyToPlayerNotes()` groups consecutive `frequencyRecord`s into `PlayerNote` objects:
+Max score: **10,000** per song (simple, user-friendly).
 
-- A new `PlayerNote` is started when:
-  - The target note changes (new syllable)
-  - The distance changes (pitch jumped to a different semitone offset)
-  - There's a singing gap > 100ms (break tolerance)
-- `PlayerNote.length` is extended each tick while the same distance holds
-- `isPerfect = distance === 0 && |length - note.length| < 0.5 beats`
-- `vibrato = distance === 0 && detectVibrato(frequencyRecords)` — detects oscillation in pitch changes
+```
+pointsPerBeat = 10000 / totalSingableBeats
+```
 
-**Vibrato detection:** scans direction-change points in the frequency stream; if the intervals between changes are consistent (within 1.75× factor) for a window of 6 changes → vibrato.
-
----
-
-## 3. Scoring
-
-Max score per song: **3,500,000** (allkaraoke's value — use the same for UltraStar compatibility).
-
-**Note type multipliers:**
-
-| Type | Multiplier |
+| Hit type | Points |
 |---|---|
-| `normal` | 1× |
-| `golden` (star) | 2× |
-| `freestyle` / `rap` | 0.25× (always hit if any singing) |
-| `rap-golden` (rapstar) | 0.5× |
-| perfect bonus | +0.5× per beat on perfect notes |
-| vibrato bonus | +0.25× per beat with vibrato |
+| Normal note, beat hit (distance ≤ tolerance) | pointsPerBeat |
+| Golden note, beat hit | pointsPerBeat × 2 |
+| Rap/Golden Rap, any sound | pointsPerBeat |
+| Freestyle | 0 |
+| Miss | 0 |
 
-**Algorithm:**
-1. Count total singable beats in song (weighted by multipliers) → `maxBeats`
-2. `pointsPerBeat = MAX_POINTS / maxBeats`
-3. For each `PlayerNote` with `distance === 0`: accumulate `note.length` into the corresponding note type bucket
-4. `score = sum(buckets) * pointsPerBeat`
+Score recalculated live each tick from accumulated hit beats.
 
-Score is computed live during playback (recalculated each frame from `playerNotes`).
+### Phrase ratings (nice-to-have)
+After each phrase: **Perfect / Great / Good / Okay / Miss** badge based on % beats hit.
 
 ---
 
-## 4. Canvas Note Lane Rendering
+## IPC Event Contract
 
-Each player gets a horizontal strip of the canvas. For 1 player: full height. For 2 players: split top/bottom.
+| Event | Payload | Direction |
+|---|---|---|
+| `ultrastar:play-song` | `PlaySongPayload` (existing) | DJ → Beamer |
+| `ultrastar:game-tick` | `{ players: { id, records: FrequencyRecord[] }[], currentBeat: number }` | DJ → Beamer |
+| `ultrastar:game-end` | `{ players: { id, name, score }[] }` | DJ → Beamer |
+| `ultrastar:stop-song` | `null` | DJ → Beamer |
+| `ultrastar:pause-song` | `null` | DJ → Beamer |
+| `ultrastar:resume-song` | `null` | DJ → Beamer |
 
-**Layout per player strip:**
-```
-[horizontal padding 15%] [note lane area] [horizontal padding 15%]
-```
-
-**What's drawn each frame:**
-
-### 4a. Target notes (notes to sing)
-- Grey rounded rectangles at the correct pitch row
-- Gold/yellow for `golden` type
-- Wider height for golden (`BIG_NOTE_HEIGHT = NOTE_HEIGHT + 6`)
-- X position based on beat position within current section
-- Slide-in animation from right on section start (bezier easing, 25th power)
-- Progressive slide: notes drift slightly left as section progresses
-
-### 4b. Player sung notes
-- Colored bars (per-player color) at the actual sung pitch row
-- Full opacity when `distance === 0` (hit), semi-transparent when off-pitch
-- Thicker/bigger when on-target
-- Frequency trace drawn when hitting perfectly (shows precise pitch within the note height)
-
-### 4c. Particles & effects (optional high-quality mode)
-- **Flare**: ray + triangle particle at leading edge of a hit note
-- **Gold particle**: sparkles on golden note hits
-- **Vibrato particle**: extra effect when vibrato detected
-- **Exploding note**: burst on section end for hit notes
-- **Fadeout note**: fading ghost of notes on section change
-
-### 4d. Section-based display
-- Only the **current section** is shown at any time (one lyric line worth of notes)
-- On section change: fadeout/explode old notes, new section slides in from right
-- Pitch range auto-scaled to `[minPitch - 6, maxPitch + 6]` of the current song track
+DJ sends only **new** FrequencyRecords each tick (delta). Beamer reconstructs locally.
 
 ---
 
-## 5. Oscilloscope (optional)
+## Players per Beamer
 
-Allkaraoke doesn't show a mic oscilloscope during gameplay — it shows a mic level meter in the setup screen. For UltrastarDJ we can optionally add an oscilloscope overlay per player using the raw `FloatTimeDomainData` from the AnalyserNode. This is a nice-to-have, not required for MVP.
-
----
-
-## 6. Word Splitting (Lyrics Highlighting)
-
-Currently `LyricsRenderer.svelte` doesn't highlight the **current syllable** within a line. To fix:
-
-- Track `currentBeat` from the audio time
-- Find the note whose `startBeat <= currentBeat < startBeat + lengthBeats`
-- Highlight that syllable — change color/weight/underline
-
-This is separate from note lane rendering — it happens in the existing `LyricsRenderer`.
+| Count | Layout |
+|---|---|
+| 1 | Full height — one note lane + lyrics at bottom |
+| 2 | Split: top note lane + lyrics, bottom note lane + lyrics |
+| 3–4 | Quarter splits (two per beamer max recommended) |
 
 ---
 
-## 7. Implementation Plan
+## Implementation Plan
 
-### Phase 1 — Pitch detection & player notes (no UI)
-- [ ] Install `aubiojs`: `npm install aubiojs`
-- [ ] `src/lib/game/pitch-detector.ts` — AubioJS wrapper, `getFrequency(buffer) → Hz`
-- [ ] `src/lib/game/mic-input.svelte.ts` — `getUserMedia`, `AnalyserNode`, setInterval loop → reactive `frequencies[]` and `volumes[]`
-- [ ] `src/lib/game/calc-distance.ts` — `calcDistance(hz, targetPitch) → { distance, preciseDistance }`
-- [ ] `src/lib/game/append-frequency-to-player-notes.ts` — grouping logic
-- [ ] `src/lib/game/detect-vibrato.ts` — vibrato detection
-- [ ] `src/lib/game/player-state.svelte.ts` — per-player state: `playerNotes`, `score`, `currentSection`
+### Phase 1 — Lyrics sweep animation
+- [x] Syllable active/past classes (done)
+- [ ] Upgrade to gradient sweep (left-to-right fill per syllable)
 
-### Phase 2 — Note lane Canvas rendering
-- [ ] `src/lib/game/calculate-layout.ts` — canvas pixel coords for a note given pitch/beat
-- [ ] `src/components/game/NoteLane.svelte` — `<canvas>` component, rAF loop
-  - `drawTargetNotes()` — grey/gold bars
-  - `drawSungNotes()` — colored player bars
-  - `drawFrequencyTrace()` — precise pitch line within hit note
-- [ ] Wire into `BeamerView.svelte`: one `NoteLane` per player, stacked below lyrics
+### Phase 2 — Note lane (target notes only, no mic yet)
+- [ ] `src/components/game/NoteLane.svelte` — CSS Grid, target note bars with syllables
+- [ ] Wire into `BeamerView.svelte` — one lane per assigned player, stacked
 
-### Phase 3 — Scoring display
-- [ ] Live score shown per player in BeamerView (large text, top corner)
-- [ ] Score bar / progress indicator
+### Phase 3 — Progress bar
+- [ ] `src/components/game/SongProgress.svelte` — thin bar, currentBeat / totalBeats
 
-### Phase 4 — Lyrics word splitting
-- [ ] Update `LyricsRenderer.svelte` to highlight current syllable based on `currentBeat`
+### Phase 4 — Pitch detection (DJ window)
+- [ ] `npm install aubiojs`
+- [ ] `src/lib/game/pitch-detector.ts`
+- [ ] `src/lib/game/mic-input.svelte.ts`
+- [ ] `src/lib/game/pitch-processor.ts`
+- [ ] `src/lib/game/score-loop.ts`
 
-### Phase 5 — Effects (nice-to-have)
-- [ ] Particle system (port from allkaraoke or implement simpler version)
-- [ ] Oscilloscope overlay
+### Phase 5 — Wire DJ → Beamer
+- [ ] DJ: emit `ultrastar:game-tick` at 60fps
+- [ ] Beamer: receive ticks, render sung note overlay on note lane
+
+### Phase 6 — Score display & end screen
+- [ ] Live score in BeamerView corner
+- [ ] Score screen on `ultrastar:game-end`
+- [ ] Phrase ratings (nice-to-have)
 
 ---
 
-## 8. Files to Create
+## Files to Create
 
 ```
 src/
   lib/
     game/
-      pitch-detector.ts          ← AubioJS wrapper
-      mic-input.svelte.ts        ← reactive mic stream + frequency polling
-      calc-distance.ts           ← Hz → distance to target pitch
-      append-frequency-to-player-notes.ts
-      detect-vibrato.ts
-      calculate-score.ts         ← live score from playerNotes
-      player-state.svelte.ts     ← per-player reactive state
-      game-engine.svelte.ts      ← top-level: ties mic + state + timing together
+      pitch-detector.ts       ← AubioJS wrapper
+      mic-input.svelte.ts     ← getUserMedia + AnalyserNode + interval
+      pitch-processor.ts      ← hz → distance → hit/miss + joker
+      score-loop.ts           ← hit beats → live score
+      game-engine.svelte.ts   ← ties everything together
   components/
     game/
-      NoteLane.svelte            ← Canvas note lane per player
-      ScoreDisplay.svelte        ← live score per player
+      NoteLane.svelte         ← CSS Grid note lane
+      SongProgress.svelte     ← progress bar
+      ScoreDisplay.svelte     ← live score per player
+      PhraseRating.svelte     ← "Perfect!" badge (Phase 6)
 ```
-
----
-
-## 9. Multi-Window Architecture — Where Calculation Happens
-
-### Rule: DJ window = game engine, Beamers = dumb displays
-
-Microphones are physically connected to the DJ's machine. `getUserMedia()` runs in the DJ window's
-WebView. Beamer windows are separate Tauri WebView processes on the same machine — routing mic
-access into them would be messy and redundant.
-
-```
-DJ Window
-  ├── getUserMedia() → mic streams (one per assigned player)
-  ├── AubioJS pitch detection (runs in DJ window, ~23ms interval)
-  ├── PlayerState per player (playerNotes, score, currentSection)
-  └── Tauri IPC → emits game state to beamer window(s)
-
-Beamer Window(s)
-  ├── Receive IPC events from DJ
-  ├── Reconstruct playerNotes locally from incoming frequencyRecord deltas
-  ├── Render note lane canvas (for assigned player IDs only)
-  ├── Render lyrics with current beat highlight
-  └── Render score display
-```
-
-### IPC strategy — delta push (Option B)
-
-Rather than sending the full accumulated `playerNotes` array every frame (which grows unboundedly),
-the DJ sends only new `frequencyRecord`s since the last tick. The beamer runs its own local copy
-of `appendFrequencyToPlayerNotes()` to reconstruct the note state.
-
-- On `ultrastar:play-song`: beamer receives full `Song` + assigned `playerIds`
-- Each game tick: DJ emits new frequency records only
-- Beamer accumulates locally → renders canvas
-
-### Players per beamer
-
-`PlaySongPayload.playerIds` already carries which players are on which beamer.
-
-| Player count on beamer | Canvas layout |
-|---|---|
-| 1 | Full height — one note lane |
-| 2 | Split top/bottom — two note lanes |
-| 3–4 | Split into quarters (two per beamer max recommended) |
-
-### Updated IPC event contract
-
-| Event | Payload | Direction | Notes |
-|---|---|---|---|
-| `ultrastar:play-song` | `PlaySongPayload` (existing) | DJ → Beamer | Includes `playerIds` |
-| `ultrastar:game-tick` | `{ players: { id, records: FrequencyRecord[] }[], currentBeat: number }` | DJ → Beamer | ~60fps, delta only |
-| `ultrastar:game-end` | `{ players: { id, name, score, scoreDetails }[] }` | DJ → Beamer | All players, both beamers |
-| `ultrastar:stop-song` | `null` (existing) | DJ → Beamer | |
-| `ultrastar:pause-song` | `null` (existing) | DJ → Beamer | |
-| `ultrastar:resume-song` | `null` (existing) | DJ → Beamer | |
-
-### Score screen
-
-On `ultrastar:game-end` (or early stop), **both** beamer windows switch to a score screen.
-The score screen shows **all players** ranked — regardless of which beamer they played on.
-This lives in `BeamerView.svelte` as a different render mode (`gameStatus === 'ended'`).
-
----
-
-## 10. Key Differences from allkaraoke
-
-| Topic | allkaraoke | UltrastarDJ |
-|---|---|---|
-| Framework | React | Svelte 5 |
-| State | Custom class + events | Svelte 5 runes |
-| Rendering | Canvas (CanvasDrawing class) | Canvas in Svelte component |
-| Remote mic | WebRTC (phone as mic) | Not planned (local USB mics via Rust cpal) |
-| Multiplayer | Network (WebRTC) | Local only (multiple USB mics) |
-| Audio | YouTube iframes | Local files + YouTube |
-| Pitch lib | aubiojs | aubiojs (same) |
-| Max score | 3,500,000 | 3,500,000 (same) |

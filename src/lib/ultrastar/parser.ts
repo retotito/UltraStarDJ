@@ -125,11 +125,13 @@ export function parseSongNotes(text: string): import('./types').NoteTrack[] {
 
     const noteType = NOTE_TYPES[line[0]]
     if (noteType) {
-      const parts = line.slice(1).trim().split(/\s+/)
-      const startBeat   = parseInt(parts[0], 10)
-      const lengthBeats = parseInt(parts[1], 10)
-      const pitch       = parseInt(parts[2], 10)
-      const syllable    = parts.slice(3).join(' ')
+      // Split on single space (no trim) — preserves leading/trailing spaces in syllable,
+      // which UltraStar uses to encode word boundaries. Same approach as allkaraoke.party.
+      const split = line.split(' ')
+      const startBeat   = parseInt(split[1], 10)
+      const lengthBeats = parseInt(split[2], 10)
+      const pitch       = parseInt(split[3], 10)
+      const syllable    = split.slice(4).join(' ')
       currentNotes.push({ type: noteType, startBeat, lengthBeats, pitch, syllable })
       continue
     }

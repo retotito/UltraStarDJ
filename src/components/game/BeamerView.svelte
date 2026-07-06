@@ -376,8 +376,9 @@
   .lyrics-area {
     flex: 1;
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
+    padding-bottom: var(--space-6);
   }
 
   .lyrics-placeholder {

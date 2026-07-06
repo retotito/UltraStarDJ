@@ -1,11 +1,13 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
 
-  let { tracks, currentTime, bpm, gap }: {
+  let { tracks, currentTime, bpm, gap, trackIndex = 0, playerColor = null }: {
     tracks: NoteTrack[]
     currentTime: number
     bpm: number
     gap: number       // ms offset before first note
+    trackIndex?: number
+    playerColor?: string | null
   } = $props()
 
   // UltraStar beat formula — negative beats are valid (pre-GAP notes)
@@ -48,8 +50,8 @@
     return currentBeat >= note.startBeat + note.lengthBeats
   }
 
-  // Use track 0 (P1) for now — duet support later
-  const track = $derived(tracks[0] ?? null)
+  // Use the specified trackIndex — P1=0, P2=1, etc.
+  const track = $derived(tracks[trackIndex] ?? null)
   const activeLine = $derived(track ? getActiveLine(track.lines) : null)
   const nextLine = $derived(track ? getNextLine(track.lines, activeLine) : null)
 </script>
@@ -63,6 +65,7 @@
           class:active={isNoteActive(note)}
           class:past={isNotePast(note)}
           class:golden={note.type === 'golden'}
+          style={playerColor && isNotePast(note) && note.type !== 'golden' ? `color: ${playerColor}` : ''}
         >{note.syllable}</span>
       {/each}
     {:else}
