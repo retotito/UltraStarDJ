@@ -31,7 +31,7 @@
   {#if layout.showPlayer && layout.showQueue}
     <!-- Both visible — split with drag handle -->
     <div class="widget-area" style="height: {layout.rightPlayerHeightPct}%">
-      <div class="widget-label">Player</div>
+      <div class="widget-label">Preview Player</div>
       <PlayerWidget />
     </div>
     <!-- Vertical drag handle -->
@@ -43,7 +43,6 @@
       onmousedown={startResize}
     ></div>
     <div class="widget-area" style="height: {100 - layout.rightPlayerHeightPct}%">
-      <div class="widget-label">Queue</div>
       <QueueWidget />
     </div>
 

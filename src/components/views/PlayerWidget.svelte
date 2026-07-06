@@ -237,9 +237,6 @@
     <div class="song-info">
       <p class="song-title truncate">{player.song.title}</p>
       <p class="song-artist truncate text-muted text-sm">{player.song.artist}</p>
-      {#if player.song.year}
-        <p class="text-xs text-muted">{player.song.year}{player.song.language ? ` · ${player.song.language}` : ''}</p>
-      {/if}
     </div>
 
     <div class="preview-fader">
