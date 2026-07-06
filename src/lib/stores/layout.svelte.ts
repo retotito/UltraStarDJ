@@ -11,7 +11,6 @@ export interface ColumnConfig {
 
 export interface LayoutState {
   rightPanelWidth: number
-  rightPlayerHeightPct: number
   showPlayer: boolean
   showQueue: boolean
   showNowPlaying: boolean
@@ -31,7 +30,6 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 
 const DEFAULTS: LayoutState = {
   rightPanelWidth: 380,
-  rightPlayerHeightPct: 40,
   showPlayer: true,
   showQueue: true,
   showNowPlaying: false,
@@ -42,7 +40,6 @@ let state = $state<LayoutState>({ ...DEFAULTS, columns: DEFAULT_COLUMNS.map(c =>
 
 export const layout = {
   get rightPanelWidth()      { return state.rightPanelWidth },
-  get rightPlayerHeightPct() { return state.rightPlayerHeightPct },
   get showPlayer()      { return state.showPlayer },
   get showQueue()       { return state.showQueue },
   get showNowPlaying()  { return state.showNowPlaying },
@@ -51,9 +48,6 @@ export const layout = {
 
   setRightPanelWidth(w: number) {
     state.rightPanelWidth = Math.max(220, Math.min(700, w))
-  },
-  setRightPlayerHeightPct(pct: number) {
-    state.rightPlayerHeightPct = Math.max(20, Math.min(80, pct))
   },
   togglePlayer()     { state.showPlayer     = !state.showPlayer },
   toggleQueue()      { state.showQueue      = !state.showQueue },
