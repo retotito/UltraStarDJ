@@ -154,7 +154,7 @@
 
     <!-- Transport controls — always shown -->
     <div class="mixer">
-      <HorizontalFader label="Song" level={gameChannel.level} gain={gameChannel.gain} ongainchange={(v) => gameChannel.setGain(v)} dimmed={!!playback.song?.youtubeId} />
+      <HorizontalFader label="Song" level={gameChannel.level} gain={gameChannel.gain} ongainchange={(v) => gameChannel.setGain(v)} dimmed={!!playback.song?.youtubeId && !playback.song?.audioPath && !playback.song?.videoPath} />
     </div>
 
     <!-- Mic mix section — only players on an OPEN display AND with a mic assigned -->
