@@ -18,7 +18,13 @@ import { invoke } from '@tauri-apps/api/core'
 
 export type ChannelName = 'game' | 'preview'
 
-const SUPPORTS_SINK_ID = typeof HTMLMediaElement !== 'undefined' &&
+const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+
+// setSinkId works on Windows/Chromium with browser mediaDevices IDs.
+// On macOS/Tauri (WKWebView) setSinkId exists but only accepts enumerateDevices() IDs,
+// not cpal device names — so we always use the cpal worklet path on Tauri.
+const SUPPORTS_SINK_ID = !IS_TAURI &&
+  typeof HTMLMediaElement !== 'undefined' &&
   'setSinkId' in HTMLMediaElement.prototype
 
 export class AudioChannel {
