@@ -82,7 +82,7 @@
 
 <div class="players-view">
   <div class="view-header">
-    <span class="view-title">Players</span>
+    <span class="view-title">Audio Input</span>
     <div class="header-actions">
       <button
         class="btn btn-icon"

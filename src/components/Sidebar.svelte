@@ -52,22 +52,22 @@
 
     <button
       class="btn btn-icon"
-      class:is-active={showPlayers}
-      data-tooltip="Players"
-      aria-label="Player & mic settings"
-      onclick={() => { const v = !showPlayers; closeAll(); showPlayers = v }}
-    >
-      <span class="icon">group</span>
-    </button>
-
-    <button
-      class="btn btn-icon"
       class:is-active={showDisplays}
       data-tooltip="Displays"
       aria-label="Open Displays"
       onclick={() => { const v = !showDisplays; closeAll(); showDisplays = v }}
     >
       <span class="icon">tv_displays</span>
+    </button>
+
+    <button
+      class="btn btn-icon"
+      class:is-active={showPlayers}
+      data-tooltip="Audio Input"
+      aria-label="Audio Input"
+      onclick={() => { const v = !showPlayers; closeAll(); showPlayers = v }}
+    >
+      <span class="icon">mic_external_on</span>
     </button>
 
     <button
@@ -232,7 +232,7 @@
 
   .layout-popover {
     position: fixed;
-    left: 64px;
+    left: 84px;
     top: 60px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
@@ -240,7 +240,7 @@
     min-width: 240px;
     width: max-content;
     z-index: var(--z-overlay);
-    box-shadow: var(--elevation-2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -248,7 +248,7 @@
 
   .players-popover {
     position: fixed;
-    left: 64px;
+    left: 84px;
     top: 98px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
@@ -258,13 +258,13 @@
     display: flex;
     flex-direction: column;
     z-index: var(--z-overlay);
-    box-shadow: var(--elevation-2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     overflow: hidden;
   }
 
   .displays-popover {
     position: fixed;
-    left: 64px;
+    left: 84px;
     top: 200px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
@@ -273,13 +273,13 @@
     display: flex;
     flex-direction: column;
     z-index: var(--z-overlay);
-    box-shadow: var(--elevation-2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     overflow: hidden;
   }
 
   .audio-output-popover {
     position: fixed;
-    left: 64px;
+    left: 84px;
     top: 240px;
     background: var(--md-sys-color-surface-container-high);
     border: 1px solid var(--md-sys-color-outline-variant);
@@ -289,7 +289,7 @@
     display: flex;
     flex-direction: column;
     z-index: var(--z-overlay);
-    box-shadow: var(--elevation-2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     overflow: hidden;
   }
 

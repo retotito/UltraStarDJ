@@ -16,6 +16,17 @@
   let hoveredId = $state<string | null>(null)
   let menuSongId = $state<string | null>(null)
   let menuPos = $state({ x: 0, y: 0 })
+  let menuEl = $state<HTMLElement | null>(null)
+
+  $effect(() => {
+    if (!menuEl) return
+    const { height } = menuEl.getBoundingClientRect()
+    const vh = window.innerHeight
+    const MARGIN = 40
+    if (menuPos.y + height > vh - MARGIN) {
+      menuPos = { ...menuPos, y: Math.max(8, vh - height - MARGIN) }
+    }
+  })
   const sorted = $derived(
     [...songs].sort((a, b) => {
       const av = (a[sortKey] ?? '') as string | number
@@ -167,6 +178,7 @@
     class="row-menu"
     style="left: {menuPos.x}px; top: {menuPos.y}px"
     role="menu"
+    bind:this={menuEl}
   >
     <button class="menu-item" role="menuitem" onclick={() => { previewSong(menuSong); closeMenu() }}>
       <span class="icon icon-sm">play_arrow</span> Preview
@@ -223,7 +235,6 @@
 
   .song-row td {
     padding: var(--space-2) var(--space-3);
-    border-bottom: 1px solid var(--color-table-border);
     color: var(--md-sys-color-on-surface);
     white-space: nowrap;
     overflow: hidden;
@@ -234,6 +245,9 @@
   .song-row {
     cursor: pointer;
     transition: background var(--transition-fast);
+  }
+  .song-row:nth-child(even) {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent);
   }
   .song-row:hover {
     background: var(--color-table-row-hover);
