@@ -98,6 +98,67 @@ The **Preview** device selector in the Audio Output panel lists all audio output
 
 ---
 
+---
+
+## Mic Input Signal Chain
+
+Each player's mic is captured via a dedicated cpal input stream (one per player). The full chain, from hardware to speaker and pitch scorer:
+
+```
+Mic hardware
+  → cpal input callback (f32/i16/u16 format)
+  → channel extract (left / right / mono)
+  → soft saturation: x / (1 + |x|)    ← prevents hard clipping
+  → input gain (dB-linear, hot-reload)
+  → noise gate (RMS-based, hot-reload)
+  → ring buffer → cpal output (mic-mix channel)  ← monitor speaker
+  → RMS event → JS mic level meter
+  → JS pitch detector → pitch scoring
+```
+
+### Input Gain
+
+- Range: 0–100% fader = 0× to 1.0× (no boost, only attenuation)
+- Taper: **dB-linear** — `gain = 10^(1.5 × (v − 1))` where v is 0–1
+  - 100% = 0dB (unity), 90% ≈ −3dB, 0% = silence (−∞)
+  - Each 10% step is a perceptually equal ~3dB change
+- Hot-reload: changing the fader updates the `mic_input_gains` map in Rust — no stream restart needed
+
+### Noise Gate
+
+- Comparison signal: **RMS** of the post-gain mono frame
+- Open threshold: `rms >= threshold`
+- Close threshold (hysteresis): `rms >= threshold × 0.5` while gate is open
+- Hot-reload: dragging the threshold handle updates `mic_thresholds` map in Rust — no stream restart needed
+- During "Test mic" mode: threshold is seeded as **0** (gate bypassed) so audio flows freely while the user calibrates the fader. The threshold handle still moves and saves to the store for use during gameplay.
+
+### Meter Display
+
+The level meter uses a log scale to match human loudness perception:
+
+```
+displayPos = clamp((20 × log10(rms) + 40) / 40 × 1.5, 0, 1)
+```
+
+- Floor: −40 dBFS → displayPos = 0
+- 0 dBFS → displayPos = 1.5 (clips into red)
+- ×1.5 boost ensures a loud singing voice hits the red zone
+
+The threshold handle uses the **same formula** for its position, so placing it at 20% on the bar cuts signals showing at 20% on the meter.
+
+### Mic Delay Compensation
+
+`micDelay` (ms, global setting) compensates for hardware latency in **pitch scoring only** — no audio buffering:
+
+```
+delayBeats = (micDelayMs / 1000) × (bpm / 60) × 4
+evalBeat   = currentBeat − delayBeats
+```
+
+At 120 BPM, 80 ms delay ≈ 0.64 beats. The pitch evaluator looks up which note was active at `evalBeat` instead of `currentBeat`, so late-arriving audio is still scored against the correct note.
+
+---
+
 ## Platform Notes
 
 | Feature | macOS | Windows |
