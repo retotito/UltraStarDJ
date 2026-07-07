@@ -49,7 +49,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    padding: 0 var(--space-4) var(--space-3);
+    padding: var(--space-2) var(--space-4) 0;
     box-sizing: border-box;
   }
 

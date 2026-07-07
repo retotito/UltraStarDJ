@@ -164,7 +164,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    padding: 0.5rem 0 0.7rem;
+    padding: 0.5rem 0 1.35rem;
     width: 100%;
     opacity: 0;
     transition: opacity 0.4s ease;

@@ -417,7 +417,6 @@
     backdrop-filter: blur(4px);
     display: flex;
     justify-content: center;
-    padding-bottom: 44px; /* leave room for progress bar */
   }
 
   /* ── Song progress bar — overlays bottom of lyrics area ── */
