@@ -54,10 +54,17 @@
   const isDisconnected = $derived(playersStore.disconnectedIds.has(player.id))
   const level = $derived(playersStore.levels[player.id] ?? 0)
 
-  // Update input gain instantly via hot-reload (no stream restart needed)
+  // dB-linear gain taper: 100% = 0dB, each 10% step ≈ -3dB, 0% = silence.
+  // Gives perceptually equal steps across the whole fader range.
+  function gainCurve(v: number): number {
+    if (v <= 0) return 0
+    return 10 ** (1.5 * (v - 1))  // range: 0% ≈ -30dB, 100% = 0dB
+  }
+
+  // Update input gain instantly via hot-reload (no stream restart needed).
   function onGainChange(v: number) {
     playersStore.setInputGain(player.id, v)
-    setMicInputGain(player.id, v).catch(() => {})
+    setMicInputGain(player.id, gainCurve(v)).catch(() => {})
   }
 
   async function toggleMonitor() {
@@ -74,7 +81,7 @@
       try {
         await openMicMixChannel().catch(e => console.warn('[PlayerCard] openMicMixChannel:', e))
         // threshold=0 during test — gate bypassed so audio flows continuously
-        await startMicMonitor(player.mic.deviceId, player.mic.channel, player.id, 0, player.inputGain ?? 1.0)
+        await startMicMonitor(player.mic.deviceId, player.mic.channel, player.id, 0, gainCurve(player.inputGain ?? 1.0))
         playersStore.setMonitoring(player.id, true)
         playersStore.setDisconnected(player.id, false)
       } catch (e) {
