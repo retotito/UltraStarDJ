@@ -2,6 +2,7 @@
   import { appSettings } from '$lib/stores/settings.svelte'
   import Select from '$components/ui/Select.svelte'
   import BeamerDisplaySettings from '$components/dialogs/BeamerDisplaySettings.svelte'
+  import DifficultySetting from '$components/dialogs/DifficultySetting.svelte'
 </script>
 
 <div class="settings-dialog">
@@ -20,6 +21,9 @@
   <section class="section">
     <h3 class="section-title">Beamer Display</h3>
     <BeamerDisplaySettings />
+
+    <h3 class="section-title">Game</h3>
+    <DifficultySetting />
   </section>
 </div>
 

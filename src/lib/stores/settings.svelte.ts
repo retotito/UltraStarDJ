@@ -3,6 +3,15 @@
  * Persisted to Tauri store plugin (or localStorage fallback).
  */
 
+export type Difficulty = 'easy' | 'medium' | 'hard'
+
+/** Semitone tolerance per difficulty level (octave-invariant matching) */
+export const DIFFICULTY_TOLERANCE: Record<Difficulty, number> = {
+  easy:   3,
+  medium: 2,
+  hard:   1,
+}
+
 export interface SongSource {
   id: string
   type: 'local-folder' | 'usdb' | 'custom'
@@ -24,6 +33,8 @@ export interface AppSettings {
   lyricsOffsetMs: number
   /** Volume 0–1 */
   volume: number
+  /** Pitch matching difficulty */
+  difficulty: Difficulty
 }
 
 const DEFAULTS: AppSettings = {
@@ -31,7 +42,8 @@ const DEFAULTS: AppSettings = {
   sources: [],
   beamerMonitorIndex: 1,
   lyricsOffsetMs: 0,
-  volume: 1
+  volume: 1,
+  difficulty: 'medium',
 }
 
 let settings = $state<AppSettings>({ ...DEFAULTS })
@@ -42,6 +54,7 @@ export const appSettings = {
   get beamerMonitorIndex() { return settings.beamerMonitorIndex },
   get lyricsOffsetMs() { return settings.lyricsOffsetMs },
   get volume() { return settings.volume },
+  get difficulty() { return settings.difficulty },
 
   setTheme(theme: AppSettings['theme']) {
     settings.theme = theme
