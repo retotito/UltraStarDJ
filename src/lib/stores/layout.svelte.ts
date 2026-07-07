@@ -12,6 +12,7 @@ export interface ColumnConfig {
 export interface LayoutState {
   rightPanelWidth: number
   showNowPlaying: boolean
+  showPianoRollLines: boolean
   columns: ColumnConfig[]
 }
 
@@ -29,6 +30,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 const DEFAULTS: LayoutState = {
   rightPanelWidth: 380,
   showNowPlaying: false,
+  showPianoRollLines: true,
   columns: DEFAULT_COLUMNS
 }
 
@@ -47,6 +49,7 @@ function loadState(): LayoutState {
     return {
       rightPanelWidth: saved.rightPanelWidth ?? DEFAULTS.rightPanelWidth,
       showNowPlaying: saved.showNowPlaying ?? DEFAULTS.showNowPlaying,
+      showPianoRollLines: saved.showPianoRollLines ?? DEFAULTS.showPianoRollLines,
       columns,
     }
   } catch {
@@ -65,6 +68,7 @@ let state = $state<LayoutState>(loadState())
 export const layout = {
   get rightPanelWidth()      { return state.rightPanelWidth },
   get showNowPlaying()  { return state.showNowPlaying },
+  get showPianoRollLines() { return state.showPianoRollLines },
   get columns()              { return state.columns },
   get visibleColumns()       { return state.columns.filter(c => c.visible) },
 
@@ -73,6 +77,7 @@ export const layout = {
     persist()
   },
   toggleNowPlaying() { state.showNowPlaying = !state.showNowPlaying; persist() },
+  togglePianoRollLines() { state.showPianoRollLines = !state.showPianoRollLines; persist() },
   toggleColumn(key: string) {
     const col = state.columns.find(c => c.key === key)
     if (col) { col.visible = !col.visible; persist() }

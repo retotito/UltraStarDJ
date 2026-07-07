@@ -5,6 +5,7 @@
   import LyricsRenderer from '$components/game/LyricsRenderer.svelte'
   import NoteLane from '$components/game/NoteLane.svelte'
   import BeamerBackground from '$components/game/BeamerBackground.svelte'
+  import { layout } from '$lib/stores/layout.svelte'
 
   let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone }: {
     screen?: BeamerScreen
@@ -132,6 +133,7 @@
                   bpm={payload.song.bpm}
                   gap={payload.song.gap}
                   rowCount={laneRowCount}
+                  showPianoRollLines={layout.showPianoRollLines}
                 />
               </div>
             {/each}

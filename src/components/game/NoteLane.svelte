@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
 
-  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16 }: {
+  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true }: {
     tracks: NoteTrack[]
     trackIndex?: number
     playerColor?: string
@@ -9,6 +9,7 @@
     bpm: number
     gap: number     // ms
     rowCount?: number
+    showPianoRollLines?: boolean
   } = $props()
 
   // ── Beat math ──────────────────────────────────────────────────────────────
@@ -131,10 +132,12 @@
     </div>
   {/each}
 
-  <!-- Piano-roll row lines (DEBUG) -->
-  {#each Array(rowCount) as _, i}
-    <div class="row-line" style="grid-row: {i + 1}; grid-column: 1 / -1;"></div>
-  {/each}
+  <!-- Piano-roll row lines (optional, for visual reference) -->
+  {#if showPianoRollLines}
+    {#each Array(rowCount) as _, i}
+      <div class="row-line" style="grid-row: {i + 1}; grid-column: 1 / -1;"></div>
+    {/each}
+  {/if}
 </div>
 
 <style>
@@ -168,7 +171,7 @@
     right: 0;
     height: max(80%, 28px);
     top: 50%;
-    transform: translateY(-50%);
+    transform: translateY(calc(-50% - 1.75px));  /* compensate for 1.5px border */
     background: rgba(255, 255, 255, 0.18);
     border: 1.5px solid rgba(255, 255, 255, 0.35);
     border-radius: 4px;
