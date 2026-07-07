@@ -118,13 +118,6 @@
     <div class="playing-screen">
       <BeamerBackground song={payload.song} assetBase={payload.assetBase} {currentTime} playing={screen === 'playing'} paused={screen === 'paused'} />
       <div class="playing-overlay">
-        <div class="now-playing-header">
-          <span class="np-artist">{payload.song.artist}</span>
-          <span class="np-title">{payload.song.title}</span>
-          {#if screen === 'paused'}
-            <span class="paused-badge">PAUSED</span>
-          {/if}
-        </div>
 
         {#if payload.song.notes && payload.song.notes.length > 0}
           <!-- One note lane per assigned player, stacked vertically -->
@@ -356,45 +349,13 @@
     inset: 0;
     display: flex;
     flex-direction: column;
-    padding: var(--space-6);
+    padding: var(--space-6) 0 0 0;
     background: linear-gradient(to bottom,
       rgba(0,0,0,0.55) 0%,
       rgba(0,0,0,0.1) 40%,
       rgba(0,0,0,0.1) 60%,
       rgba(0,0,0,0.7) 100%
     );
-  }
-
-  .now-playing-header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
-    padding-bottom: var(--space-4);
-    border-bottom: 1px solid rgba(255,255,255,0.15);
-  }
-
-  .np-artist {
-    font-size: 1.2rem;
-    color: rgba(255,255,255,0.5);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .np-title {
-    font-size: 2rem;
-    font-weight: 700;
-  }
-
-  .paused-badge {
-    background: rgba(255,200,0,0.2);
-    color: #f7c84f;
-    border: 1px solid #f7c84f;
-    border-radius: var(--radius-full);
-    padding: 2px 12px;
-    font-size: 0.85rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
   }
 
   /* ── Note lanes ── */
@@ -407,6 +368,7 @@
     gap: var(--space-2);
     padding: 0 var(--space-4);
     box-sizing: border-box;
+    justify-content: flex-end;
   }
 
   .lane-wrap {
@@ -414,13 +376,14 @@
     width: 100%;
   }
 
-  /* ── Lyrics (fixed height at bottom) ── */
+  /* ── Lyrics bar (fixed at bottom, semi-transparent background) ── */
   .lyrics-area {
     flex-shrink: 0;
+    width: 100%;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
     display: flex;
-    align-items: flex-end;
     justify-content: center;
-    padding-bottom: var(--space-6);
   }
 
   .lyrics-placeholder {

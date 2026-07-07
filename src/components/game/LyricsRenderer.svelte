@@ -87,8 +87,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.2rem;
-    padding: 2rem;
+    gap: 0.4rem;
+    padding: 0.6rem 2rem 0.8rem;
     width: 100%;
   }
 
@@ -97,11 +97,11 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 0;
-    font-size: clamp(2rem, 5vw, 4.5rem);
+    font-size: clamp(1.4rem, 3.2vw, 2.8rem);
     font-weight: 800;
     letter-spacing: 0.01em;
     line-height: 1.2;
-    min-height: 1.4em;
+    min-height: 1.3em;
   }
 
   .line-next {
@@ -109,11 +109,11 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 0;
-    font-size: clamp(1rem, 2.5vw, 2.2rem);
+    font-size: clamp(0.85rem, 1.8vw, 1.5rem);
     font-weight: 500;
-    opacity: 0.4;
+    opacity: 0.45;
     letter-spacing: 0.01em;
-    min-height: 1.4em;
+    min-height: 1.3em;
   }
 
   .syllable {
