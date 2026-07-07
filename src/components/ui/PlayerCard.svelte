@@ -2,7 +2,7 @@
   import { playersStore, type PlayerConfig, type MicChannel } from '$lib/stores/players.svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import type { AudioInputDevice } from '$lib/ipc/tauri'
-  import { startMicMonitor, stopMicMonitor, openMicMixChannel, closeMicMixChannel } from '$lib/ipc/tauri'
+  import { startMicMonitor, stopMicMonitor, openMicMixChannel, closeMicMixChannel, setMicInputGain } from '$lib/ipc/tauri'
   import Select from '$components/ui/Select.svelte'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
 
@@ -54,17 +54,10 @@
   const isDisconnected = $derived(playersStore.disconnectedIds.has(player.id))
   const level = $derived(playersStore.levels[player.id] ?? 0)
 
-  // Restart the Rust stream after the Gain slider settles (500ms debounce)
-  let gainRestartTimer: ReturnType<typeof setTimeout> | null = null
+  // Update input gain instantly via hot-reload (no stream restart needed)
   function onGainChange(v: number) {
     playersStore.setInputGain(player.id, v)
-    if (!isMonitoring || !player.mic) return
-    if (gainRestartTimer) clearTimeout(gainRestartTimer)
-    gainRestartTimer = setTimeout(async () => {
-      await stopMicMonitor(player.id).catch(() => {})
-      // threshold=0 during test — gate bypassed so audio flows continuously
-      await startMicMonitor(player.mic!.deviceId, player.mic!.channel, player.id, 0, v).catch(() => {})
-    }, 500)
+    setMicInputGain(player.id, v).catch(() => {})
   }
 
   async function toggleMonitor() {

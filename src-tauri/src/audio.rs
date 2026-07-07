@@ -91,6 +91,8 @@ pub struct AudioState {
     /// Mic output mix gain per player: player_id → 0.0–2.0
     /// Arc so input stream closures can hold a reference without copying AudioState
     mic_mix_gains: Arc<Mutex<HashMap<u8, f32>>>,
+    /// Mic input gain per player: player_id → 0.0–4.0 (hot-reloadable, no stream restart needed)
+    mic_input_gains: Arc<Mutex<HashMap<u8, f32>>>,
     /// Snapshot of input device names for hot-plug detection
     known_devices: Mutex<Vec<String>>,
     /// Snapshot of output device names for hot-plug detection
@@ -108,6 +110,7 @@ impl AudioState {
             streams: Mutex::new(HashMap::new()),
             output_channels: Mutex::new(HashMap::new()),
             mic_mix_gains: Arc::new(Mutex::new(HashMap::new())),
+            mic_input_gains: Arc::new(Mutex::new(HashMap::new())),
             known_devices: Mutex::new(known),
             known_output_devices: Mutex::new(known_out),
         }
@@ -251,6 +254,10 @@ pub fn start_mic_monitor(
 
     // Shared gain map so set_mic_mix_gain can update gain without restarting the stream
     let gains: Arc<Mutex<HashMap<u8, f32>>> = Arc::clone(&state.mic_mix_gains);
+    // Shared input gain map so set_mic_input_gain can update without restarting the stream
+    let input_gains: Arc<Mutex<HashMap<u8, f32>>> = Arc::clone(&state.mic_input_gains);
+    // Seed initial input gain from the value passed at stream creation
+    input_gains.lock().unwrap().insert(player_id, input_gain);
     // Prefer "mic-mix" channel (dedicated for mic→speaker routing), fall back to "game"
     // Create a dedicated per-player ring inside the mic-mix (or game) output channel.
     // The output callback sums all player rings, so N mics don't flood a shared buffer.
@@ -272,9 +279,9 @@ pub fn start_mic_monitor(
                ring_found={} ch_idx={ch_index} threshold={threshold:.3} input_gain={input_gain:.2}", game_ring.is_some());
 
     let stream = match default_config.sample_format() {
-        SampleFormat::F32 => build_input_stream_f32(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count, threshold, input_gain),
-        SampleFormat::I16 => build_input_stream_i16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count, threshold, input_gain),
-        SampleFormat::U16 => build_input_stream_u16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count, threshold, input_gain),
+        SampleFormat::F32 => build_input_stream_f32(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, input_gains, game_ring, in_sample_rate, out_sample_rate, call_count, threshold),
+        SampleFormat::I16 => build_input_stream_i16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, input_gains, game_ring, in_sample_rate, out_sample_rate, call_count, threshold),
+        SampleFormat::U16 => build_input_stream_u16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, input_gains, game_ring, in_sample_rate, out_sample_rate, call_count, threshold),
         _ => Err("Unsupported sample format".to_string()),
     }?;
 
@@ -312,6 +319,16 @@ pub fn set_mic_mix_gain(
     gain: f32,
 ) -> Result<(), String> {
     state.mic_mix_gains.lock().unwrap().insert(player_id, gain.clamp(0.0, 4.0));
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_mic_input_gain(
+    state: tauri::State<Arc<AudioState>>,
+    player_id: u8,
+    gain: f32,
+) -> Result<(), String> {
+    state.mic_input_gains.lock().unwrap().insert(player_id, gain.clamp(0.0, 4.0));
     Ok(())
 }
 
@@ -517,15 +534,17 @@ fn build_input_stream_f32(
     device: &Device, config: &StreamConfig,
     total_ch: usize, ch_idx: usize, player_id: u8, app: AppHandle,
     gains: Arc<Mutex<HashMap<u8, f32>>>,
+    input_gains: Arc<Mutex<HashMap<u8, f32>>>,
     game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
-    call_count: Arc<AtomicU64>, threshold: f32, input_gain: f32,
+    call_count: Arc<AtomicU64>, threshold: f32,
 ) -> Result<cpal::Stream, String> {
     let mut gate_open = false;
     device.build_input_stream(
         config,
         move |data: &[f32], _| {
+            let ig = *input_gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
             let mono: Vec<f32> = data.chunks(total_ch)
-                .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s * input_gain))).collect();
+                .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s * ig))).collect();
             let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
             let above = peak >= threshold || (gate_open && peak >= threshold * 0.5);
             gate_open = above;
@@ -545,15 +564,17 @@ fn build_input_stream_i16(
     device: &Device, config: &StreamConfig,
     total_ch: usize, ch_idx: usize, player_id: u8, app: AppHandle,
     gains: Arc<Mutex<HashMap<u8, f32>>>,
+    input_gains: Arc<Mutex<HashMap<u8, f32>>>,
     game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
-    call_count: Arc<AtomicU64>, threshold: f32, input_gain: f32,
+    call_count: Arc<AtomicU64>, threshold: f32,
 ) -> Result<cpal::Stream, String> {
     let mut gate_open = false;
     device.build_input_stream(
         config,
         move |data: &[i16], _| {
+            let ig = *input_gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
             let mono: Vec<f32> = data.chunks(total_ch)
-                .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s as f32 / i16::MAX as f32 * input_gain))).collect();
+                .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s as f32 / i16::MAX as f32 * ig))).collect();
             let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
             let above = peak >= threshold || (gate_open && peak >= threshold * 0.5);
             gate_open = above;
@@ -573,15 +594,17 @@ fn build_input_stream_u16(
     device: &Device, config: &StreamConfig,
     total_ch: usize, ch_idx: usize, player_id: u8, app: AppHandle,
     gains: Arc<Mutex<HashMap<u8, f32>>>,
+    input_gains: Arc<Mutex<HashMap<u8, f32>>>,
     game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
-    call_count: Arc<AtomicU64>, threshold: f32, input_gain: f32,
+    call_count: Arc<AtomicU64>, threshold: f32,
 ) -> Result<cpal::Stream, String> {
     let mut gate_open = false;
     device.build_input_stream(
         config,
         move |data: &[u16], _| {
+            let ig = *input_gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
             let mono: Vec<f32> = data.chunks(total_ch)
-                .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate((s as f32 - 32768.0) / 32768.0 * input_gain))).collect();
+                .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate((s as f32 - 32768.0) / 32768.0 * ig))).collect();
             let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
             let above = peak >= threshold || (gate_open && peak >= threshold * 0.5);
             gate_open = above;

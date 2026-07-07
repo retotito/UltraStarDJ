@@ -378,6 +378,10 @@ export async function setMicMixGain(playerId: number, gain: number): Promise<voi
   await invoke('set_mic_mix_gain', { playerId, gain })
 }
 
+export async function setMicInputGain(playerId: number, gain: number): Promise<void> {
+  await invoke('set_mic_input_gain', { playerId, gain })
+}
+
 /** Open a dedicated cpal output channel to the default device for mic→speaker routing. */
 export async function openMicMixChannel(): Promise<void> {
   await invoke('open_output_channel', { channel: 'mic-mix', deviceId: '', jsSampleRate: 44100, jsChannels: 2 })
