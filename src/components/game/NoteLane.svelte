@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
 
-  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true }: {
+  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true }: {
     tracks: NoteTrack[]
     trackIndex?: number
     playerColor?: string
@@ -10,6 +10,7 @@
     gap: number     // ms
     rowCount?: number
     showPianoRollLines?: boolean
+    showNoteSyllables?: boolean
   } = $props()
 
   // ── Beat math ──────────────────────────────────────────────────────────────
@@ -124,8 +125,8 @@
           style="width: {pct}%"
         ></div>
       {/if}
-      <!-- Syllable label (only show if bar is wide enough) -->
-      {#if cell.colSpan >= 2}
+      <!-- Syllable label (optional, only when bar is wide enough) -->
+      {#if showNoteSyllables && cell.colSpan >= 2}
         <span class="note-syllable">{cell.note.syllable.trim()}</span>
       {/if}
       </div>
@@ -173,7 +174,7 @@
     top: 50%;
     transform: translateY(calc(-50% - 1.75px));  /* compensate for 1.5px border */
     background: rgba(255, 255, 255, 0.18);
-    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.35);
     border-radius: 4px;
     display: flex;
     align-items: center;
@@ -206,14 +207,14 @@
     inset: 0;
     right: auto;
     background: var(--player-color);
-    opacity: 0.55;
+    opacity: 0.8;
     pointer-events: none;
     transition: width 80ms linear;
   }
 
   .note-bar.golden .note-fill {
     background: #ffd23c;
-    opacity: 0.7;
+    opacity: 0.88;
   }
 
   /* ── Syllable text ── */

@@ -134,6 +134,7 @@
                   gap={payload.song.gap}
                   rowCount={laneRowCount}
                   showPianoRollLines={layout.showPianoRollLines}
+                  showNoteSyllables={layout.showNoteSyllables}
                 />
               </div>
             {/each}
