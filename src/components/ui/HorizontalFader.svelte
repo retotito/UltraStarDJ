@@ -55,6 +55,20 @@
     level <= 0 ? 0 : Math.max(0, (20 * Math.log10(level) + 40) / 40) * 1.5
   )
 
+  // Convert a linear amplitude (0–1) to display-space position (0–1) using the
+  // same log scale as the meter, so the threshold handle sits at the visually
+  // correct meter segment.
+  function ampToDisplayPos(amp: number): number {
+    if (amp <= 0) return 0
+    return Math.min(1, Math.max(0, (20 * Math.log10(amp) + 40) / 40) * 1.5)
+  }
+
+  // Inverse of ampToDisplayPos: pixel fraction → amplitude
+  function displayPosToAmp(pos: number): number {
+    if (pos <= 0) return 0
+    return Math.pow(10, (pos / 1.5 * 40 - 40) / 20)
+  }
+
   const segments = $derived(
     Array.from({ length: TOTAL }, (_, i) => {
       const lit = i < Math.round(displayLevel * TOTAL)
@@ -109,7 +123,8 @@
   function thresholdFromPointer(clientX: number): number {
     if (!trackEl) return threshold
     const rect = trackEl.getBoundingClientRect()
-    return Math.max(0, Math.min(maxThreshold, (clientX - rect.left) / rect.width * maxThreshold))
+    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    return Math.min(maxThreshold, displayPosToAmp(fraction))
   }
 
   function onThresholdPointerDown(e: PointerEvent) {
@@ -158,7 +173,7 @@
 
       <!-- Threshold: dim LEFT side (below threshold = blocked noise) -->
       {#if threshold > 0}
-        <div class="threshold-dim" style="width: {Math.min(threshold / maxThreshold, 1) * 100}%"></div>
+        <div class="threshold-dim" style="width: {ampToDisplayPos(threshold) * 100}%"></div>
       {/if}
 
       <!-- Fader knob -->
@@ -185,7 +200,7 @@
       <div
         class="threshold-handle"
         class:threshold-dragging={thresholdDragging}
-        style="left: {Math.min(threshold / maxThreshold, 1) * 100}%"
+        style="left: {ampToDisplayPos(threshold) * 100}%"
         title="Noise gate threshold"
         onpointerdown={onThresholdPointerDown}
         onpointermove={onThresholdPointerMove}

@@ -592,13 +592,14 @@ fn build_input_stream_f32(
             let thr = *thresholds.lock().unwrap().get(&player_id).unwrap_or(&0.0);
             let mono: Vec<f32> = data.chunks(total_ch)
                 .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s * ig))).collect();
-            let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
-            let above = peak >= thr || (gate_open && peak >= thr * 0.5);
+            
+            let level = rms(&mono);
+            let above = level >= thr || (gate_open && level >= thr * 0.5);
             gate_open = above;
             let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
             if above {
                 route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
-                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
+                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: level });
             } else {
                 let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: 0.0 });
             }
@@ -624,13 +625,14 @@ fn build_input_stream_i16(
             let thr = *thresholds.lock().unwrap().get(&player_id).unwrap_or(&0.0);
             let mono: Vec<f32> = data.chunks(total_ch)
                 .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s as f32 / i16::MAX as f32 * ig))).collect();
-            let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
-            let above = peak >= thr || (gate_open && peak >= thr * 0.5);
+            
+            let level = rms(&mono);
+            let above = level >= thr || (gate_open && level >= thr * 0.5);
             gate_open = above;
             let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
             if above {
                 route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
-                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
+                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: level });
             } else {
                 let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: 0.0 });
             }
@@ -656,13 +658,14 @@ fn build_input_stream_u16(
             let thr = *thresholds.lock().unwrap().get(&player_id).unwrap_or(&0.0);
             let mono: Vec<f32> = data.chunks(total_ch)
                 .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate((s as f32 - 32768.0) / 32768.0 * ig))).collect();
-            let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
-            let above = peak >= thr || (gate_open && peak >= thr * 0.5);
+            
+            let level = rms(&mono);
+            let above = level >= thr || (gate_open && level >= thr * 0.5);
             gate_open = above;
             let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
             if above {
                 route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
-                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
+                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: level });
             } else {
                 let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: 0.0 });
             }
