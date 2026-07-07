@@ -89,13 +89,6 @@
     return last.startBeat + last.lengthBeats - first
   })
 
-  // ── Progress through the current note (for fill animation) ─────────────────
-  function noteFillPct(note: Note): number {
-    if (currentBeat < note.startBeat) return 0
-    if (currentBeat >= note.startBeat + note.lengthBeats) return 100
-    return ((currentBeat - note.startBeat) / note.lengthBeats) * 100
-  }
-
   // ── Sung note: which note is active right now + its row ────────────────────
   const sungRow = $derived.by(() => {
     if (!pitchTick || pitchTick.midiNote < 0 || pitchTick.rowPitch < 0) return null
@@ -123,7 +116,6 @@
   "
 >
   {#each cells as cell (cell.note.startBeat + '_' + cell.note.pitch)}
-    {@const pct = noteFillPct(cell.note)}
     {@const isGolden = cell.note.type === 'golden'}
     {@const isRap = cell.note.type === 'rap' || cell.note.type === 'rap-golden'}
     {@const isFreestyle = cell.note.type === 'freestyle'}
@@ -140,13 +132,6 @@
         class:rap={isRap}
         class:freestyle={isFreestyle}
       >
-      <!-- Fill overlay showing how far the beat has progressed through this note -->
-      {#if pct > 0}
-        <div
-          class="note-fill"
-          style="width: {pct}%"
-        ></div>
-      {/if}
       <!-- Syllable label (optional, only when bar is wide enough) -->
       {#if showNoteSyllables && cell.colSpan >= 2}
         <span class="note-syllable">{cell.note.syllable.trim()}</span>
