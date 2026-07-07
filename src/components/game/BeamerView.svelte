@@ -350,7 +350,7 @@
     inset: 0;
     display: flex;
     flex-direction: column;
-    padding: var(--space-6) 0 0 0;
+    padding: 0;
     background: linear-gradient(to bottom,
       rgba(0,0,0,0.55) 0%,
       rgba(0,0,0,0.1) 40%,
@@ -367,13 +367,13 @@
     width: 100%;
     min-height: 0;
     gap: var(--space-2);
-    padding: 0 var(--space-4);
+    padding: 30px var(--space-4);
     box-sizing: border-box;
-    justify-content: flex-end;
   }
 
   .lane-wrap {
-    flex-shrink: 0;
+    flex: 1;          /* each player gets an equal share of the available height */
+    min-height: 0;    /* allow shrinking below content size */
     width: 100%;
   }
 

@@ -104,15 +104,18 @@
     {@const isRap = cell.note.type === 'rap' || cell.note.type === 'rap-golden'}
     {@const isFreestyle = cell.note.type === 'freestyle'}
     <div
-      class="note-bar"
-      class:golden={isGolden}
-      class:rap={isRap}
-      class:freestyle={isFreestyle}
+      class="note-cell"
       style="
         grid-column: {cell.col} / span {cell.colSpan};
         grid-row: {cell.row};
       "
     >
+      <div
+        class="note-bar"
+        class:golden={isGolden}
+        class:rap={isRap}
+        class:freestyle={isFreestyle}
+      >
       <!-- Fill overlay showing how far the beat has progressed through this note -->
       {#if pct > 0}
         <div
@@ -124,27 +127,48 @@
       {#if cell.colSpan >= 2}
         <span class="note-syllable">{cell.note.syllable.trim()}</span>
       {/if}
+      </div>
     </div>
+  {/each}
+
+  <!-- Piano-roll row lines (DEBUG) -->
+  {#each Array(rowCount) as _, i}
+    <div class="row-line" style="grid-row: {i + 1}; grid-column: 1 / -1;"></div>
   {/each}
 </div>
 
 <style>
   .note-lane {
-    --row-height: 40px;
     width: 100%;
-    /* Fixed intrinsic height — same regardless of player count */
-    height: calc(var(--rows) * var(--row-height) + (var(--rows) - 1) * 2px);
+    height: 100%;            /* fills whatever the parent lane-wrap gives it */
     display: grid;
-    grid-template-rows:    repeat(var(--rows), var(--row-height));
+    grid-template-rows:    repeat(var(--rows), 1fr);
     grid-template-columns: repeat(var(--cols), 1fr);
     gap: 2px;
     padding: var(--space-2) var(--space-4);
     box-sizing: border-box;
   }
 
-  /* ── Note bar ── */
-  .note-bar {
+  /* ── Piano-roll row lines (DEBUG) ── */
+  .row-line {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Note cell (grid item, full cell height) ── */
+  .note-cell {
     position: relative;
+  }
+
+  /* ── Note bar (centered inside cell) ── */
+  .note-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: max(80%, 28px);
+    top: 50%;
+    transform: translateY(-50%);
     background: rgba(255, 255, 255, 0.18);
     border: 1.5px solid rgba(255, 255, 255, 0.35);
     border-radius: 4px;
