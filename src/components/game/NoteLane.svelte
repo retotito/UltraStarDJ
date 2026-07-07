@@ -130,10 +130,12 @@
 
 <style>
   .note-lane {
+    --row-height: 40px;
     width: 100%;
-    height: 100%;
+    /* Fixed intrinsic height — same regardless of player count */
+    height: calc(var(--rows) * var(--row-height) + (var(--rows) - 1) * 2px);
     display: grid;
-    grid-template-rows:    repeat(var(--rows), 1fr);
+    grid-template-rows:    repeat(var(--rows), var(--row-height));
     grid-template-columns: repeat(var(--cols), 1fr);
     gap: 2px;
     padding: var(--space-2) var(--space-4);
