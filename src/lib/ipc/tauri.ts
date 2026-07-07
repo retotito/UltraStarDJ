@@ -24,6 +24,7 @@ export const IPC_EVENTS = {
   COUNTDOWN_DONE:  'ultrastar:countdown-done',
   BEAMER_READY:    'ultrastar:beamer-ready',
   BEAMER_SETTINGS: 'ultrastar:beamer-settings',
+  PITCH_TICK:      'ultrastar:pitch-tick',
 } as const
 
 // ── Window labels ──────────────────────────────────────────────
@@ -181,6 +182,29 @@ export function onCountdownDone(handler: () => void): Promise<UnlistenFn> {
 
 export async function sendBeamerReady(): Promise<void> {
   await emit(IPC_EVENTS.BEAMER_READY, {})
+}
+
+// ── Pitch tick ─────────────────────────────────────────────────
+export interface PitchTickEntry {
+  playerId:  number
+  midiNote:  number   // -1 = no pitch
+  correct:   boolean
+  rowPitch:  number   // pitch row to draw (-1 = hide)
+}
+
+export interface PitchTickPayload {
+  ticks: PitchTickEntry[]
+  beat:  number
+}
+
+export async function sendPitchTick(payload: PitchTickPayload): Promise<void> {
+  await emit(IPC_EVENTS.PITCH_TICK, payload)
+}
+
+export function onPitchTick(
+  handler: (payload: PitchTickPayload) => void
+): Promise<UnlistenFn> {
+  return listen<PitchTickPayload>(IPC_EVENTS.PITCH_TICK, e => handler(e.payload))
 }
 
 export function onBeamerReady(handler: () => void): Promise<UnlistenFn> {
