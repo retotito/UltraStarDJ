@@ -9,6 +9,7 @@ import { layout } from '$lib/stores/layout.svelte'
 import { playersStore } from '$lib/stores/players.svelte'
 import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, sendPitchTick, onBeamerReady, onCountdownDone } from '$lib/ipc/tauri'
 import { readFile, needsTranscode, transcodeToMp4, deleteTempFile, startMicMonitor, stopMicMonitor, openMicMixChannel, closeMicMixChannel } from '$lib/ipc/tauri'
+import { gainCurve } from '$lib/audio/gainCurve'
 import { parseSongNotes } from '$lib/ultrastar/parser'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { pitchSession } from '$lib/audio/pitchSession.svelte'
@@ -55,10 +56,10 @@ onCountdownDone(async () => {
     for (const p of playersWithMic) {
       if (!playersStore.monitoringIds.has(p.id)) {
         try {
-          await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id, p.threshold ?? 0.1, p.inputGain ?? 1.0)
+          await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id, p.threshold ?? 0.1, gainCurve(p.inputGain ?? 1.0))
           playersStore.setMonitoring(p.id, true)
           playersStore.setDisconnected(p.id, false)
-          console.log(`[playback] mic started — player ${p.id} device:${p.mic!.deviceId} ch:${p.mic!.channel} threshold:${p.threshold ?? 0.1} inputGain:${p.inputGain ?? 1.0}`)
+          console.log(`[playback] mic started — player ${p.id} device:${p.mic!.deviceId} ch:${p.mic!.channel} threshold:${p.threshold ?? 0.1} inputGain:${gainCurve(p.inputGain ?? 1.0)}`)
         } catch (e) {
           console.warn(`[playback] mic start failed — player ${p.id}:`, e)
         }
@@ -67,7 +68,7 @@ onCountdownDone(async () => {
 
     // Start pitch detection for all active mic players
     await pitchSession.start(
-      playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: p.inputGain ?? 1.0 }))
+      playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: gainCurve(p.inputGain ?? 1.0) }))
     )
     startPitchLoop()
     console.log('[playback] pitch detection started')
@@ -300,7 +301,7 @@ export const playback = {
       for (const p of playersWithMic) {
         if (!playersStore.monitoringIds.has(p.id)) {
           try {
-            await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id, p.threshold ?? 0.1, p.inputGain ?? 1.0)
+            await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id, p.threshold ?? 0.1, gainCurve(p.inputGain ?? 1.0))
             playersStore.setMonitoring(p.id, true)
             playersStore.setDisconnected(p.id, false)
             console.log(`[playback] mic started — player ${p.id} (resume)`)
@@ -310,7 +311,7 @@ export const playback = {
         }
       }
       await pitchSession.start(
-        playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: p.inputGain ?? 1.0 }))
+        playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: gainCurve(p.inputGain ?? 1.0) }))
       )
       startPitchLoop()
     }

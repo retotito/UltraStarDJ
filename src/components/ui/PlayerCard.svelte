@@ -2,7 +2,8 @@
   import { playersStore, type PlayerConfig, type MicChannel } from '$lib/stores/players.svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import type { AudioInputDevice } from '$lib/ipc/tauri'
-  import { startMicMonitor, stopMicMonitor, openMicMixChannel, closeMicMixChannel, setMicInputGain } from '$lib/ipc/tauri'
+  import { startMicMonitor, stopMicMonitor, openMicMixChannel, closeMicMixChannel, setMicInputGain, setMicThreshold } from '$lib/ipc/tauri'
+  import { gainCurve } from '$lib/audio/gainCurve'
   import Select from '$components/ui/Select.svelte'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
 
@@ -53,13 +54,6 @@
   const isMonitoring = $derived(playersStore.monitoringIds.has(player.id))
   const isDisconnected = $derived(playersStore.disconnectedIds.has(player.id))
   const level = $derived(playersStore.levels[player.id] ?? 0)
-
-  // dB-linear gain taper: 100% = 0dB, each 10% step ≈ -3dB, 0% = silence.
-  // Gives perceptually equal steps across the whole fader range.
-  function gainCurve(v: number): number {
-    if (v <= 0) return 0
-    return 10 ** (1.5 * (v - 1))  // range: 0% ≈ -30dB, 100% = 0dB
-  }
 
   // Update input gain instantly via hot-reload (no stream restart needed).
   function onGainChange(v: number) {
@@ -164,7 +158,7 @@
       showDb={false}
       color={accent}
       ongainchange={onGainChange}
-      onthresholdchange={(v) => playersStore.setThreshold(player.id, v)}
+      onthresholdchange={(v) => { playersStore.setThreshold(player.id, v); setMicThreshold(player.id, v).catch(() => {}) }}
     />
 
     <!-- Monitor output: hear the mic while adjusting gain/gate -->
