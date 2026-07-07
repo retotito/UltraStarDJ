@@ -5,6 +5,7 @@
   import LyricsRenderer from '$components/game/LyricsRenderer.svelte'
   import NoteLane from '$components/game/NoteLane.svelte'
   import BeamerBackground from '$components/game/BeamerBackground.svelte'
+  import SongProgress from '$components/game/SongProgress.svelte'
 
   let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white' }: {
     screen?: BeamerScreen
@@ -53,6 +54,24 @@
 
   // Placeholder scores for score screen
   const placeholderScores: Record<number, number> = { 1: 8540, 2: 7230, 3: 9100, 4: 6800 }
+
+  // Song duration derived from last note beat
+  const songDuration = $derived.by(() => {
+    const song = payload?.song
+    if (!song?.notes) return 0
+    let lastBeat = 0
+    for (const track of song.notes) {
+      for (const line of track.lines) {
+        for (const note of line.notes) {
+          const end = note.startBeat + note.lengthBeats
+          if (end > lastBeat) lastBeat = end
+        }
+      }
+    }
+    return song.gap / 1000 + (lastBeat * 60) / (song.bpm * 4)
+  })
+
+  const p1Color = $derived(PLAYER_COLORS[assignedPlayerIds[0] ?? 1] ?? '#4f8ef7')
 </script>
 
 <div class="beamer-view">
@@ -160,6 +179,9 @@
           {:else}
             <span class="lyrics-placeholder">♪ No lyrics available ♪</span>
           {/if}
+        </div>
+        <div class="progress-overlay">
+          <SongProgress {currentTime} duration={songDuration} playerColor={p1Color} />
         </div>
       </div>
     </div>
@@ -395,6 +417,16 @@
     backdrop-filter: blur(4px);
     display: flex;
     justify-content: center;
+    padding-bottom: 44px; /* leave room for progress bar */
+  }
+
+  /* ── Song progress bar — overlays bottom of lyrics area ── */
+  .progress-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
   }
 
   .lyrics-placeholder {
