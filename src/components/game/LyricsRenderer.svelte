@@ -33,7 +33,12 @@
         return line
       }
     }
-    return null
+    // Outside any lead-in window — show the next upcoming phrase immediately
+    // (covers song start and long gaps between phrases)
+    return lines.find(l => {
+      const last = l.notes[l.notes.length - 1]
+      return last && (last.startBeat + last.lengthBeats + 8) > currentBeat
+    }) ?? null
   }
 
   /** Find the next line after the active one */
