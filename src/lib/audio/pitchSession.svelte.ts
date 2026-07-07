@@ -40,12 +40,14 @@ export const pitchSession = {
   async start(players: ActivePlayer[]): Promise<void> {
     await pitchSession.stop()
     _notes = {}
+    console.log('[pitchSession] start — players:', players.map(p => `P${p.playerId} dev:${p.deviceId}`))
 
     await Promise.all(players.map(async p => {
       const det = new PitchDetector(p.playerId, p.threshold ?? 0.1, p.inputGain ?? 1.0)
       detectors.set(p.playerId, det)
       try {
         await det.start(p.deviceId)
+        console.log(`[pitchSession] P${p.playerId} mic started OK`)
       } catch (e) {
         console.warn(`[pitchSession] could not start mic for P${p.playerId}:`, e)
         detectors.delete(p.playerId)

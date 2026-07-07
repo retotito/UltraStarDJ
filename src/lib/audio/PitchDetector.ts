@@ -44,14 +44,53 @@ export class PitchDetector {
   async start(deviceId: string): Promise<void> {
     await this.stop()
 
+    // The deviceId from cpal is not a browser MediaDevices ID.
+    // Enumerate browser devices to find the matching one by label, falling back
+    // to no constraint (browser default) if nothing matches.
+    let browserDeviceId: string | undefined
+    try {
+      // Need permission first before labels are populated
+      const probe = await navigator.mediaDevices.getUserMedia({ audio: true })
+      probe.getTracks().forEach(t => t.stop())
+
+      const allDevices = await navigator.mediaDevices.enumerateDevices()
+      const audioInputs = allDevices.filter(d => d.kind === 'audioinput')
+      console.log(`[PitchDetector P${this.playerId}] browser audio inputs:`, audioInputs.map(d => `${d.deviceId.slice(0,8)}… "${d.label}"`))
+
+      // Match: cpal ID contains a fragment of the browser label or vice-versa
+      // (e.g. cpal "USBMIC Serial# 091286492" vs browser label "USB Audio Device")
+      // Use the first non-default input if only one real device is present.
+      const nonDefault = audioInputs.filter(d => d.deviceId !== 'default' && d.deviceId !== 'communications')
+      if (nonDefault.length === 1) {
+        browserDeviceId = nonDefault[0].deviceId
+        console.log(`[PitchDetector P${this.playerId}] single input device, using: "${nonDefault[0].label}"`)
+      } else {
+        // 1. Exact label match with cpal device ID (browser often shows cpal ID as label)
+        let match = nonDefault.find(d => d.label === deviceId)
+        // 2. Label contains the full cpal ID or vice-versa
+        if (!match) match = nonDefault.find(d => d.label.includes(deviceId) || deviceId.includes(d.label))
+        // 3. Both contain 'usb' (loose fallback)
+        if (!match) match = nonDefault.find(d =>
+          d.label.toLowerCase().includes('usb') && deviceId.toLowerCase().includes('usb')
+        )
+        browserDeviceId = match?.deviceId
+        console.log(`[PitchDetector P${this.playerId}] matched browser device:`, match?.label ?? 'none — using default')
+      }
+    } catch (e) {
+      console.warn(`[PitchDetector P${this.playerId}] enumerateDevices failed:`, e)
+    }
+
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        deviceId: { exact: deviceId },
+        ...(browserDeviceId ? { deviceId: { exact: browserDeviceId } } : {}),
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
       }
     })
+    const track = this.stream.getAudioTracks()[0]
+    console.log(`[PitchDetector P${this.playerId}] started — track: "${track?.label}"`)
+
 
     this.ctx      = new AudioContext()
     this.source   = this.ctx.createMediaStreamSource(this.stream)
