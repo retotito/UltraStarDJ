@@ -85,7 +85,7 @@
   /** Inline gradient style for a note syllable */
   function syllableStyle(note: Note): string {
     const pct = sweepPct(note)
-    const c = note.type === 'golden' ? '#ffd700' : color
+    const c = note.type === 'golden' ? '#ffd700' : '#4f8ef7'
     if (pct <= 0)  return 'color: rgba(255,255,255,0.85)'
     if (pct >= 100) return note.type === 'golden'
       ? `color: #ffd700; text-shadow: 0 0 16px #ffd700aa`
