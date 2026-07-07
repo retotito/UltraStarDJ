@@ -18,6 +18,6 @@
     font-size: var(--text-sm, 0.85rem);
     font-weight: 600;
     letter-spacing: 0.03em;
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--progress-text-color, rgba(255, 255, 255, 0.85));
   }
 </style>

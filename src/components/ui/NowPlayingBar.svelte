@@ -7,6 +7,14 @@
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
   import MicMixRow from '$components/ui/MicMixRow.svelte'
   import { gameChannel } from '$lib/audio/channels.svelte'
+  import SongProgress from '$components/game/SongProgress.svelte'
+
+  const PLAYER_COLORS_CSS: Record<number, string> = {
+    1: '#4f8ef7',
+    2: '#f75f5f',
+    3: '#4ecb71',
+    4: '#f7c84f',
+  }
 
   const PLAYER_COLORS: Record<number, string> = {
     1: 'var(--player-1)',
@@ -80,6 +88,24 @@
 
   onMount(() => window.addEventListener('resize', clamp))
   onDestroy(() => window.removeEventListener('resize', clamp))
+
+  const songDuration = $derived.by(() => {
+    const song = playback.song
+    if (!song?.notes) return 0
+    let lastBeat = 0
+    for (const track of song.notes) {
+      for (const line of track.lines) {
+        for (const note of line.notes) {
+          const end = note.startBeat + note.lengthBeats
+          if (end > lastBeat) lastBeat = end
+        }
+      }
+    }
+    return song.gap / 1000 + (lastBeat * 60) / (song.bpm * 4)
+  })
+
+  const p1Id = $derived(displaysStore.display1.playerIds[0] ?? displaysStore.display2.playerIds[0] ?? 1)
+  const progressColor = $derived(PLAYER_COLORS_CSS[p1Id] ?? '#4f8ef7')
 </script>
 
 {#if layout.showNowPlaying}
@@ -109,22 +135,15 @@
         <span class="icon" style="font-size:16px">tv_off</span>
         No display open — open a display to start
       </div>
-    {:else if playback.status === 'playing'}
-      <div class="status-bar status-playing">
-        <span class="icon" style="font-size:16px">fiber_manual_record</span>
-        Now playing
-        <span class="status-time">{formatTime(playback.currentTime)}</span>
-      </div>
-    {:else if playback.status === 'paused'}
-      <div class="status-bar status-paused">
-        <span class="icon" style="font-size:16px">pause_circle</span>
-        Paused
-        <span class="status-time">{formatTime(playback.currentTime)}</span>
-      </div>
     {:else}
-      <div class="status-bar status-ready">
-        <span class="icon" style="font-size:16px">check_circle</span>
-        Ready — press play to start
+      <div class="progress-wrapper">
+        <SongProgress
+          inline
+          currentTime={playback.currentTime}
+          duration={songDuration}
+          playerColor={progressColor}
+          inactive={playback.status !== 'playing' && playback.status !== 'paused'}
+        />
       </div>
     {/if}
 
@@ -291,15 +310,16 @@
     border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
     border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
   }
-  .status-warn    { color: #ff6a00; background: rgba(255,179,0,0.15); }
-  .status-playing { color: #4ecb71; background: rgba(78,203,113,0.12); }
-  .status-paused  { color: #00ccff; background: rgba(255,179,0,0.15); }
-  .status-ready   { color: var(--md-sys-color-on-surface-variant); }
+  .status-warn  { color: #ff6a00; background: rgba(255,179,0,0.15); }
+  .status-ready { color: var(--md-sys-color-on-surface-variant); }
 
-  .status-time {
-    margin-left: auto;
-    font-variant-numeric: tabular-nums;
-    opacity: 0.8;
+  /* ── Progress bar wrapper — sets theme-aware CSS vars ── */
+  .progress-wrapper {
+    border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
+    --progress-pill-bg: var(--md-sys-color-surface-variant);
+    --progress-track-bg: var(--md-sys-color-outline-variant);
+    --progress-text-color: var(--md-sys-color-on-surface-variant);
   }
 
   /* ── Song info + badges ── */
