@@ -372,6 +372,8 @@ export async function stopMicMonitor(playerId: number): Promise<void> {
   console.log(`[ipc] stopMicMonitor → player ${playerId}`)
   await invoke('stop_mic_monitor', { playerId })
   console.log(`[ipc] stopMicMonitor ✓ player ${playerId}`)
+  const open = await invoke<string[]>('debug_open_streams')
+  console.log(`[ipc] open streams after stop:`, open.length === 0 ? '(none)' : open)
 }
 
 export async function setMicMixGain(playerId: number, gain: number): Promise<void> {

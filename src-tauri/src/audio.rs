@@ -50,8 +50,15 @@ pub const EVT_OUTPUT_DEVICES_CHANGED: &str = "audio:output-devices-changed";
 // ── Input stream state ────────────────────────────────────────────────────────
 
 struct ActiveStream {
-    _stream: cpal::Stream, // kept alive; dropped on stop
+    stream: cpal::Stream, // kept alive; dropped on stop
     device_id: String,
+    player_id: u8,
+}
+
+impl Drop for ActiveStream {
+    fn drop(&mut self) {
+        eprintln!("[ActiveStream::drop] player={} device={} — cpal stream being disposed", self.player_id, self.device_id);
+    }
 }
 
 // cpal::Stream is !Send on CoreAudio (contains *mut). We hold it behind a
@@ -289,7 +296,7 @@ pub fn start_mic_monitor(
 
     let mut streams = state.streams.lock().unwrap();
     streams.remove(&player_id);
-    streams.insert(player_id, ActiveStream { _stream: stream, device_id });
+    streams.insert(player_id, ActiveStream { stream, device_id, player_id });
     Ok(())
 }
 
@@ -298,16 +305,37 @@ pub fn stop_mic_monitor(
     state: tauri::State<Arc<AudioState>>,
     player_id: u8,
 ) -> Result<(), String> {
-    let mut streams = state.streams.lock().unwrap();
-    let had = streams.remove(&player_id).is_some();
-    eprintln!("[stop_mic_monitor] player={player_id} stream_removed={had} remaining={}", streams.len());
-    drop(streams);
+    // Remove from map while holding the lock, but pause + drop the stream AFTER
+    // releasing the lock — pausing before drop ensures CoreAudio fully releases
+    // the mic input device and dismisses the macOS privacy indicator.
+    let removed = {
+        let mut streams = state.streams.lock().unwrap();
+        let removed = streams.remove(&player_id);
+        eprintln!("[stop_mic_monitor] player={player_id} stream_removed={} remaining={}", removed.is_some(), streams.len());
+        removed
+    }; // mutex released here
+    // Pause before drop: tells CoreAudio to stop the AudioUnit before we dispose it.
+    if let Some(ref active) = removed {
+        let _ = active.stream.pause();
+        eprintln!("[stop_mic_monitor] player={player_id} stream paused");
+    }
+    eprintln!("[stop_mic_monitor] player={player_id} dropping stream now…");
+    drop(removed); // cpal stream disposed after pause + lock release
+    eprintln!("[stop_mic_monitor] player={player_id} stream dropped ✓");
     // Remove the player's dedicated ring from all output channels
     let channels = state.output_channels.lock().unwrap();
     for ch in channels.values() {
         ch.mic_rings.lock().unwrap().remove(&player_id);
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn debug_open_streams(state: tauri::State<Arc<AudioState>>) -> Vec<String> {
+    let streams = state.streams.lock().unwrap();
+    streams.iter()
+        .map(|(id, s)| format!("player={id} device={}", s.device_id))
+        .collect()
 }
 
 /// Set the output mix gain for a player's mic (0.0 = muted, 1.0 = unity, 2.0 = boost).
