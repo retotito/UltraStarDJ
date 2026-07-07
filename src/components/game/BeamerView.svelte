@@ -48,6 +48,8 @@
 
   // Derived: how many note-lane rows each player gets (shrink for 3-4 players)
   const laneRowCount = $derived(assignedPlayerIds.length <= 2 ? 16 : 12)
+  const noteBarMinHeight = $derived(assignedPlayerIds.length <= 2 ? 40 : 28)
+  const noteBarRadius = $derived(assignedPlayerIds.length <= 2 ? 8 : 4)
 
   // Placeholder scores for score screen
   const placeholderScores: Record<number, number> = { 1: 8540, 2: 7230, 3: 9100, 4: 6800 }
@@ -135,6 +137,8 @@
                   bpm={payload.song.bpm}
                   gap={payload.song.gap}
                   rowCount={laneRowCount}
+                  {noteBarMinHeight}
+                  {noteBarRadius}
                   {showPianoRollLines}
                   {showNoteSyllables}
                   {noteBarStyle}

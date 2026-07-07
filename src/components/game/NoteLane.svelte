@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
 
-  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white' }: {
+  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', noteBarMinHeight = 28, noteBarRadius = 4 }: {
     tracks: NoteTrack[]
     trackIndex?: number
     playerColor?: string
@@ -12,6 +12,8 @@
     showPianoRollLines?: boolean
     showNoteSyllables?: boolean
     noteBarStyle?: 'white' | 'black'
+    noteBarMinHeight?: number
+    noteBarRadius?: number
   } = $props()
 
   // ── Beat math ──────────────────────────────────────────────────────────────
@@ -99,6 +101,8 @@
     --rows: {rowCount};
     --cols: {phraseBeats};
     --player-color: {playerColor};
+    --bar-min-h: {noteBarMinHeight}px;
+    --bar-radius: {noteBarRadius}px;
     --bar-bg:     {noteBarStyle === 'black' ? 'rgba(0,0,0,0.45)'   : 'rgba(255,255,255,0.18)'};
     --bar-border: {noteBarStyle === 'black' ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'};
   "
@@ -173,12 +177,12 @@
     position: absolute;
     left: 0;
     right: 0;
-    height: max(80%, 28px);
+    height: max(80%, var(--bar-min-h, 28px));
     top: 50%;
     transform: translateY(calc(-50% - 1.75px));  /* compensate for 1.5px border */
     background: var(--bar-bg);
     border: 2px solid var(--bar-border);
-    border-radius: 4px;
+    border-radius: var(--bar-radius, 4px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -210,14 +214,14 @@
     inset: 0;
     right: auto;
     background: var(--player-color);
-    opacity: 0.8;
+    opacity: 0.92;
     pointer-events: none;
     transition: width 80ms linear;
   }
 
   .note-bar.golden .note-fill {
     background: #ffd23c;
-    opacity: 0.88;
+    opacity: 0.97;
   }
 
   /* ── Syllable text ── */
