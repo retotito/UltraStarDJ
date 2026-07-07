@@ -2,13 +2,14 @@
   import { onDestroy } from 'svelte'
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
 
-  let { tracks, currentTime, bpm, gap, trackIndex = 0, playerColor = null }: {
+  let { tracks, currentTime, bpm, gap, trackIndex = 0, playerColor = null, playing = true }: {
     tracks: NoteTrack[]
     currentTime: number
     bpm: number
     gap: number       // ms offset before first note
     trackIndex?: number
     playerColor?: string | null
+    playing?: boolean
   } = $props()
 
   const color = $derived(playerColor ?? '#ffffff')
@@ -27,8 +28,10 @@
   })
 
   function tick() {
-    const elapsed = (performance.now() - lastKnownAt) / 1000
-    smoothTime = lastKnownTime + elapsed
+    if (playing) {
+      const elapsed = (performance.now() - lastKnownAt) / 1000
+      smoothTime = lastKnownTime + elapsed
+    }
     rafId = requestAnimationFrame(tick)
   }
   rafId = requestAnimationFrame(tick)

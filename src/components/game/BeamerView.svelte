@@ -145,6 +145,7 @@
               {currentTime}
               bpm={payload.song.bpm}
               gap={payload.song.gap}
+              playing={screen === 'playing'}
             />
           {:else}
             <span class="lyrics-placeholder">♪ No lyrics available ♪</span>
