@@ -6,8 +6,9 @@
   import NoteLane from '$components/game/NoteLane.svelte'
   import BeamerBackground from '$components/game/BeamerBackground.svelte'
   import SongProgress from '$components/game/SongProgress.svelte'
+  import type { PitchTickEntry } from '$lib/ipc/tauri'
 
-  let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white' }: {
+  let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', pitchTicks = [] }: {
     screen?: BeamerScreen
     payload: PlaySongPayload | PreviewSongPayload | null
     assignedPlayerIds?: number[]
@@ -16,6 +17,7 @@
     showPianoRollLines?: boolean
     showNoteSyllables?: boolean
     noteBarStyle?: 'white' | 'black'
+    pitchTicks?: PitchTickEntry[]
   } = $props()
 
   const PLAYER_COLORS: Record<number, string> = {
@@ -161,6 +163,7 @@
                   {showPianoRollLines}
                   {showNoteSyllables}
                   {noteBarStyle}
+                  pitchTick={pitchTicks.find(t => t.playerId === id) ?? null}
                 />
               </div>
             {/each}

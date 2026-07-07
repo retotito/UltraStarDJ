@@ -35,6 +35,9 @@ export interface AppSettings {
   volume: number
   /** Pitch matching difficulty */
   difficulty: Difficulty
+  /** Global mic input latency offset in milliseconds (0–300). Shifts the beat
+   *  comparison window back so pitch is matched against the correct note. */
+  micDelay: number
 }
 
 const DEFAULTS: AppSettings = {
@@ -44,6 +47,7 @@ const DEFAULTS: AppSettings = {
   lyricsOffsetMs: 0,
   volume: 1,
   difficulty: 'medium',
+  micDelay: 0,
 }
 
 let settings = $state<AppSettings>({ ...DEFAULTS })
@@ -55,6 +59,7 @@ export const appSettings = {
   get lyricsOffsetMs() { return settings.lyricsOffsetMs },
   get volume() { return settings.volume },
   get difficulty() { return settings.difficulty },
+  get micDelay() { return settings.micDelay },
 
   setTheme(theme: AppSettings['theme']) {
     settings.theme = theme

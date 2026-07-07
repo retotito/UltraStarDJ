@@ -20,6 +20,7 @@
     level      = 0,
     gain       = 1,
     maxGain    = 1,
+    threshold  = 0,
     ongainchange = (_: number) => {},
     color      = 'var(--md-sys-color-primary)',
     dimmed     = false,
@@ -28,6 +29,7 @@
     level?:        number
     gain?:         number
     maxGain?:      number
+    threshold?:    number
     ongainchange?: (v: number) => void
     color?:        string
     dimmed?:       boolean
@@ -106,6 +108,11 @@
         <div class="seg seg-{seg.color}" class:lit={seg.lit}></div>
       {/each}
     </div>
+
+    <!-- Threshold: dim everything to the right of the knob -->
+    {#if threshold > 0 && threshold < maxGain}
+      <div class="threshold-dim" style="left: {threshold / maxGain * 100}%"></div>
+    {/if}
 
     <!-- Fader knob -->
     <div
@@ -190,6 +197,18 @@
   .seg-green.lit  { background: #4ecb71; box-shadow: 0 0 3px #4ecb7166; }
   .seg-yellow.lit { background: #f7c84f; box-shadow: 0 0 3px #f7c84f66; }
   .seg-red.lit    { background: #f75f5f; box-shadow: 0 0 3px #f75f5f66; }
+
+  /* ── Threshold dim overlay ── */
+  .threshold-dim {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 0 3px 3px 0;
+    pointer-events: none;
+    z-index: 2;
+  }
 
   /* ── Knob ── */
   .knob {

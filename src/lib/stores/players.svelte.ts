@@ -21,8 +21,17 @@ export interface PlayerConfig {
   /** Tailwind-style color key used for player accent, e.g. 'blue', 'red' */
   color: string
   mic: MicAssignment | null
-  /** Mic input sensitivity multiplier 0.0–2.0, default 1.0 */
-  gain: number
+  /**
+   * Noise gate threshold 0.0–1.0 (fraction of full-scale amplitude).
+   * Samples below this level are treated as silence — no pitch detection,
+   * no audio output. Default 0.1 (10% amplitude, filters background noise).
+   */
+  threshold: number
+  /**
+   * Input gain multiplier 0.0–2.0. Applied before threshold check.
+   * Use to boost quiet mics. Default 1.0 (unity gain).
+   */
+  inputGain: number
   /** Mic output mix volume 0.0–2.0, default 1.0 */
   mixGain: number
 }
@@ -35,7 +44,8 @@ const DEFAULTS: PlayerConfig[] = [1, 2, 3, 4].map((id, i) => ({
   name: `Player ${id}`,
   color: PLAYER_COLORS[i],
   mic: null,
-  gain: 1.0,
+  threshold: 0.1,
+  inputGain: 1.0,
   mixGain: 1.0,
 }))
 
@@ -92,8 +102,13 @@ export const playersStore = {
     playersStore.save()
   },
 
-  setGain(id: number, gain: number) {
-    players = players.map(p => p.id === id ? { ...p, gain: Math.round(gain * 100) / 100 } : p)
+  setThreshold(id: number, threshold: number) {
+    players = players.map(p => p.id === id ? { ...p, threshold: Math.round(threshold * 1000) / 1000 } : p)
+    playersStore.save()
+  },
+
+  setInputGain(id: number, inputGain: number) {
+    players = players.map(p => p.id === id ? { ...p, inputGain: Math.round(inputGain * 100) / 100 } : p)
     playersStore.save()
   },
 

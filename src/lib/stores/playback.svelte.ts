@@ -7,10 +7,12 @@ import type { Song } from '$lib/ultrastar/types'
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { layout } from '$lib/stores/layout.svelte'
 import { playersStore } from '$lib/stores/players.svelte'
-import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, onBeamerReady, onCountdownDone } from '$lib/ipc/tauri'
+import { sendPlaySong, sendPreviewSong, sendPauseSong, sendResumeSong, sendStopSong, sendTimeTick, sendPitchTick, onBeamerReady, onCountdownDone } from '$lib/ipc/tauri'
 import { readFile, needsTranscode, transcodeToMp4, deleteTempFile, startMicMonitor, stopMicMonitor, openMicMixChannel, closeMicMixChannel } from '$lib/ipc/tauri'
 import { parseSongNotes } from '$lib/ultrastar/parser'
 import { convertFileSrc } from '@tauri-apps/api/core'
+import { pitchSession } from '$lib/audio/pitchSession.svelte'
+import { appSettings } from '$lib/stores/settings.svelte'
 
 export type PlaybackStatus = 'idle' | 'loaded' | 'preview' | 'playing' | 'paused'
 
@@ -53,15 +55,22 @@ onCountdownDone(async () => {
     for (const p of playersWithMic) {
       if (!playersStore.monitoringIds.has(p.id)) {
         try {
-          await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id)
+          await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id, p.threshold ?? 0.1, p.inputGain ?? 1.0)
           playersStore.setMonitoring(p.id, true)
           playersStore.setDisconnected(p.id, false)
-          console.log(`[playback] mic started — player ${p.id} device:${p.mic!.deviceId} ch:${p.mic!.channel}`)
+          console.log(`[playback] mic started — player ${p.id} device:${p.mic!.deviceId} ch:${p.mic!.channel} threshold:${p.threshold ?? 0.1} inputGain:${p.inputGain ?? 1.0}`)
         } catch (e) {
           console.warn(`[playback] mic start failed — player ${p.id}:`, e)
         }
       }
     }
+
+    // Start pitch detection for all active mic players
+    await pitchSession.start(
+      playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: p.inputGain ?? 1.0 }))
+    )
+    startPitchLoop()
+    console.log('[playback] pitch detection started')
   }
 })
 
@@ -88,6 +97,35 @@ function startTick() {
 
 function stopTick() {
   if (tickInterval) { clearInterval(tickInterval); tickInterval = null }
+}
+
+// ── Pitch rAF loop ────────────────────────────────────────────
+let pitchRaf: number | null = null
+
+function startPitchLoop() {
+  if (pitchRaf !== null) return
+  const loop = () => {
+    const song = state.song
+    if (song?.notes && getTime) {
+      const currentBeat = (getTime() - song.gap / 1000) * (song.bpm / 60) * 4
+      pitchSession.tick(song.notes, currentBeat, appSettings.difficulty, appSettings.micDelay, song.bpm)
+      const ticks = Object.values(pitchSession.notes).map(r => ({
+        playerId: r.playerId,
+        midiNote: r.midiNote,
+        correct:  r.correct,
+        rowPitch: r.rowPitch,
+      }))
+      if (ticks.length > 0) {
+        sendPitchTick({ ticks, beat: currentBeat }).catch(() => {})
+      }
+    }
+    pitchRaf = requestAnimationFrame(loop)
+  }
+  pitchRaf = requestAnimationFrame(loop)
+}
+
+function stopPitchLoop() {
+  if (pitchRaf !== null) { cancelAnimationFrame(pitchRaf); pitchRaf = null }
 }
 
 export const playback = {
@@ -236,6 +274,8 @@ export const playback = {
     state.status = 'paused'
     isCountingDown = false
     stopTick()
+    stopPitchLoop()
+    await pitchSession.stop()
     await sendPauseSong()
     // Stop mic monitors on pause (mic output also closes so no audio bleed)
     for (const id of [...playersStore.monitoringIds]) {
@@ -260,7 +300,7 @@ export const playback = {
       for (const p of playersWithMic) {
         if (!playersStore.monitoringIds.has(p.id)) {
           try {
-            await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id)
+            await startMicMonitor(p.mic!.deviceId, p.mic!.channel, p.id, p.threshold ?? 0.1, p.inputGain ?? 1.0)
             playersStore.setMonitoring(p.id, true)
             playersStore.setDisconnected(p.id, false)
             console.log(`[playback] mic started — player ${p.id} (resume)`)
@@ -269,6 +309,10 @@ export const playback = {
           }
         }
       }
+      await pitchSession.start(
+        playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: p.inputGain ?? 1.0 }))
+      )
+      startPitchLoop()
     }
     console.log('[playback] resumed')
   },
@@ -278,6 +322,8 @@ export const playback = {
     if (state.status === 'idle') return
     isCountingDown = false
     stopTick()
+    stopPitchLoop()
+    await pitchSession.stop()
     state.status = 'loaded'
     showClearBeamers = true
     await sendStopSong()

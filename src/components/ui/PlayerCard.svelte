@@ -51,7 +51,7 @@
   const accent = $derived(COLOR_MAP[player.color] ?? 'var(--player-1)')
   const isMonitoring = $derived(playersStore.monitoringIds.has(player.id))
   const isDisconnected = $derived(playersStore.disconnectedIds.has(player.id))
-  const level = $derived(Math.min(1, (playersStore.levels[player.id] ?? 0) * player.gain))
+  const level = $derived(playersStore.levels[player.id] ?? 0)
 
   async function toggleMonitor() {
     if (isMonitoring) {
@@ -61,7 +61,7 @@
     } else {
       if (!player.mic) return
       try {
-        await startMicMonitor(player.mic.deviceId, player.mic.channel, player.id)
+        await startMicMonitor(player.mic.deviceId, player.mic.channel, player.id, player.threshold ?? 0.1, player.inputGain ?? 1.0)
         playersStore.setMonitoring(player.id, true)
         playersStore.setDisconnected(player.id, false)
       } catch (e) {
@@ -133,14 +133,25 @@
       {/if}
     </div>
 
-    <!-- Fader row: level meter + gain -->
+    <!-- Gain fader: input amplification 0–2× -->
     <HorizontalFader
-      label=""
+      label="Gain"
       level={level}
-      gain={player.gain}
-      maxGain={2}
+      gain={player.inputGain}
+      maxGain={2.0}
       color={accent}
-      ongainchange={(v) => playersStore.setGain(player.id, v)}
+      ongainchange={(v) => playersStore.setInputGain(player.id, v)}
+    />
+
+    <!-- Gate fader: noise gate threshold, right side dimmed -->
+    <HorizontalFader
+      label="Gate"
+      level={level}
+      gain={player.threshold}
+      maxGain={0.5}
+      threshold={player.threshold}
+      color={accent}
+      ongainchange={(v) => playersStore.setThreshold(player.id, v)}
     />
     {/if}
 </div>

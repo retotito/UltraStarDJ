@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
+  import type { PitchTickEntry } from '$lib/ipc/tauri'
 
-  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', noteBarMinHeight = 28, noteBarRadius = 4 }: {
+  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', noteBarMinHeight = 28, noteBarRadius = 4, pitchTick = null }: {
     tracks: NoteTrack[]
     trackIndex?: number
     playerColor?: string
@@ -14,6 +15,7 @@
     noteBarStyle?: 'white' | 'black'
     noteBarMinHeight?: number
     noteBarRadius?: number
+    pitchTick?: PitchTickEntry | null
   } = $props()
 
   // ── Beat math ──────────────────────────────────────────────────────────────
@@ -93,6 +95,19 @@
     if (currentBeat >= note.startBeat + note.lengthBeats) return 100
     return ((currentBeat - note.startBeat) / note.lengthBeats) * 100
   }
+
+  // ── Sung note: which note is active right now + its row ────────────────────
+  const sungRow = $derived.by(() => {
+    if (!pitchTick || pitchTick.midiNote < 0 || pitchTick.rowPitch < 0) return null
+    if (!activeLine) return null
+    // Is currentBeat inside any note in the active phrase?
+    const onNote = activeLine.notes.some(
+      n => currentBeat >= n.startBeat && currentBeat < n.startBeat + n.lengthBeats
+    )
+    if (!onNote) return null
+    const avg = cells.reduce((s, c) => s + c.note.pitch, 0) / (cells.length || 1)
+    return pitchToRow(pitchTick.rowPitch, avg, rowCount)
+  })
 </script>
 
 <div
@@ -146,6 +161,15 @@
       <div class="row-line" style="grid-row: {i + 1}; grid-column: 1 / -1;"></div>
     {/each}
   {/if}
+
+  <!-- Sung note indicator — spans full phrase width at detected pitch row -->
+  {#if sungRow !== null}
+    <div
+      class="sung-indicator"
+      class:sung-correct={pitchTick?.correct}
+      style="grid-row: {sungRow}; grid-column: 1 / -1;"
+    ></div>
+  {/if}
 </div>
 
 <style>
@@ -165,6 +189,24 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
     pointer-events: none;
     z-index: 0;
+  }
+
+  /* ── Sung note indicator ── */
+  .sung-indicator {
+    pointer-events: none;
+    z-index: 5;
+    border-radius: var(--bar-radius, 4px);
+    background: rgba(255, 255, 255, 0.35);
+    height: max(80%, var(--bar-min-h, 28px));
+    align-self: center;
+    margin: 0 2px;
+    transition: grid-row 0s; /* instant row change */
+  }
+
+  .sung-indicator.sung-correct {
+    background: var(--player-color, #4f8ef7);
+    opacity: 0.7;
+    box-shadow: 0 0 8px var(--player-color, #4f8ef7);
   }
 
   /* ── Note cell (grid item, full cell height) ── */

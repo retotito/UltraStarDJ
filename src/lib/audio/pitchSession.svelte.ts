@@ -18,7 +18,8 @@ import type { NoteTrack } from '$lib/ultrastar/types'
 export interface ActivePlayer {
   playerId: number
   deviceId: string
-  trackIndex: number  // which NoteTrack to compare against
+  threshold?: number
+  inputGain?: number
 }
 
 export interface PitchResult {
@@ -41,7 +42,7 @@ export const pitchSession = {
     _notes = {}
 
     await Promise.all(players.map(async p => {
-      const det = new PitchDetector(p.playerId)
+      const det = new PitchDetector(p.playerId, p.threshold ?? 0.1, p.inputGain ?? 1.0)
       detectors.set(p.playerId, det)
       try {
         await det.start(p.deviceId)
@@ -59,9 +60,14 @@ export const pitchSession = {
    * @param tracks    Song note tracks (for current-note lookup)
    * @param currentBeat  Current playback beat
    * @param difficulty   Tolerance level
+   * @param micDelayMs   Global mic latency offset in ms (shifts beat comparison back)
+   * @param songBpm      Song BPM (UltraStar quarter-BPM) for beat offset calculation
    */
-  tick(tracks: NoteTrack[], currentBeat: number, difficulty: Difficulty): void {
+  tick(tracks: NoteTrack[], currentBeat: number, difficulty: Difficulty, micDelayMs = 0, songBpm = 120): void {
     const tolerance = DIFFICULTY_TOLERANCE[difficulty]
+    // Shift beat comparison back by mic latency
+    const delayBeats = (micDelayMs / 1000) * (songBpm / 60) * 4
+    const evalBeat = currentBeat - delayBeats
     const next: Record<number, PitchResult> = {}
 
     for (const [playerId, det] of detectors) {
@@ -70,11 +76,11 @@ export const pitchSession = {
       // Find which NoteTrack belongs to this player
       const track = tracks.find(t => t.player === det.playerId - 1) ?? tracks[0]
 
-      // Find the note active at currentBeat
+      // Find the note active at evalBeat (delay-adjusted)
       let targetPitch = -1
       for (const line of (track?.lines ?? [])) {
         for (const note of line.notes) {
-          if (currentBeat >= note.startBeat && currentBeat < note.startBeat + note.lengthBeats) {
+          if (evalBeat >= note.startBeat && evalBeat < note.startBeat + note.lengthBeats) {
             targetPitch = note.pitch
             break
           }

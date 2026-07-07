@@ -362,8 +362,10 @@ export async function startMicMonitor(
   deviceId: string,
   channel: 'left' | 'right' | 'mono',
   playerId: number,
+  threshold = 0.1,
+  inputGain = 1.0,
 ): Promise<void> {
-  await invoke('start_mic_monitor', { deviceId, channel, playerId })
+  await invoke('start_mic_monitor', { deviceId, channel, playerId, threshold, inputGain })
 }
 
 export async function stopMicMonitor(playerId: number): Promise<void> {

@@ -221,6 +221,8 @@ pub fn start_mic_monitor(
     device_id: String,
     channel: String, // "left" | "right" | "mono"
     player_id: u8,
+    threshold: f32,   // noise gate: 0.0–1.0, samples below this = silence
+    input_gain: f32,  // pre-gain multiplier: 0.0–2.0, applied before threshold
 ) -> Result<(), String> {
     let host = host();
     let device = find_device(&host, &device_id)
@@ -260,12 +262,12 @@ pub fn start_mic_monitor(
     let call_count = Arc::new(AtomicU64::new(0));
 
     eprintln!("[mic-monitor] player={player_id} in_rate={in_sample_rate} out_rate={out_sample_rate} \
-               ring_found={} ch_idx={ch_index}", game_ring.is_some());
+               ring_found={} ch_idx={ch_index} threshold={threshold:.3} input_gain={input_gain:.2}", game_ring.is_some());
 
     let stream = match default_config.sample_format() {
-        SampleFormat::F32 => build_input_stream_f32(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count),
-        SampleFormat::I16 => build_input_stream_i16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count),
-        SampleFormat::U16 => build_input_stream_u16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count),
+        SampleFormat::F32 => build_input_stream_f32(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count, threshold, input_gain),
+        SampleFormat::I16 => build_input_stream_i16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count, threshold, input_gain),
+        SampleFormat::U16 => build_input_stream_u16(&device, &config, total_channels, ch_index, player_id, app.clone(), gains, game_ring, in_sample_rate, out_sample_rate, call_count, threshold, input_gain),
         _ => Err("Unsupported sample format".to_string()),
     }?;
 
@@ -509,16 +511,21 @@ fn build_input_stream_f32(
     total_ch: usize, ch_idx: usize, player_id: u8, app: AppHandle,
     gains: Arc<Mutex<HashMap<u8, f32>>>,
     game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
-    call_count: Arc<AtomicU64>,
+    call_count: Arc<AtomicU64>, threshold: f32, input_gain: f32,
 ) -> Result<cpal::Stream, String> {
     device.build_input_stream(
         config,
         move |data: &[f32], _| {
             let mono: Vec<f32> = data.chunks(total_ch)
-                .filter_map(|frame| frame.get(ch_idx).copied()).collect();
+                .filter_map(|frame| frame.get(ch_idx).map(|&s| (s * input_gain).clamp(-1.0, 1.0))).collect();
+            let above = mono.iter().any(|s| s.abs() > threshold);
             let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
-            route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
-            let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
+            if above {
+                route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
+                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
+            } else {
+                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: 0.0 });
+            }
         },
         move |_err| {}, None,
     ).map_err(|e| e.to_string())
@@ -529,16 +536,21 @@ fn build_input_stream_i16(
     total_ch: usize, ch_idx: usize, player_id: u8, app: AppHandle,
     gains: Arc<Mutex<HashMap<u8, f32>>>,
     game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
-    call_count: Arc<AtomicU64>,
+    call_count: Arc<AtomicU64>, threshold: f32, input_gain: f32,
 ) -> Result<cpal::Stream, String> {
     device.build_input_stream(
         config,
         move |data: &[i16], _| {
             let mono: Vec<f32> = data.chunks(total_ch)
-                .filter_map(|frame| frame.get(ch_idx).map(|&s| s as f32 / i16::MAX as f32)).collect();
+                .filter_map(|frame| frame.get(ch_idx).map(|&s| (s as f32 / i16::MAX as f32 * input_gain).clamp(-1.0, 1.0))).collect();
+            let above = mono.iter().any(|s| s.abs() > threshold);
             let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
-            route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
-            let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
+            if above {
+                route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
+                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
+            } else {
+                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: 0.0 });
+            }
         },
         move |_err| {}, None,
     ).map_err(|e| e.to_string())
@@ -549,16 +561,21 @@ fn build_input_stream_u16(
     total_ch: usize, ch_idx: usize, player_id: u8, app: AppHandle,
     gains: Arc<Mutex<HashMap<u8, f32>>>,
     game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
-    call_count: Arc<AtomicU64>,
+    call_count: Arc<AtomicU64>, threshold: f32, input_gain: f32,
 ) -> Result<cpal::Stream, String> {
     device.build_input_stream(
         config,
         move |data: &[u16], _| {
             let mono: Vec<f32> = data.chunks(total_ch)
-                .filter_map(|frame| frame.get(ch_idx).map(|&s| (s as f32 - 32768.0) / 32768.0)).collect();
+                .filter_map(|frame| frame.get(ch_idx).map(|&s| ((s as f32 - 32768.0) / 32768.0 * input_gain).clamp(-1.0, 1.0))).collect();
+            let above = mono.iter().any(|s| s.abs() > threshold);
             let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
-            route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
-            let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
+            if above {
+                route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
+                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: rms(&mono) });
+            } else {
+                let _ = app.emit(EVT_MIC_LEVEL, MicLevelEvent { player_id, rms: 0.0 });
+            }
         },
         move |_err| {}, None,
     ).map_err(|e| e.to_string())

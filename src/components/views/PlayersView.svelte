@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte'
   import { playersStore } from '$lib/stores/players.svelte'
   import { playback } from '$lib/stores/playback.svelte'
+  import { appSettings } from '$lib/stores/settings.svelte'
   import {
     listAudioInputDevices,
     startMicMonitor,
@@ -71,6 +72,21 @@
   </div>
 
   <div class="cards">
+    <!-- Global mic delay row -->
+    <div class="delay-row">
+      <span class="icon delay-icon">timer</span>
+      <span class="delay-label">Mic Delay</span>
+      <input
+        type="range"
+        min="0" max="300" step="10"
+        value={appSettings.micDelay}
+        oninput={e => appSettings.set('micDelay', Number((e.target as HTMLInputElement).value))}
+        class="delay-slider"
+        aria-label="Global mic delay"
+      />
+      <span class="delay-value">{appSettings.micDelay} ms</span>
+    </div>
+
     {#each playersStore.all as player (player.id)}
       <PlayerCard {player} {devices} />
     {/each}
@@ -125,5 +141,44 @@
     overflow-y: auto;
     flex: 1;
     min-height: 0;
+  }
+
+  /* ── Global mic delay row ── */
+  .delay-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--md-sys-color-surface-container);
+    border-radius: var(--radius-lg);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  }
+
+  .delay-icon {
+    font-size: 18px;
+    color: var(--md-sys-color-on-surface-variant);
+    flex-shrink: 0;
+  }
+
+  .delay-label {
+    font-size: var(--text-sm);
+    color: var(--md-sys-color-on-surface-variant);
+    white-space: nowrap;
+    min-width: 68px;
+  }
+
+  .delay-slider {
+    flex: 1;
+    accent-color: var(--md-sys-color-primary);
+    height: 4px;
+    cursor: pointer;
+  }
+
+  .delay-value {
+    font-size: var(--text-sm);
+    color: var(--md-sys-color-on-surface);
+    font-variant-numeric: tabular-nums;
+    min-width: 44px;
+    text-align: right;
   }
 </style>
