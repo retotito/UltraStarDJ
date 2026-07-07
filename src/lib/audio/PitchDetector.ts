@@ -49,9 +49,17 @@ export class PitchDetector {
     // to no constraint (browser default) if nothing matches.
     let browserDeviceId: string | undefined
     try {
-      // Need permission first before labels are populated
-      const probe = await navigator.mediaDevices.getUserMedia({ audio: true })
-      probe.getTracks().forEach(t => t.stop())
+      // Only probe for permission if not already granted — avoids stutter on play
+      let needsProbe = true
+      try {
+        const perm = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+        if (perm.state === 'granted') needsProbe = false
+      } catch { /* permissions API not available */ }
+
+      if (needsProbe) {
+        const probe = await navigator.mediaDevices.getUserMedia({ audio: true })
+        probe.getTracks().forEach(t => t.stop())
+      }
 
       const allDevices = await navigator.mediaDevices.enumerateDevices()
       const audioInputs = allDevices.filter(d => d.kind === 'audioinput')

@@ -27,6 +27,8 @@ export interface PitchResult {
   midiNote:  number   // -1 = no pitch
   correct:   boolean
   rowPitch:  number   // note pitch to display in lane (-1 = hide)
+  /** noteStartBeat → fill fraction 0–1, for note fill rendering */
+  noteFills: Record<number, number>
 }
 
 let detectors = new Map<number, PitchDetector>()
@@ -34,12 +36,22 @@ let detectors = new Map<number, PitchDetector>()
 // Reactive: latest pitch result per playerId
 let _notes = $state<Record<number, PitchResult>>({})
 
+// Accumulated correct-beat hits per player per note: playerId → (noteStartBeat → hits)
+// Cleared on stop(). Used to compute fill fraction in NoteLane.
+const _noteHits = new Map<number, Map<number, number>>()
+
 export const pitchSession = {
   get notes(): Record<number, PitchResult> { return _notes },
+
+  /** Returns the hit-count map for a player (noteStartBeat → correctBeats). */
+  noteHits(playerId: number): Map<number, number> {
+    return _noteHits.get(playerId) ?? new Map()
+  },
 
   async start(players: ActivePlayer[]): Promise<void> {
     await pitchSession.stop()
     _notes = {}
+    _noteHits.clear()
     console.log('[pitchSession] start — players:', players.map(p => `P${p.playerId} dev:${p.deviceId}`))
 
     await Promise.all(players.map(async p => {
@@ -80,14 +92,19 @@ export const pitchSession = {
 
       // Find the note active at evalBeat (delay-adjusted)
       let targetPitch = -1
+      let activeNoteStart = -1
+      let activeNoteLen = 1
+      // Build a map of startBeat → lengthBeats for all notes in this track
+      const noteLengths = new Map<number, number>()
       for (const line of (track?.lines ?? [])) {
         for (const note of line.notes) {
+          noteLengths.set(note.startBeat, note.lengthBeats)
           if (evalBeat >= note.startBeat && evalBeat < note.startBeat + note.lengthBeats) {
             targetPitch = note.pitch
-            break
+            activeNoteStart = note.startBeat
+            activeNoteLen = note.lengthBeats
           }
         }
-        if (targetPitch >= 0) break
       }
 
       let correct = false
@@ -97,11 +114,31 @@ export const pitchSession = {
         correct = distance <= tolerance
       }
 
+      // Accumulate correct hits for this note
+      if (correct && activeNoteStart >= 0) {
+        if (!_noteHits.has(playerId)) _noteHits.set(playerId, new Map())
+        const playerHits = _noteHits.get(playerId)!
+        playerHits.set(activeNoteStart, (playerHits.get(activeNoteStart) ?? 0) + 1)
+      }
+
+      // Build noteFills: convert accumulated hits to fill fractions (capped at 1)
+      // frames per UltraStar beat = 60fps × (60s / (songBpm × 4 ticks/beat)) = 900 / songBpm
+      const framesPerBeat = 900 / songBpm
+      const playerHits = _noteHits.get(playerId)
+      const noteFills: Record<number, number> = {}
+      if (playerHits) {
+        for (const [startBeat, hits] of playerHits) {
+          const noteLen = noteLengths.get(startBeat) ?? 1
+          noteFills[startBeat] = Math.min(1, hits / (noteLen * framesPerBeat))
+        }
+      }
+
       next[playerId] = {
         playerId,
         midiNote: sample.midiNote,
         correct,
         rowPitch: correct ? targetPitch : sample.midiNote,
+        noteFills,
       }
     }
 
@@ -111,6 +148,7 @@ export const pitchSession = {
   async stop(): Promise<void> {
     await Promise.all([...detectors.values()].map(d => d.stop()))
     detectors.clear()
+    _noteHits.clear()
     _notes = {}
   },
 }

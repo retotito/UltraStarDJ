@@ -190,6 +190,8 @@ export interface PitchTickEntry {
   midiNote:  number   // -1 = no pitch
   correct:   boolean
   rowPitch:  number   // pitch row to draw (-1 = hide)
+  /** noteStartBeat → fill fraction 0–1 */
+  noteFills: Record<number, number>
 }
 
 export interface PitchTickPayload {

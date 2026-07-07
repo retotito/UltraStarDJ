@@ -90,17 +90,6 @@
   })
 
   // ── Sung note: which note is active right now + its row ────────────────────
-  const sungRow = $derived.by(() => {
-    if (!pitchTick || pitchTick.midiNote < 0 || pitchTick.rowPitch < 0) return null
-    if (!activeLine) return null
-    // Is currentBeat inside any note in the active phrase?
-    const onNote = activeLine.notes.some(
-      n => currentBeat >= n.startBeat && currentBeat < n.startBeat + n.lengthBeats
-    )
-    if (!onNote) return null
-    const avg = cells.reduce((s, c) => s + c.note.pitch, 0) / (cells.length || 1)
-    return pitchToRow(pitchTick.rowPitch, avg, rowCount)
-  })
 </script>
 
 <div
@@ -132,6 +121,10 @@
         class:rap={isRap}
         class:freestyle={isFreestyle}
       >
+      <!-- Sung fill: grows as player correctly hits this note -->
+      {#if (pitchTick?.noteFills?.[cell.note.startBeat] ?? 0) > 0}
+        <div class="note-fill-sung" style="width: {((pitchTick?.noteFills?.[cell.note.startBeat] ?? 0) * 100).toFixed(1)}%"></div>
+      {/if}
       <!-- Syllable label (optional, only when bar is wide enough) -->
       {#if showNoteSyllables && cell.colSpan >= 2}
         <span class="note-syllable">{cell.note.syllable.trim()}</span>
@@ -145,15 +138,6 @@
     {#each Array(rowCount) as _, i}
       <div class="row-line" style="grid-row: {i + 1}; grid-column: 1 / -1;"></div>
     {/each}
-  {/if}
-
-  <!-- Sung note indicator — spans full phrase width at detected pitch row -->
-  {#if sungRow !== null}
-    <div
-      class="sung-indicator"
-      class:sung-correct={pitchTick?.correct}
-      style="grid-row: {sungRow}; grid-column: 1 / -1;"
-    ></div>
   {/if}
 </div>
 
@@ -177,23 +161,6 @@
   }
 
   /* ── Sung note indicator ── */
-  .sung-indicator {
-    pointer-events: none;
-    z-index: 5;
-    border-radius: var(--bar-radius, 4px);
-    background: rgba(255, 255, 255, 0.35);
-    height: max(80%, var(--bar-min-h, 28px));
-    align-self: center;
-    margin: 0 2px;
-    transition: grid-row 0s; /* instant row change */
-  }
-
-  .sung-indicator.sung-correct {
-    background: var(--player-color, #4f8ef7);
-    opacity: 0.7;
-    box-shadow: 0 0 8px var(--player-color, #4f8ef7);
-  }
-
   /* ── Note cell (grid item, full cell height) ── */
   .note-cell {
     position: relative;
@@ -236,19 +203,19 @@
   }
 
   /* ── Fill overlay (current beat progress) ── */
-  .note-fill {
+  .note-fill-sung {
     position: absolute;
     inset: 0;
     right: auto;
     background: var(--player-color);
-    opacity: 0.92;
+    opacity: 0.8;
     pointer-events: none;
     transition: width 80ms linear;
   }
 
-  .note-bar.golden .note-fill {
+  .note-bar.golden .note-fill-sung {
     background: #ffd23c;
-    opacity: 0.97;
+    opacity: 0.9;
   }
 
   /* ── Syllable text ── */

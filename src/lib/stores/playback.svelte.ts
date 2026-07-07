@@ -66,12 +66,11 @@ onCountdownDone(async () => {
       }
     }
 
-    // Start pitch detection for all active mic players
-    await pitchSession.start(
-      playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: gainCurve(p.inputGain ?? 1.0) }))
-    )
+    // Pitch session was pre-warmed during countdown — just start the rAF loop.
+    // If somehow not yet started (e.g. getUserMedia still pending), it will pick up
+    // detectors as they come online.
     startPitchLoop()
-    console.log('[playback] pitch detection started')
+    console.log('[playback] pitch loop started')
   }
 })
 
@@ -115,6 +114,7 @@ function startPitchLoop() {
         midiNote: r.midiNote,
         correct:  r.correct,
         rowPitch: r.rowPitch,
+        noteFills: r.noteFills,
       }))
       if (ticks.length > 0) {
         sendPitchTick({ ticks, beat: currentBeat }).catch(() => {})
@@ -267,6 +267,13 @@ export const playback = {
     console.log(`[playback] play() display1={open:${displaysStore.display1.open} players:[${displaysStore.display1.playerIds}]} display2={open:${displaysStore.display2.open} players:[${displaysStore.display2.playerIds}]} activeMicPlayers=[${micCandidates.map(p => p.id)}]`)
     if (micCandidates.length > 0) {
       await openMicMixChannel().catch(e => console.warn('[playback] openMicMixChannel failed:', e))
+      // Pre-open getUserMedia during countdown so the audio subsystem is ready
+      // before the song starts — avoids a stutter when pitch detection comes online.
+      pitchSession.start(
+        micCandidates.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: gainCurve(p.inputGain ?? 1.0) }))
+      ).then(() => {
+        console.log('[playback] pitch session pre-warmed during countdown')
+      }).catch(e => console.warn('[playback] pitchSession pre-warm failed:', e))
     }
   },
 
@@ -310,10 +317,10 @@ export const playback = {
           }
         }
       }
-      await pitchSession.start(
-        playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: gainCurve(p.inputGain ?? 1.0) }))
-      )
       startPitchLoop()
+      pitchSession.start(
+        playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: gainCurve(p.inputGain ?? 1.0) }))
+      ).catch(e => console.warn('[playback] pitchSession.start (resume) failed:', e))
     }
     console.log('[playback] resumed')
   },
