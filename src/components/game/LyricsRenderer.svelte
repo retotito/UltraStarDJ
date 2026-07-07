@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte'
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
 
   let { tracks, currentTime, bpm, gap, trackIndex = 0, playerColor = null }: {
@@ -12,9 +13,30 @@
 
   const color = $derived(playerColor ?? '#ffffff')
 
+  // ── Smooth currentTime via rAF interpolation ────────────────────────────────
+  // audio timeupdate fires ~4Hz; we interpolate at 60fps to avoid gradient judder
+  let smoothTime = $state(currentTime)
+  let lastKnownTime = currentTime
+  let lastKnownAt   = performance.now()
+  let rafId: number
+
+  $effect(() => {
+    // When the prop changes, re-anchor the interpolation
+    lastKnownTime = currentTime
+    lastKnownAt   = performance.now()
+  })
+
+  function tick() {
+    const elapsed = (performance.now() - lastKnownAt) / 1000
+    smoothTime = lastKnownTime + elapsed
+    rafId = requestAnimationFrame(tick)
+  }
+  rafId = requestAnimationFrame(tick)
+  onDestroy(() => cancelAnimationFrame(rafId))
+
   // UltraStar beat formula
   const currentBeat = $derived(
-    (currentTime - gap / 1000) * (bpm / 60) * 4
+    (smoothTime - gap / 1000) * (bpm / 60) * 4
   )
 
   // How many beats = 3 seconds (lead-in window)
@@ -68,17 +90,19 @@
     return `background-image: linear-gradient(to right, ${c} ${pct}%, rgba(255,255,255,0.85) ${pct}%); background-clip: text; -webkit-background-clip: text; color: transparent`
   }
 
-  /** Lead-in playhead gradient (the sweeping blob before a phrase starts) */
-  const leadInStyle = $derived.by((): string | null => {
-    if (!activeLine) return null
+  /** Lead-in playhead — always computed, opacity handles visibility */
+  const leadIn = $derived.by(() => {
+    if (!activeLine) return { style: '', visible: false }
     const firstBeat = activeLine.notes[0]?.startBeat
-    if (firstBeat === undefined) return null
-    // pct goes from ~100 (3s before) down to 0 (at phrase start) then negative (singing)
-    const pct = ((currentBeat - firstBeat) * -100) / leadInBeats
-    if (pct < -5 || pct > 110) return null   // hide when off-screen
+    if (firstBeat === undefined) return { style: '', visible: false }
+    const pct   = ((currentBeat - firstBeat) * -100) / leadInBeats
     const end   = pct
     const start = pct + 30
-    return `background-image: linear-gradient(270deg, transparent ${end}%, ${color} ${end}%, transparent ${start}%)`
+    const visible = pct > -5 && pct < 110
+    return {
+      style: `background-image: linear-gradient(270deg, transparent ${end}%, #4f8ef7 ${end}%, transparent ${start}%)`,
+      visible,
+    }
   })
 
   const track      = $derived(tracks[trackIndex] ?? null)
@@ -96,25 +120,30 @@
 </script>
 
 <div class="lyrics-renderer" class:visible>
-  <!-- Lead-in playhead: sweeps right→left in the 3s before the phrase starts -->
-  <div class="lead-in-track">
-    {#if leadInStyle}
-      <div class="lead-in-bar" style={leadInStyle}></div>
-    {/if}
-  </div>
 
-  <!-- Current phrase -->
-  <div class="line-current">
-    {#if activeLine}
-      {#each activeLine.notes as note, i (note.startBeat)}
-        <span
-          class="syllable"
-          class:golden={note.type === 'golden'}
-          class:freestyle={note.type === 'freestyle'}
-          style={syllableStyle(note)}
-        >{note.syllable}{needsTrailingSpace(activeLine.notes, i) ? ' ' : ''}</span>
-      {/each}
-    {/if}
+  <!-- 3-col grid: [lead-in 1fr] [lyrics max-content] [1fr] -->
+  <div class="current-row">
+    <div class="lead-in-col">
+      <div
+        class="lead-in-bar"
+        style="{leadIn.style}; opacity: {leadIn.visible ? 1 : 0}"
+      ></div>
+    </div>
+
+    <div class="text-col">
+      {#if activeLine}
+        {#each activeLine.notes as note, i (note.startBeat)}
+          <span
+            class="syllable"
+            class:golden={note.type === 'golden'}
+            class:freestyle={note.type === 'freestyle'}
+            style={syllableStyle(note)}
+          >{note.syllable}{needsTrailingSpace(activeLine.notes, i) ? ' ' : ''}</span>
+        {/each}
+      {/if}
+    </div>
+
+    <div></div>
   </div>
 
   <!-- Upcoming phrase -->
@@ -131,9 +160,8 @@
   .lyrics-renderer {
     display: flex;
     flex-direction: column;
-    align-items: center;
     gap: 0.3rem;
-    padding: 0.5rem 2rem 0.7rem;
+    padding: 0.5rem 0 0.7rem;
     width: 100%;
     opacity: 0;
     transition: opacity 0.4s ease;
@@ -143,31 +171,32 @@
     opacity: 1;
   }
 
-  /* ── Lead-in playhead ── */
-  .lead-in-track {
-    width: 60%;
-    height: 3px;
-    position: relative;
-    overflow: visible;
-    margin-bottom: 0.15rem;
-  }
-
-  .lead-in-bar {
-    position: absolute;
-    inset: 0;
-    height: 3px;
-    border-radius: 2px;
-  }
-
-  /* ── Current phrase ── */
-  .line-current {
-    display: block;
-    text-align: center;
+  /* 3-column grid row for current phrase + lead-in */
+  .current-row {
+    display: grid;
+    grid-template-columns: 1fr max-content 1fr;
+    align-items: center;
     font-size: clamp(1.4rem, 3.2vw, 2.8rem);
     font-weight: 800;
     letter-spacing: 0.01em;
     line-height: 1.25;
     min-height: 1.3em;
+  }
+
+  .lead-in-col {
+    height: 0.9em;      /* 90% of font size, centred vertically */
+    overflow: hidden;
+    transition: opacity 0.15s ease;
+    align-self: center;
+  }
+
+  .lead-in-bar {
+    width: 100%;
+    height: 100%;
+  }
+
+  .text-col {
+    text-align: center;
   }
 
   /* ── Upcoming phrase ── */
