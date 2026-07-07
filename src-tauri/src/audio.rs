@@ -200,6 +200,13 @@ fn rms(samples: &[f32]) -> f32 {
     (sum_sq / samples.len() as f32).sqrt()
 }
 
+/// Soft saturation — smoothly limits signal to (-1, 1) without hard clipping.
+/// Uses x / (1 + |x|) which is gentle at low levels, never exceeds ±1.
+#[inline]
+fn soft_saturate(x: f32) -> f32 {
+    x / (1.0 + x.abs())
+}
+
 // ── Tauri commands — input / mic ──────────────────────────────────────────────
 
 #[tauri::command]
@@ -488,8 +495,8 @@ fn route_to_output(mono: &[f32], gain: f32, ring: &Option<RingBuffer>, in_rate: 
         buf.push_back(out); // L
         buf.push_back(out); // R
     }
-    // Gentle drift correction: if ring grew beyond ~40ms, drop only 2 samples (one frame)
-    let max_stereo = (out_rate / 25) as usize * 2; // 40ms ceiling
+    // Reduce ring to ~12ms max to minimise monitoring latency (lower = less "roomy" reverb)
+    let max_stereo = (out_rate / 80) as usize * 2; // 12ms ceiling
     if buf.len() > max_stereo {
         buf.drain(..2);
     }
@@ -513,12 +520,15 @@ fn build_input_stream_f32(
     game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
     call_count: Arc<AtomicU64>, threshold: f32, input_gain: f32,
 ) -> Result<cpal::Stream, String> {
+    let mut gate_open = false;
     device.build_input_stream(
         config,
         move |data: &[f32], _| {
             let mono: Vec<f32> = data.chunks(total_ch)
-                .filter_map(|frame| frame.get(ch_idx).map(|&s| (s * input_gain).clamp(-1.0, 1.0))).collect();
-            let above = mono.iter().any(|s| s.abs() > threshold);
+                .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s * input_gain))).collect();
+            let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+            let above = peak >= threshold || (gate_open && peak >= threshold * 0.5);
+            gate_open = above;
             let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
             if above {
                 route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
@@ -538,12 +548,15 @@ fn build_input_stream_i16(
     game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
     call_count: Arc<AtomicU64>, threshold: f32, input_gain: f32,
 ) -> Result<cpal::Stream, String> {
+    let mut gate_open = false;
     device.build_input_stream(
         config,
         move |data: &[i16], _| {
             let mono: Vec<f32> = data.chunks(total_ch)
-                .filter_map(|frame| frame.get(ch_idx).map(|&s| (s as f32 / i16::MAX as f32 * input_gain).clamp(-1.0, 1.0))).collect();
-            let above = mono.iter().any(|s| s.abs() > threshold);
+                .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s as f32 / i16::MAX as f32 * input_gain))).collect();
+            let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+            let above = peak >= threshold || (gate_open && peak >= threshold * 0.5);
+            gate_open = above;
             let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
             if above {
                 route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);
@@ -563,12 +576,15 @@ fn build_input_stream_u16(
     game_ring: Option<RingBuffer>, in_rate: u32, out_rate: u32,
     call_count: Arc<AtomicU64>, threshold: f32, input_gain: f32,
 ) -> Result<cpal::Stream, String> {
+    let mut gate_open = false;
     device.build_input_stream(
         config,
         move |data: &[u16], _| {
             let mono: Vec<f32> = data.chunks(total_ch)
-                .filter_map(|frame| frame.get(ch_idx).map(|&s| ((s as f32 - 32768.0) / 32768.0 * input_gain).clamp(-1.0, 1.0))).collect();
-            let above = mono.iter().any(|s| s.abs() > threshold);
+                .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate((s as f32 - 32768.0) / 32768.0 * input_gain))).collect();
+            let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+            let above = peak >= threshold || (gate_open && peak >= threshold * 0.5);
+            gate_open = above;
             let gain = *gains.lock().unwrap().get(&player_id).unwrap_or(&1.0);
             if above {
                 route_to_output(&mono, gain, &game_ring, in_rate, out_rate, &call_count);

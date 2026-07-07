@@ -1,7 +1,8 @@
 <script lang="ts">
   import { playersStore, type PlayerConfig, type MicChannel } from '$lib/stores/players.svelte'
+  import { playback } from '$lib/stores/playback.svelte'
   import type { AudioInputDevice } from '$lib/ipc/tauri'
-  import { startMicMonitor, stopMicMonitor } from '$lib/ipc/tauri'
+  import { startMicMonitor, stopMicMonitor, openMicMixChannel, closeMicMixChannel } from '$lib/ipc/tauri'
   import Select from '$components/ui/Select.svelte'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
 
@@ -53,15 +54,34 @@
   const isDisconnected = $derived(playersStore.disconnectedIds.has(player.id))
   const level = $derived(playersStore.levels[player.id] ?? 0)
 
+  // Restart the Rust stream after the Gain slider settles (500ms debounce)
+  let gainRestartTimer: ReturnType<typeof setTimeout> | null = null
+  function onGainChange(v: number) {
+    playersStore.setInputGain(player.id, v)
+    if (!isMonitoring || !player.mic) return
+    if (gainRestartTimer) clearTimeout(gainRestartTimer)
+    gainRestartTimer = setTimeout(async () => {
+      await stopMicMonitor(player.id).catch(() => {})
+      // threshold=0 during test — gate bypassed so audio flows continuously
+      await startMicMonitor(player.mic!.deviceId, player.mic!.channel, player.id, 0, v).catch(() => {})
+    }, 500)
+  }
+
   async function toggleMonitor() {
     if (isMonitoring) {
       await stopMicMonitor(player.id)
       playersStore.setMonitoring(player.id, false)
       playersStore.setLevel(player.id, 0)
+      // Close mic-mix channel if no other players are monitoring
+      if (playersStore.monitoringIds.size === 0 && !playback.isActive) {
+        await closeMicMixChannel().catch(() => {})
+      }
     } else {
       if (!player.mic) return
       try {
-        await startMicMonitor(player.mic.deviceId, player.mic.channel, player.id, player.threshold ?? 0.1, player.inputGain ?? 1.0)
+        await openMicMixChannel().catch(e => console.warn('[PlayerCard] openMicMixChannel:', e))
+        // threshold=0 during test — gate bypassed so audio flows continuously
+        await startMicMonitor(player.mic.deviceId, player.mic.channel, player.id, 0, player.inputGain ?? 1.0)
         playersStore.setMonitoring(player.id, true)
         playersStore.setDisconnected(player.id, false)
       } catch (e) {
@@ -133,26 +153,43 @@
       {/if}
     </div>
 
-    <!-- Gain fader: input amplification 0–2× -->
+    <!-- Combined Gain + Gate fader -->
     <HorizontalFader
       label="Gain"
       level={level}
       gain={player.inputGain}
-      maxGain={2.0}
+      threshold={player.threshold}
+      maxThreshold={0.5}
+      showThreshold={true}
+      showDb={false}
       color={accent}
-      ongainchange={(v) => playersStore.setInputGain(player.id, v)}
+      ongainchange={onGainChange}
+      onthresholdchange={(v) => playersStore.setThreshold(player.id, v)}
     />
 
-    <!-- Gate fader: noise gate threshold, right side dimmed -->
-    <HorizontalFader
-      label="Gate"
-      level={level}
-      gain={player.threshold}
-      maxGain={0.5}
-      threshold={player.threshold}
-      color={accent}
-      ongainchange={(v) => playersStore.setThreshold(player.id, v)}
-    />
+    <!-- Monitor output: hear the mic while adjusting gain/gate -->
+    {#if isMonitoring}
+      {@const isMuted = playersStore.mutedIds.has(player.id)}
+      <div class="monitor-row">
+        <button
+          class="btn btn-icon mute-btn"
+          class:is-muted={isMuted}
+          title={isMuted ? 'Unmute monitor' : 'Mute monitor'}
+          aria-label={isMuted ? 'Unmute monitor' : 'Mute monitor'}
+          onclick={() => playersStore.toggleMute(player.id)}
+        >
+          <span class="icon">{isMuted ? 'volume_off' : 'volume_up'}</span>
+        </button>
+        <HorizontalFader
+          label="Output"
+          level={isMuted ? 0 : Math.min(1, level * player.mixGain)}
+          gain={isMuted ? 0 : player.mixGain}
+          ongainchange={(v) => playersStore.setMixGain(player.id, v)}
+          color={accent}
+          dimmed={isMuted}
+        />
+      </div>
+    {/if}
     {/if}
 </div>
 
@@ -179,10 +216,6 @@
 
   .player-card.disconnected {
     border-left-color: color-mix(in srgb, #f75f5f 70%, transparent);
-  }
-
-  .player-card.inactive {
-    opacity: 0.45;
   }
 
   .card-header {
@@ -246,6 +279,33 @@
     gap: var(--space-2);
   }
 
+  .monitor-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-top: var(--space-1);
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    width: 100%;
+    min-width: 0;
+  }
+
+  .monitor-row :global(.fader-row) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mute-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .mute-btn.is-muted {
+    color: #f75f5f;
+  }
+
   
 
   .disconnected-badge {
@@ -258,38 +318,5 @@
 
   .disconnected-badge .icon {
     font-size: 14px;
-  }
-
-  /* ── Gain slider ── */
-  .gain-row {
-    position: relative;
-    padding-left: 24px;
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-
-  .gain-icon {
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 16px;
-    color: var(--md-sys-color-on-surface-variant);
-  }
-
-  .gain-slider {
-    flex: 1;
-    height: 4px;
-    accent-color: var(--md-sys-color-primary);
-    cursor: pointer;
-  }
-
-  .gain-value {
-    font-size: var(--text-xs);
-    color: var(--md-sys-color-on-surface-variant);
-    width: 36px;
-    text-align: right;
-    flex-shrink: 0;
   }
 </style>

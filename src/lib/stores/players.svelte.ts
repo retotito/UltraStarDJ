@@ -108,7 +108,8 @@ export const playersStore = {
   },
 
   setInputGain(id: number, inputGain: number) {
-    players = players.map(p => p.id === id ? { ...p, inputGain: Math.round(inputGain * 100) / 100 } : p)
+    const clamped = Math.min(1.0, Math.max(0, Math.round(inputGain * 100) / 100))
+    players = players.map(p => p.id === id ? { ...p, inputGain: clamped } : p)
     playersStore.save()
   },
 
