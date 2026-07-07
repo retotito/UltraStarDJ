@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
 
-  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true }: {
+  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white' }: {
     tracks: NoteTrack[]
     trackIndex?: number
     playerColor?: string
@@ -11,6 +11,7 @@
     rowCount?: number
     showPianoRollLines?: boolean
     showNoteSyllables?: boolean
+    noteBarStyle?: 'white' | 'black'
   } = $props()
 
   // ── Beat math ──────────────────────────────────────────────────────────────
@@ -98,6 +99,8 @@
     --rows: {rowCount};
     --cols: {phraseBeats};
     --player-color: {playerColor};
+    --bar-bg:     {noteBarStyle === 'black' ? 'rgba(0,0,0,0.45)'   : 'rgba(255,255,255,0.18)'};
+    --bar-border: {noteBarStyle === 'black' ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'};
   "
 >
   {#each cells as cell (cell.note.startBeat + '_' + cell.note.pitch)}
@@ -173,8 +176,8 @@
     height: max(80%, 28px);
     top: 50%;
     transform: translateY(calc(-50% - 1.75px));  /* compensate for 1.5px border */
-    background: rgba(255, 255, 255, 0.18);
-    border: 2px solid rgba(255, 255, 255, 0.35);
+    background: var(--bar-bg);
+    border: 2px solid var(--bar-border);
     border-radius: 4px;
     display: flex;
     align-items: center;

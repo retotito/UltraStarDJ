@@ -1,6 +1,7 @@
 <script lang="ts">
   import { appSettings } from '$lib/stores/settings.svelte'
   import Select from '$components/ui/Select.svelte'
+  import BeamerDisplaySettings from '$components/dialogs/BeamerDisplaySettings.svelte'
 </script>
 
 <div class="settings-dialog">
@@ -14,6 +15,11 @@
         onchange={(v) => appSettings.setTheme(v as 'dark' | 'light')}
       />
     </div>
+  </section>
+
+  <section class="section">
+    <h3 class="section-title">Beamer Display</h3>
+    <BeamerDisplaySettings />
   </section>
 </div>
 

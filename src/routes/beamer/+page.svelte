@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { onPlaySong, onPreviewSong, onStopSong, onPauseSong, onResumeSong, onScreenConfig, onTimeTick, getWindowLabel, sendCountdownDone } from '$lib/ipc/tauri'
+  import { onPlaySong, onPreviewSong, onStopSong, onPauseSong, onResumeSong, onScreenConfig, onTimeTick, getWindowLabel, sendCountdownDone, onBeamerSettings } from '$lib/ipc/tauri'
   import type { UnlistenFn } from '@tauri-apps/api/event'
   import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
   import BeamerView from '$components/game/BeamerView.svelte'
@@ -12,6 +12,11 @@
   let assignedPlayerIds = $state<number[]>([])
   let currentTime = $state(0)
   let unlisteners: UnlistenFn[] = []
+
+  // Beamer display settings (synced from DJ window via IPC)
+  let showPianoRollLines = $state(true)
+  let showNoteSyllables  = $state(true)
+  let noteBarStyle       = $state<'white' | 'black'>('white')
 
   const windowLabel = getWindowLabel()
 
@@ -45,6 +50,11 @@
         }
       }),
       onTimeTick(t => { currentTime = t }),
+      onBeamerSettings(s => {
+        showPianoRollLines = s.showPianoRollLines
+        showNoteSyllables  = s.showNoteSyllables
+        noteBarStyle       = s.noteBarStyle
+      }),
     ])
   })
 
@@ -56,5 +66,5 @@
   }
 </script>
 
-<BeamerView {screen} payload={currentPayload} {assignedPlayerIds} {currentTime} onCountdownDone={onCountdownDone} />
+<BeamerView {screen} payload={currentPayload} {assignedPlayerIds} {currentTime} onCountdownDone={onCountdownDone} {showPianoRollLines} {showNoteSyllables} {noteBarStyle} />
 

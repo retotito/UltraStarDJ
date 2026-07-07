@@ -14,15 +14,16 @@ import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
 
 // ── Event names ────────────────────────────────────────────────
 export const IPC_EVENTS = {
-  PLAY_SONG:     'ultrastar:play-song',
-  PREVIEW_SONG:  'ultrastar:preview-song',
-  STOP_SONG:     'ultrastar:stop-song',
-  PAUSE_SONG:    'ultrastar:pause-song',
-  RESUME_SONG:   'ultrastar:resume-song',
-  SCREEN_CONFIG: 'ultrastar:screen-config',
-  TIME_TICK:     'ultrastar:time-tick',
-  COUNTDOWN_DONE: 'ultrastar:countdown-done',
-  BEAMER_READY:   'ultrastar:beamer-ready',
+  PLAY_SONG:       'ultrastar:play-song',
+  PREVIEW_SONG:    'ultrastar:preview-song',
+  STOP_SONG:       'ultrastar:stop-song',
+  PAUSE_SONG:      'ultrastar:pause-song',
+  RESUME_SONG:     'ultrastar:resume-song',
+  SCREEN_CONFIG:   'ultrastar:screen-config',
+  TIME_TICK:       'ultrastar:time-tick',
+  COUNTDOWN_DONE:  'ultrastar:countdown-done',
+  BEAMER_READY:    'ultrastar:beamer-ready',
+  BEAMER_SETTINGS: 'ultrastar:beamer-settings',
 } as const
 
 // ── Window labels ──────────────────────────────────────────────
@@ -155,6 +156,23 @@ export async function sendTimeTick(currentTime: number): Promise<void> {
 
 export async function sendCountdownDone(): Promise<void> {
   await emit(IPC_EVENTS.COUNTDOWN_DONE, {})
+}
+
+// ── Beamer display settings ─────────────────────────────────────
+export interface BeamerSettingsPayload {
+  showPianoRollLines: boolean
+  showNoteSyllables: boolean
+  noteBarStyle: 'white' | 'black'
+}
+
+export async function sendBeamerSettings(payload: BeamerSettingsPayload): Promise<void> {
+  await emit(IPC_EVENTS.BEAMER_SETTINGS, payload)
+}
+
+export function onBeamerSettings(
+  handler: (payload: BeamerSettingsPayload) => void
+): Promise<UnlistenFn> {
+  return listen<BeamerSettingsPayload>(IPC_EVENTS.BEAMER_SETTINGS, e => handler(e.payload))
 }
 
 export function onCountdownDone(handler: () => void): Promise<UnlistenFn> {

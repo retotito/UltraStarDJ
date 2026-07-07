@@ -5,14 +5,16 @@
   import LyricsRenderer from '$components/game/LyricsRenderer.svelte'
   import NoteLane from '$components/game/NoteLane.svelte'
   import BeamerBackground from '$components/game/BeamerBackground.svelte'
-  import { layout } from '$lib/stores/layout.svelte'
 
-  let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone }: {
+  let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white' }: {
     screen?: BeamerScreen
     payload: PlaySongPayload | PreviewSongPayload | null
     assignedPlayerIds?: number[]
     currentTime?: number
     onCountdownDone?: () => void
+    showPianoRollLines?: boolean
+    showNoteSyllables?: boolean
+    noteBarStyle?: 'white' | 'black'
   } = $props()
 
   const PLAYER_COLORS: Record<number, string> = {
@@ -133,8 +135,9 @@
                   bpm={payload.song.bpm}
                   gap={payload.song.gap}
                   rowCount={laneRowCount}
-                  showPianoRollLines={layout.showPianoRollLines}
-                  showNoteSyllables={layout.showNoteSyllables}
+                  {showPianoRollLines}
+                  {showNoteSyllables}
+                  {noteBarStyle}
                 />
               </div>
             {/each}

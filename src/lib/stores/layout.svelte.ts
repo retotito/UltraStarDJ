@@ -3,6 +3,16 @@
  * Persisted to localStorage (Tauri Store plugin later).
  */
 
+import { sendBeamerSettings } from '$lib/ipc/tauri'
+
+function broadcastBeamerSettings(s: LayoutState) {
+  sendBeamerSettings({
+    showPianoRollLines: s.showPianoRollLines,
+    showNoteSyllables:  s.showNoteSyllables,
+    noteBarStyle:       s.noteBarStyle,
+  }).catch(() => {/* beamer may not be open */})
+}
+
 export interface ColumnConfig {
   key: string
   label: string
@@ -14,6 +24,7 @@ export interface LayoutState {
   showNowPlaying: boolean
   showPianoRollLines: boolean
   showNoteSyllables: boolean
+  noteBarStyle: 'white' | 'black'
   columns: ColumnConfig[]
 }
 
@@ -33,6 +44,7 @@ const DEFAULTS: LayoutState = {
   showNowPlaying: false,
   showPianoRollLines: true,
   showNoteSyllables: true,
+  noteBarStyle: 'white',
   columns: DEFAULT_COLUMNS
 }
 
@@ -53,6 +65,7 @@ function loadState(): LayoutState {
       showNowPlaying: saved.showNowPlaying ?? DEFAULTS.showNowPlaying,
       showPianoRollLines: saved.showPianoRollLines ?? DEFAULTS.showPianoRollLines,
       showNoteSyllables: saved.showNoteSyllables ?? DEFAULTS.showNoteSyllables,
+      noteBarStyle: saved.noteBarStyle ?? DEFAULTS.noteBarStyle,
       columns,
     }
   } catch {
@@ -73,6 +86,7 @@ export const layout = {
   get showNowPlaying()  { return state.showNowPlaying },
   get showPianoRollLines() { return state.showPianoRollLines },
   get showNoteSyllables() { return state.showNoteSyllables },
+  get noteBarStyle() { return state.noteBarStyle },
   get columns()              { return state.columns },
   get visibleColumns()       { return state.columns.filter(c => c.visible) },
 
@@ -81,8 +95,9 @@ export const layout = {
     persist()
   },
   toggleNowPlaying() { state.showNowPlaying = !state.showNowPlaying; persist() },
-  togglePianoRollLines() { state.showPianoRollLines = !state.showPianoRollLines; persist() },
-  toggleNoteSyllables() { state.showNoteSyllables = !state.showNoteSyllables; persist() },
+  togglePianoRollLines() { state.showPianoRollLines = !state.showPianoRollLines; persist(); broadcastBeamerSettings(state) },
+  toggleNoteSyllables() { state.showNoteSyllables = !state.showNoteSyllables; persist(); broadcastBeamerSettings(state) },
+  toggleNoteBarStyle() { state.noteBarStyle = state.noteBarStyle === 'white' ? 'black' : 'white'; persist(); broadcastBeamerSettings(state) },
   toggleColumn(key: string) {
     const col = state.columns.find(c => c.key === key)
     if (col) { col.visible = !col.visible; persist() }
