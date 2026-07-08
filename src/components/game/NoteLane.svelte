@@ -133,6 +133,46 @@
     }
     return segments
   })
+
+  // ── Perfect line flash ─────────────────────────────────────────────────────
+  // Fires once per completed line where every singable beat was correct.
+  let _evaluatedLineBeats = new Set<number>()   // plain JS — not reactive, no loop risk
+  let perfectFlash = $state(false)
+
+  $effect(() => {
+    if (!pitchTick?.processedBeats || !track) {
+      _evaluatedLineBeats.clear()
+      return
+    }
+    const beatMap = new Map(pitchTick.processedBeats.map(b => [b.beat, b]))
+
+    for (const line of track.lines) {
+      if (!line.notes.length) continue
+      const firstBeat = line.notes[0].startBeat
+      const lastNote  = line.notes[line.notes.length - 1]
+      const lineEnd   = lastNote.startBeat + lastNote.lengthBeats
+
+      if (currentBeat < lineEnd) continue          // line not yet finished
+      if (_evaluatedLineBeats.has(firstBeat)) continue  // already evaluated
+
+      _evaluatedLineBeats.add(firstBeat)
+
+      const singableBeats: number[] = []
+      for (const note of line.notes) {
+        if (note.type === 'freestyle') continue
+        for (let b = note.startBeat; b < note.startBeat + note.lengthBeats; b++) {
+          singableBeats.push(b)
+        }
+      }
+      if (!singableBeats.length) continue
+
+      const allCorrect = singableBeats.every(b => beatMap.get(b)?.correct === true)
+      if (allCorrect) {
+        perfectFlash = true
+        setTimeout(() => { perfectFlash = false }, 1600)
+      }
+    }
+  })
 </script>
 
 <div
@@ -189,6 +229,13 @@
     {#each Array(rowCount) as _, i}
       <div class="row-line" style="grid-row: {i + 1}; grid-column: 1 / -1;"></div>
     {/each}
+  {/if}
+
+  <!-- Perfect line flash overlay -->
+  {#if perfectFlash}
+    <div class="perfect-overlay" style="grid-row: 1 / -1; grid-column: 1 / -1;">
+      <span class="perfect-text">PERFECT!</span>
+    </div>
   {/if}
 </div>
 
@@ -295,5 +342,35 @@
 
   .note-bar.golden .note-syllable {
     color: #ffe680;
+  }
+
+  /* ── Perfect flash ── */
+  .perfect-overlay {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  .perfect-text {
+    font-size: clamp(1.4rem, 3.5vw, 2.4rem);
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    color: #fff;
+    text-shadow:
+      0 0 18px var(--player-color),
+      0 0 40px var(--player-color),
+      0 2px 8px rgba(0,0,0,0.9);
+    animation: perfect-pop 1.6s ease forwards;
+  }
+
+  @keyframes perfect-pop {
+    0%   { opacity: 0; transform: scale(0.4); }
+    12%  { opacity: 1; transform: scale(1.15); }
+    22%  { opacity: 1; transform: scale(0.97); }
+    65%  { opacity: 1; transform: scale(1.0); }
+    100% { opacity: 0; transform: scale(0.95) translateY(-16px); }
   }
 </style>
