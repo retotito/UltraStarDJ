@@ -151,6 +151,25 @@
     return hits
   })
 
+  // ── Fully-correct note detection (normal + golden) ─────────────────────────
+  // A note is "fully correct" when every beat in it has correct=true
+  const fullyCorrectNotes = $derived.by((): Set<number> => {
+    if (!pitchTick?.processedBeats || !activeLine) return new Set()
+    const beatMap = new Map(pitchTick.processedBeats.map(b => [b.beat, b]))
+    const hits = new Set<number>()
+    for (const note of activeLine.notes) {
+      if (note.type !== 'normal' && note.type !== 'golden') continue
+      // Note must be fully passed (playhead beyond end)
+      if (currentBeat < note.startBeat + note.lengthBeats) continue
+      let allCorrect = true
+      for (let b = note.startBeat; b < note.startBeat + note.lengthBeats; b++) {
+        if (!beatMap.get(b)?.correct) { allCorrect = false; break }
+      }
+      if (allCorrect) hits.add(note.startBeat)
+    }
+    return hits
+  })
+
   // ── Perfect line flash ─────────────────────────────────────────────────────
   // Fires once per completed line where every singable beat was correct.
   let _evaluatedLineBeats = new Set<number>()   // plain JS — not reactive, no loop risk
@@ -262,6 +281,22 @@
       {/if}
     {/each}
   {/if}
+
+  <!-- Border overlay: transparent fill, just the border, always on top of sung fill -->
+  {#each cells as cell (cell.note.startBeat + '_' + cell.note.pitch + '_brd')}
+    {@const isGolden = cell.note.type === 'golden'}
+    {@const isRap = cell.note.type === 'rap' || cell.note.type === 'rap-golden'}
+    {@const isFreestyle = cell.note.type === 'freestyle'}
+    {@const isFullyCorrect = fullyCorrectNotes.has(cell.note.startBeat)}
+    <div
+      class="note-border-overlay"
+      class:golden={isGolden}
+      class:rap={isRap}
+      class:freestyle={isFreestyle}
+      class:sung-correct={isFullyCorrect}
+      style="grid-column: {cell.col} / span {cell.colSpan}; grid-row: {cell.row};"
+    ></div>
+  {/each}
 
   <!-- Piano-roll row lines (optional, for visual reference) -->
   {#if showPianoRollLines}
@@ -421,6 +456,51 @@
 
 
   /* ── Syllable text ── */
+  /* Border overlay: separate grid pass after sung-segments, shows note border on top of fill */
+  .note-border-overlay {
+    pointer-events: none;
+    z-index: 5;
+    align-self: center;
+    height: max(80%, var(--bar-min-h, 28px));
+    border-radius: var(--bar-radius, 4px);
+    background: transparent;
+    border: 2px solid var(--bar-border);
+  }
+
+  .note-border-overlay.golden {
+    border-color: rgba(255, 210, 60, 0.85);
+  }
+
+  .note-border-overlay.rap {
+    border-style: dashed;
+    border-color: rgba(255, 165, 50, 0.5);
+  }
+
+  .note-border-overlay.freestyle {
+    border-style: dotted;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .note-border-overlay.sung-correct {
+    animation: note-correct-pulse 0.5s ease-out 1 forwards;
+  }
+
+  .note-border-overlay.golden.sung-correct {
+    animation: note-correct-pulse-golden 0.5s ease-out 1 forwards;
+  }
+
+  @keyframes note-correct-pulse {
+    0%   { border-color: var(--bar-border); box-shadow: none; }
+    40%  { border-color: rgba(255,255,255,0.95); box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+    100% { border-color: rgba(255,255,255,0.7); box-shadow: 0 0 6px rgba(255,255,255,0.25); }
+  }
+
+  @keyframes note-correct-pulse-golden {
+    0%   { border-color: rgba(255,210,60,0.85); box-shadow: none; }
+    40%  { border-color: rgba(255,220,80,1);    box-shadow: 0 0 14px rgba(255,215,0,0.75); }
+    100% { border-color: rgba(255,215,0,0.9);   box-shadow: 0 0 8px rgba(255,215,0,0.4); }
+  }
+
   /* Syllable overlay: separate grid pass, always on top of sung segments */
   .syllable-overlay {
     pointer-events: none;
