@@ -3,7 +3,7 @@
   import type { PitchTickEntry } from '$lib/ipc/tauri'
   import { onDestroy } from 'svelte'
 
-  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', noteBarMinHeight = 28, noteBarRadius = 4, pitchTick = null }: {
+  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', noteBarMinHeight = 28, noteBarRadius = 4, pitchTick = null, playing = true }: {
     tracks: NoteTrack[]
     trackIndex?: number
     playerColor?: string
@@ -17,6 +17,7 @@
     noteBarMinHeight?: number
     noteBarRadius?: number
     pitchTick?: PitchTickEntry | null
+    playing?: boolean
   } = $props()
 
   // ── Smooth currentTime via rAF interpolation (same pattern as LyricsRenderer) ──
@@ -31,8 +32,13 @@
   })
 
   function _tick() {
-    const elapsed = (performance.now() - _lastKnownAt) / 1000
-    smoothTime = _lastKnownTime + elapsed
+    if (playing) {
+      const elapsed = (performance.now() - _lastKnownAt) / 1000
+      smoothTime = _lastKnownTime + elapsed
+    } else {
+      // Keep _lastKnownAt fresh while paused so resume has no elapsed-time jump
+      _lastKnownAt = performance.now()
+    }
     _rafId = requestAnimationFrame(_tick)
   }
   _rafId = requestAnimationFrame(_tick)
@@ -196,6 +202,13 @@
     return hits
   })
 
+  // ── Playhead position (0–1, clamped to phrase) ────────────────────────────
+  const playheadFrac = $derived.by(() => {
+    if (!activeLine || phraseBeats <= 0) return -1
+    const phraseFirstBeat = activeLine.notes[0].startBeat
+    return (currentBeat - phraseFirstBeat) / phraseBeats
+  })
+
   // ── Perfect line flash ─────────────────────────────────────────────────────
   // Fires once per completed line where every singable beat was correct.
   let _evaluatedLineBeats = new Set<number>()   // plain JS — not reactive, no loop risk
@@ -331,6 +344,14 @@
     {/each}
   {/if}
 
+  <!-- Playhead: vertical line moving left→right across the phrase -->
+  {#if playheadFrac >= 0 && playheadFrac <= 1}
+    <div
+      class="playhead"
+      style="left: calc(var(--space-4) + {playheadFrac} * (100% - var(--space-4) * 2));"
+    ></div>
+  {/if}
+
   <!-- Perfect line flash overlay -->
   {#if perfectFlash}
     <div class="perfect-overlay" style="grid-row: 1 / -1; grid-column: 1 / -1;">
@@ -343,12 +364,27 @@
   .note-lane {
     width: 100%;
     height: 100%;            /* fills whatever the parent lane-wrap gives it */
+    position: relative;
     display: grid;
     grid-template-rows:    repeat(var(--rows), 1fr);
     grid-template-columns: repeat(var(--cols), 1fr);
     gap: 2px;
     padding: var(--space-2) var(--space-4);
     box-sizing: border-box;
+  }
+
+  /* ── Playhead ── */
+  .playhead {
+    position: absolute;
+    top: var(--space-2);
+    bottom: var(--space-2);
+    width: 2px;
+    background: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.2);
+    border-radius: 1px;
+    pointer-events: none;
+    z-index: 15;
+    transform: translateX(-50%);
   }
 
   /* ── Piano-roll row lines (DEBUG) ── */

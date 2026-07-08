@@ -84,6 +84,33 @@ export const pitchSession = {
     }
   },
 
+  /** Suspend during pause — stops detectors but keeps processedBeats intact */
+  async suspend(): Promise<void> {
+    await Promise.all([...detectors.values()].map(d => d.stop()))
+    detectors.clear()
+    // Do NOT clear _processedBeats or _notes — preserve sung history across pause
+    console.log('[pitchSession] suspended')
+  },
+
+  /** Resume after pause — restarts detectors but keeps accumulated processedBeats intact */
+  async resume(players: ActivePlayer[]): Promise<void> {
+    // Suspend first (detectors only) — do NOT call stop() as it clears _processedBeats
+    await pitchSession.suspend()
+    // Do NOT clear _processedBeats — preserve sung history across pause
+    console.log('[pitchSession] resume — players:', players.map(p => `P${p.playerId} dev:${p.deviceId}`))
+    for (const p of players) {
+      const det = new PitchDetector(p.playerId, p.threshold ?? 0.1, p.inputGain ?? 1.0)
+      detectors.set(p.playerId, det)
+      try {
+        await det.start(p.deviceId)
+        console.log(`[pitchSession] P${p.playerId} mic resumed OK`)
+      } catch (e) {
+        console.warn(`[pitchSession] could not resume mic for P${p.playerId}:`, e)
+        detectors.delete(p.playerId)
+      }
+    }
+  },
+
   /**
    * Sample all active detectors and update reactive notes.
    * Call once per rAF frame during playback.

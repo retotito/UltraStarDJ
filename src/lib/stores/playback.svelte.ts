@@ -307,7 +307,7 @@ export const playback = {
     isCountingDown = false
     stopTick()
     stopPitchLoop()
-    await pitchSession.stop()
+    await pitchSession.suspend()
     await sendPauseSong()
     // Stop mic monitors on pause (mic output also closes so no audio bleed)
     for (const id of [...playersStore.monitoringIds]) {
@@ -342,9 +342,9 @@ export const playback = {
         }
       }
       startPitchLoop()
-      pitchSession.start(
+      pitchSession.resume(
         playersWithMic.map(p => ({ playerId: p.id, deviceId: p.mic!.deviceId, threshold: p.threshold ?? 0.1, inputGain: gainCurve(p.inputGain ?? 1.0) }))
-      ).catch(e => console.warn('[playback] pitchSession.start (resume) failed:', e))
+      ).catch(e => console.warn('[playback] pitchSession.resume failed:', e))
     }
     console.log('[playback] resumed')
   },
