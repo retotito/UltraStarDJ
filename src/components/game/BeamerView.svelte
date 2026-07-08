@@ -170,6 +170,7 @@
                   {showPianoRollLines}
                   {showNoteSyllables}
                   {noteBarStyle}
+                  playing={screen === 'playing'}
                   pitchTick={pitchTicks.find(t => t.playerId === id) ?? null}
                 />
               </div>
