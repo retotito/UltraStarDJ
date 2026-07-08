@@ -124,7 +124,10 @@ export const pitchSession = {
       let correct = false
       // Octave-corrected midi: shift sample to same octave range as target
       let correctedMidi = sample.midiNote
-      if (sample.midiNote >= 0 && targetPitch >= 0) {
+      if (activeNoteType === 'rap' || activeNoteType === 'rap-golden') {
+        // Rap notes: any detected sound counts as correct — no pitch check
+        correct = sample.midiNote >= 0
+      } else if (sample.midiNote >= 0 && targetPitch >= 0) {
         const diff = Math.abs(sample.midiNote - targetPitch) % 12
         const distance = diff > 6 ? 12 - diff : diff
         correct = distance <= tolerance
@@ -134,13 +137,18 @@ export const pitchSession = {
         while (correctedMidi < targetPitch - 6) correctedMidi += 12
       }
 
+      // Joker system only applies to normal/golden notes, not rap
+      const isRapNote = activeNoteType === 'rap' || activeNoteType === 'rap-golden'
+
       // Joker system (TunePerfect algorithm):
       // — Correct beat  → bank a joker for next beat
       // — Wrong beat with joker → spend joker, treat as correct (forgives vibrato dips / brief misses)
       // — Wrong beat without joker → genuine miss
       // — No pitch → clear joker
       let jokerUsed = false
-      if (sample.midiNote < 0) {
+      if (isRapNote) {
+        // no joker for rap — correct is already final
+      } else if (sample.midiNote < 0) {
         _jokerState.set(playerId, false)
       } else if (correct) {
         _jokerState.set(playerId, true)

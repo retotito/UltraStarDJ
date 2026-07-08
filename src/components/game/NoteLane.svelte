@@ -105,9 +105,10 @@
                           + activeLine.notes[activeLine.notes.length - 1].lengthBeats
     const avg = avgPitch(activeLine)
 
-    // Filter to beats within current phrase only
+    // Filter to beats within current phrase only, excluding rap (handled separately)
     const beats = pitchTick.processedBeats
-      .filter(b => b.beat >= phraseFirstBeat && b.beat < phraseLastBeat)
+      .filter(b => b.beat >= phraseFirstBeat && b.beat < phraseLastBeat
+        && b.noteType !== 'rap' && b.noteType !== 'rap-golden')
       .sort((a, b) => a.beat - b.beat)
 
     if (!beats.length) return []
@@ -132,6 +133,21 @@
       }
     }
     return segments
+  })
+
+  // ── Rap note hit detection ─────────────────────────────────────────────────
+  // A rap note is "hit" when any beat within it was detected (midiNote >= 0 = correct)
+  const rapHitNotes = $derived.by((): Set<number> => {
+    if (!pitchTick?.processedBeats || !activeLine) return new Set()
+    const hits = new Set<number>()
+    for (const note of activeLine.notes) {
+      if (note.type !== 'rap' && note.type !== 'rap-golden') continue
+      const wasHit = pitchTick.processedBeats.some(
+        b => b.beat >= note.startBeat && b.beat < note.startBeat + note.lengthBeats && b.correct
+      )
+      if (wasHit) hits.add(note.startBeat)
+    }
+    return hits
   })
 
   // ── Perfect line flash ─────────────────────────────────────────────────────
@@ -202,8 +218,12 @@
         class="note-bar"
         class:golden={isGolden}
         class:rap={isRap}
+        class:rap-hit={isRap && rapHitNotes.has(cell.note.startBeat)}
         class:freestyle={isFreestyle}
       >
+      {#if isRap}
+        <span class="rap-badge">{cell.note.type === 'rap-golden' ? '★' : 'R'}</span>
+      {/if}
       <!-- Syllable label (optional, only when bar is wide enough) -->
       {#if showNoteSyllables && cell.colSpan >= 2}
         <span class="note-syllable">{cell.note.syllable.trim()}</span>
@@ -311,8 +331,34 @@
 
   .note-bar.rap {
     border-style: dashed;
-    border-color: rgba(255, 255, 255, 0.4);
-    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 165, 50, 0.5);
+    background: rgba(255, 165, 50, 0.08);
+  }
+
+  .note-bar.rap-hit {
+    background: rgba(255, 140, 0, 0.8);
+    border-color: rgba(255, 165, 50, 0.9);
+    border-style: solid;
+  }
+
+  .rap-badge {
+    position: absolute;
+    top: 2px;
+    right: 3px;
+    font-size: 0.6rem;
+    font-weight: 900;
+    line-height: 1;
+    color: #ff8c00;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 2px;
+    padding: 1px 2px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .note-bar.rap-hit .rap-badge {
+    color: #fff;
+    background: rgba(0, 0, 0, 0.5);
   }
 
   .note-bar.freestyle {
