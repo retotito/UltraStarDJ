@@ -27,6 +27,13 @@ pub struct MicLevelEvent {
     pub rms: f32, // 0.0 – 1.0
 }
 
+#[derive(Clone, Serialize)]
+pub struct MicPcmEvent {
+    pub player_id: u8,
+    pub samples: Vec<f32>,
+    pub sample_rate: u32,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct MicDisconnectedEvent {
     pub device_id: String,
@@ -42,6 +49,7 @@ pub struct MicReconnectedEvent {
 // ── Event names ───────────────────────────────────────────────────────────────
 
 pub const EVT_MIC_LEVEL: &str = "mic:level";
+pub const EVT_MIC_PCM:   &str = "mic:pcm";
 pub const EVT_MIC_DISCONNECTED: &str = "mic:disconnected";
 pub const EVT_MIC_RECONNECTED: &str = "mic:reconnected";
 pub const EVT_DEVICES_CHANGED: &str = "mic:devices-changed";
@@ -585,6 +593,8 @@ fn build_input_stream_f32(
     call_count: Arc<AtomicU64>,
 ) -> Result<cpal::Stream, String> {
     let mut gate_open = false;
+    let mut pcm_buf: Vec<f32> = Vec::with_capacity(2048);
+    const PCM_CHUNK: usize = 2048;
     device.build_input_stream(
         config,
         move |data: &[f32], _| {
@@ -592,7 +602,11 @@ fn build_input_stream_f32(
             let thr = *thresholds.lock().unwrap().get(&player_id).unwrap_or(&0.0);
             let mono: Vec<f32> = data.chunks(total_ch)
                 .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s * ig))).collect();
-            
+            pcm_buf.extend_from_slice(&mono);
+            if pcm_buf.len() >= PCM_CHUNK {
+                let chunk: Vec<f32> = pcm_buf.drain(..PCM_CHUNK).collect();
+                let _ = app.emit(EVT_MIC_PCM, MicPcmEvent { player_id, samples: chunk, sample_rate: in_rate });
+            }
             let level = rms(&mono);
             let above = level >= thr || (gate_open && level >= thr * 0.5);
             gate_open = above;
@@ -618,6 +632,8 @@ fn build_input_stream_i16(
     call_count: Arc<AtomicU64>,
 ) -> Result<cpal::Stream, String> {
     let mut gate_open = false;
+    let mut pcm_buf: Vec<f32> = Vec::with_capacity(2048);
+    const PCM_CHUNK: usize = 2048;
     device.build_input_stream(
         config,
         move |data: &[i16], _| {
@@ -625,7 +641,11 @@ fn build_input_stream_i16(
             let thr = *thresholds.lock().unwrap().get(&player_id).unwrap_or(&0.0);
             let mono: Vec<f32> = data.chunks(total_ch)
                 .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate(s as f32 / i16::MAX as f32 * ig))).collect();
-            
+            pcm_buf.extend_from_slice(&mono);
+            if pcm_buf.len() >= PCM_CHUNK {
+                let chunk: Vec<f32> = pcm_buf.drain(..PCM_CHUNK).collect();
+                let _ = app.emit(EVT_MIC_PCM, MicPcmEvent { player_id, samples: chunk, sample_rate: in_rate });
+            }
             let level = rms(&mono);
             let above = level >= thr || (gate_open && level >= thr * 0.5);
             gate_open = above;
@@ -651,6 +671,8 @@ fn build_input_stream_u16(
     call_count: Arc<AtomicU64>,
 ) -> Result<cpal::Stream, String> {
     let mut gate_open = false;
+    let mut pcm_buf: Vec<f32> = Vec::with_capacity(2048);
+    const PCM_CHUNK: usize = 2048;
     device.build_input_stream(
         config,
         move |data: &[u16], _| {
@@ -658,7 +680,11 @@ fn build_input_stream_u16(
             let thr = *thresholds.lock().unwrap().get(&player_id).unwrap_or(&0.0);
             let mono: Vec<f32> = data.chunks(total_ch)
                 .filter_map(|frame| frame.get(ch_idx).map(|&s| soft_saturate((s as f32 - 32768.0) / 32768.0 * ig))).collect();
-            
+            pcm_buf.extend_from_slice(&mono);
+            if pcm_buf.len() >= PCM_CHUNK {
+                let chunk: Vec<f32> = pcm_buf.drain(..PCM_CHUNK).collect();
+                let _ = app.emit(EVT_MIC_PCM, MicPcmEvent { player_id, samples: chunk, sample_rate: in_rate });
+            }
             let level = rms(&mono);
             let above = level >= thr || (gate_open && level >= thr * 0.5);
             gate_open = above;

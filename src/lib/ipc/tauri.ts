@@ -345,6 +345,16 @@ export interface MicLevelEvent {
   rms: number // 0.0 – 1.0
 }
 
+export interface MicPcmPayload {
+  player_id: number
+  samples: number[]
+  sample_rate: number
+}
+
+export function onMicPcm(handler: (payload: MicPcmPayload) => void): Promise<UnlistenFn> {
+  return listen<MicPcmPayload>('mic:pcm', e => handler(e.payload))
+}
+
 export interface MicDisconnectedEvent {
   device_id: string
   player_id: number

@@ -64,17 +64,20 @@ export const pitchSession = {
     _lastLoggedBeat.clear()
     console.log('[pitchSession] start — players:', players.map(p => `P${p.playerId} dev:${p.deviceId}`))
 
-    await Promise.all(players.map(async p => {
+    // Start detectors sequentially — parallel getUserMedia on macOS can cause
+    // one stream to return silence when two devices are opened at the same time.
+    for (const p of players) {
       const det = new PitchDetector(p.playerId, p.threshold ?? 0.1, p.inputGain ?? 1.0)
       detectors.set(p.playerId, det)
       try {
         await det.start(p.deviceId)
+        // Ensure AudioContext is running (may start suspended on some platforms)
         console.log(`[pitchSession] P${p.playerId} mic started OK`)
       } catch (e) {
         console.warn(`[pitchSession] could not start mic for P${p.playerId}:`, e)
         detectors.delete(p.playerId)
       }
-    }))
+    }
   },
 
   /**

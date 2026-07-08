@@ -47,9 +47,14 @@ function activeMicPlayers() {
   })
 }
 
-onCountdownDone(async () => {
-  isCountingDown = false
-  console.log('[playback] countdown done — song started')
+// Guard against HMR double-registration: store unlisten and re-use
+let _unlistenCountdownDone: (() => void) | null = null
+;(async () => {
+  const prev = _unlistenCountdownDone as (() => void) | null
+  if (prev) prev()
+  _unlistenCountdownDone = await onCountdownDone(async () => {
+    isCountingDown = false
+    console.log('[playback] countdown done — song started')
 
   const playersWithMic = activeMicPlayers()
   if (playersWithMic.length > 0) {
@@ -72,7 +77,8 @@ onCountdownDone(async () => {
     startPitchLoop()
     console.log('[playback] pitch loop started')
   }
-})
+  })
+})()
 
 // ── Time-tick loop ────────────────────────────────────────────
 let getTime: (() => number) | null = null
@@ -101,8 +107,12 @@ function stopTick() {
 
 // ── Pitch rAF loop ────────────────────────────────────────────
 let pitchRaf: number | null = null
+let _noTicksLogged = false
+let _lastTickLog = -1
 
 function startPitchLoop() {
+  _noTicksLogged = false
+  _lastTickLog = -1
   if (pitchRaf !== null) return
   const loop = () => {
     const song = state.song
@@ -117,7 +127,18 @@ function startPitchLoop() {
         processedBeats: r.processedBeats,
       }))
       if (ticks.length > 0) {
+        // Debug: log processedBeats count per player once per second
+        if (Math.floor(currentBeat) % 16 === 0 && Math.floor(currentBeat) !== _lastTickLog) {
+          _lastTickLog = Math.floor(currentBeat)
+          console.log('[pitch ticks]', ticks.map(t => `P${t.playerId}:${t.processedBeats.length}beats`).join(' '))
+        }
         sendPitchTick({ ticks, beat: currentBeat }).catch(() => {})
+      } else {
+        // No detectors active — log once to help diagnose
+        if (!_noTicksLogged) {
+          _noTicksLogged = true
+          console.warn('[playback] pitch loop running but no active detectors — check mic assignment')
+        }
       }
     }
     pitchRaf = requestAnimationFrame(loop)
