@@ -54,8 +54,9 @@
   const noteBarMinHeight = $derived(assignedPlayerIds.length <= 2 ? 40 : 28)
   const noteBarRadius = $derived(assignedPlayerIds.length <= 2 ? 8 : 4)
 
-  // Placeholder scores for score screen
-  const placeholderScores: Record<number, number> = { 1: 8540, 2: 7230, 3: 9100, 4: 6800 }
+  // Live scores from pitchTicks (also used on score screen — ticks are retained after stop)
+  function getScore(id: number) { return pitchTicks.find(t => t.playerId === id)?.score ?? 0 }
+  function getMaxScore(id: number) { return pitchTicks.find(t => t.playerId === id)?.maxScore ?? 0 }
 
   // Song duration derived from last note beat
   const songDuration = $derived.by(() => {
@@ -149,7 +150,13 @@
           <!-- One note lane per assigned player, stacked vertically -->
           <div class="lanes-area">
             {#each assignedPlayerIds as id, i (id)}
+              {@const tick = pitchTicks.find(t => t.playerId === id)}
               <div class="lane-wrap">
+                {#if tick && tick.maxScore > 0}
+                  <div class="lane-score" style="color: {PLAYER_COLORS[id] ?? '#fff'}">
+                    {tick.score.toLocaleString()}
+                  </div>
+                {/if}
                 <NoteLane
                   tracks={payload.song.notes}
                   trackIndex={Math.min(i, payload.song.notes.length - 1)}
@@ -200,9 +207,10 @@
               P{id}
             </div>
             <div class="score-bar-wrap">
-              <div class="score-bar" style="width: {(placeholderScores[id] ?? 5000) / 100}%; background: {PLAYER_COLORS[id] ?? '#888'}"></div>
+              {@const pct = getMaxScore(id) > 0 ? Math.round(getScore(id) / getMaxScore(id) * 100) : 0}
+              <div class="score-bar" style="width: {pct}%; background: {PLAYER_COLORS[id] ?? '#888'}"></div>
             </div>
-            <span class="score-value">{(placeholderScores[id] ?? 5000).toLocaleString()}</span>
+            <span class="score-value">{getScore(id).toLocaleString()}</span>
           </div>
         {/each}
       </div>
@@ -410,6 +418,19 @@
     flex: 1;          /* each player gets an equal share of the available height */
     min-height: 0;    /* allow shrinking below content size */
     width: 100%;
+    position: relative;
+  }
+
+  .lane-score {
+    position: absolute;
+    top: 4px;
+    right: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    z-index: 2;
+    pointer-events: none;
   }
 
   /* ── Lyrics bar (fixed at bottom, semi-transparent background) ── */

@@ -13,7 +13,8 @@
 import { PitchDetector } from '$lib/audio/PitchDetector'
 import { DIFFICULTY_TOLERANCE } from '$lib/stores/settings.svelte'
 import type { Difficulty } from '$lib/stores/settings.svelte'
-import type { NoteTrack } from '$lib/ultrastar/types'
+import type { NoteTrack, NoteType } from '$lib/ultrastar/types'
+import { calcScore } from '$lib/ultrastar/scoring'
 
 export interface ActivePlayer {
   playerId: number
@@ -27,6 +28,7 @@ export interface ProcessedBeat {
   midiNote:     number   // octave-corrected midi (same octave range as target)
   correct:      boolean
   isFirstInNote: boolean // true when this beat is the first beat of its note
+  noteType:     NoteType
 }
 
 export interface PitchResult {
@@ -34,6 +36,8 @@ export interface PitchResult {
   midiNote:       number   // -1 = no pitch (latest raw sample)
   correct:        boolean
   rowPitch:       number   // note pitch to display in lane (-1 = hide)
+  score:          number
+  maxScore:       number
   /** All processed beats for current section: beat index → ProcessedBeat */
   processedBeats: ProcessedBeat[]
 }
@@ -106,11 +110,13 @@ export const pitchSession = {
       // Find the note active at evalBeat (delay-adjusted)
       let targetPitch = -1
       let activeNoteStart = -1
+      let activeNoteType: NoteType = 'normal'
       for (const line of (track?.lines ?? [])) {
         for (const note of line.notes) {
           if (evalBeat >= note.startBeat && evalBeat < note.startBeat + note.lengthBeats) {
             targetPitch = note.pitch
             activeNoteStart = note.startBeat
+            activeNoteType = note.type
           }
         }
       }
@@ -171,18 +177,23 @@ export const pitchSession = {
         if (!_processedBeats.has(playerId)) _processedBeats.set(playerId, new Map())
         const playerBeats = _processedBeats.get(playerId)!
         const isFirstInNote = intBeat === activeNoteStart
-        playerBeats.set(intBeat, { beat: intBeat, midiNote: displayMidi, correct, isFirstInNote })
+        playerBeats.set(intBeat, { beat: intBeat, midiNote: displayMidi, correct, isFirstInNote, noteType: activeNoteType })
       }
 
       // Collect all processedBeats for this player as an array (sent to beamer)
       const playerBeats = _processedBeats.get(playerId)
       const processedBeats: ProcessedBeat[] = playerBeats ? [...playerBeats.values()] : []
 
+      // Compute running score
+      const { score, maxScore } = calcScore(processedBeats, track)
+
       next[playerId] = {
         playerId,
         midiNote: sample.midiNote,
         correct,
         rowPitch: correct ? targetPitch : displayMidi,
+        score,
+        maxScore,
         processedBeats,
       }
     }

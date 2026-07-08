@@ -53,6 +53,7 @@ let _unlistenCountdownDone: (() => void) | null = null
   const prev = _unlistenCountdownDone as (() => void) | null
   if (prev) prev()
   _unlistenCountdownDone = await onCountdownDone(async () => {
+    if (!isCountingDown) return  // deduplicate — 2nd beamer fires this too
     isCountingDown = false
     console.log('[playback] countdown done — song started')
 
@@ -124,6 +125,8 @@ function startPitchLoop() {
         midiNote:       r.midiNote,
         correct:        r.correct,
         rowPitch:       r.rowPitch,
+        score:          r.score,
+        maxScore:       r.maxScore,
         processedBeats: r.processedBeats,
       }))
       if (ticks.length > 0) {

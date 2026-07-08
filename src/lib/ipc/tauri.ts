@@ -190,6 +190,7 @@ export interface ProcessedBeatEntry {
   midiNote:      number   // octave-corrected midi
   correct:       boolean
   isFirstInNote: boolean
+  noteType:      string
 }
 
 export interface PitchTickEntry {
@@ -197,6 +198,8 @@ export interface PitchTickEntry {
   midiNote:       number   // -1 = no pitch (latest raw sample)
   correct:        boolean
   rowPitch:       number   // pitch row to draw (-1 = hide)
+  score:          number
+  maxScore:       number
   /** All processed beats accumulated so far this session */
   processedBeats: ProcessedBeatEntry[]
 }
