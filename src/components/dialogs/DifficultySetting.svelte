@@ -2,9 +2,9 @@
   import { appSettings, DIFFICULTY_TOLERANCE, type Difficulty } from '$lib/stores/settings.svelte'
 
   const levels: { value: Difficulty; label: string; desc: string }[] = [
-    { value: 'easy',   label: 'Easy',   desc: '±3 semitones' },
-    { value: 'medium', label: 'Medium', desc: '±2 semitones' },
-    { value: 'hard',   label: 'Hard',   desc: '±1 semitone'  },
+    { value: 'easy',   label: 'Easy',   desc: '±2 semitones' },
+    { value: 'medium', label: 'Medium', desc: '±1 semitone'  },
+    { value: 'hard',   label: 'Hard',   desc: 'exact match'  },
   ]
 
   function select(d: Difficulty) {

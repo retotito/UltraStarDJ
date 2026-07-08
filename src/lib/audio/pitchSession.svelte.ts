@@ -46,6 +46,10 @@ let _notes = $state<Record<number, PitchResult>>({})
 // processedBeats: playerId → (beat → ProcessedBeat)
 // Accumulates one entry per integer beat. Cleared on stop()/start(). Overwritten each frame (last frame per beat wins).
 const _processedBeats = new Map<number, Map<number, ProcessedBeat>>()
+// Joker state per player: true = has one free "forgiven" beat banked (TunePerfect algorithm)
+const _jokerState = new Map<number, boolean>()
+// Throttle debug logging: track last logged beat per player
+const _lastLoggedBeat = new Map<number, number>()
 
 export const pitchSession = {
   get notes(): Record<number, PitchResult> { return _notes },
@@ -56,6 +60,8 @@ export const pitchSession = {
     await pitchSession.stop()
     _notes = {}
     _processedBeats.clear()
+    _jokerState.clear()
+    _lastLoggedBeat.clear()
     console.log('[pitchSession] start — players:', players.map(p => `P${p.playerId} dev:${p.deviceId}`))
 
     await Promise.all(players.map(async p => {
@@ -119,13 +125,50 @@ export const pitchSession = {
         while (correctedMidi < targetPitch - 6) correctedMidi += 12
       }
 
+      // Joker system (TunePerfect algorithm):
+      // — Correct beat  → bank a joker for next beat
+      // — Wrong beat with joker → spend joker, treat as correct (forgives vibrato dips / brief misses)
+      // — Wrong beat without joker → genuine miss
+      // — No pitch → clear joker
+      let jokerUsed = false
+      if (sample.midiNote < 0) {
+        _jokerState.set(playerId, false)
+      } else if (correct) {
+        _jokerState.set(playerId, true)
+      } else if (_jokerState.get(playerId)) {
+        _jokerState.set(playerId, false)
+        correct = true
+        jokerUsed = true
+      } else {
+        _jokerState.set(playerId, false)
+      }
+
+      // Snap display pitch to target when correct (so segments sit ON the note bar)
+      const displayMidi = correct ? targetPitch : correctedMidi
+
+      // Log pitch info for debugging (throttled: only on new integer beats)
+      if (sample.midiNote >= 0) {
+        const intBeat = Math.floor(evalBeat)
+        const lastLogged = (_lastLoggedBeat.get(playerId) ?? -1)
+        if (intBeat !== lastLogged) {
+          _lastLoggedBeat.set(playerId, intBeat)
+          console.log(
+            `[pitch P${playerId}] beat=${intBeat}` +
+            ` raw=${sample.midiNote}` +
+            (targetPitch >= 0
+              ? ` corrected=${correctedMidi} target=${targetPitch} correct=${correct}${jokerUsed ? ' (joker)' : ''} (difficulty=${difficulty} tol=±${tolerance}st)`
+              : ' (no active note)')
+          )
+        }
+      }
+
       // Record one ProcessedBeat per integer beat when we're inside a note
       if (sample.midiNote >= 0 && activeNoteStart >= 0) {
         const intBeat = Math.floor(evalBeat)
         if (!_processedBeats.has(playerId)) _processedBeats.set(playerId, new Map())
         const playerBeats = _processedBeats.get(playerId)!
         const isFirstInNote = intBeat === activeNoteStart
-        playerBeats.set(intBeat, { beat: intBeat, midiNote: correctedMidi, correct, isFirstInNote })
+        playerBeats.set(intBeat, { beat: intBeat, midiNote: displayMidi, correct, isFirstInNote })
       }
 
       // Collect all processedBeats for this player as an array (sent to beamer)
@@ -136,7 +179,7 @@ export const pitchSession = {
         playerId,
         midiNote: sample.midiNote,
         correct,
-        rowPitch: correct ? targetPitch : correctedMidi,
+        rowPitch: correct ? targetPitch : displayMidi,
         processedBeats,
       }
     }
@@ -148,6 +191,8 @@ export const pitchSession = {
     await Promise.all([...detectors.values()].map(d => d.stop()))
     detectors.clear()
     _processedBeats.clear()
+    _jokerState.clear()
+    _lastLoggedBeat.clear()
     _notes = {}
   },
 }

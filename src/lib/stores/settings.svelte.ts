@@ -5,11 +5,11 @@
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
 
-/** Semitone tolerance per difficulty level (octave-invariant matching) */
+/** Semitone tolerance per difficulty level (octave-invariant matching, matches TunePerfect / USDX) */
 export const DIFFICULTY_TOLERANCE: Record<Difficulty, number> = {
-  easy:   3,
-  medium: 2,
-  hard:   1,
+  easy:   2,
+  medium: 1,
+  hard:   0.5,  // with integer MIDI: effectively requires exact semitone match
 }
 
 export interface SongSource {
