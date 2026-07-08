@@ -538,21 +538,23 @@
   .perfect-overlay {
     position: relative;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: calc(var(--space-2) + 30px) calc(var(--space-2) + 20px) var(--space-2) var(--space-2);
     pointer-events: none;
     z-index: 20;
   }
 
   .perfect-text {
-    font-size: clamp(1.4rem, 3.5vw, 2.4rem);
+    font-size: clamp(0.75rem, 1.6vw, 1.1rem);
     font-weight: 900;
     letter-spacing: 0.12em;
     color: #fff;
-    text-shadow:
-      0 0 18px var(--player-color),
-      0 0 40px var(--player-color),
-      0 2px 8px rgba(0,0,0,0.9);
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: var(--radius-md, 8px);
+    padding: 3px 10px;
+    box-shadow: 0 0 12px var(--player-color), 0 0 4px rgba(0,0,0,0.6);
+    text-shadow: 0 0 12px var(--player-color);
     animation: perfect-pop 1.6s ease forwards;
   }
 
