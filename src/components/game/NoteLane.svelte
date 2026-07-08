@@ -251,8 +251,15 @@
 
   .note-bar.golden {
     background: rgba(255, 210, 60, 0.2);
-    border-color: rgba(255, 210, 60, 0.7);
-    box-shadow: 0 0 6px rgba(255, 210, 60, 0.3);
+    border-color: rgba(255, 210, 60, 0.85);
+    box-shadow: 0 0 8px rgba(255, 210, 60, 0.45);
+    animation: golden-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes golden-shimmer {
+    0%   { box-shadow: 0 0 6px rgba(255, 210, 60, 0.35), inset 0 0 8px rgba(255, 210, 60, 0.0); }
+    50%  { box-shadow: 0 0 14px rgba(255, 215, 80, 0.75), inset 0 0 10px rgba(255, 215, 80, 0.18); }
+    100% { box-shadow: 0 0 6px rgba(255, 210, 60, 0.35), inset 0 0 8px rgba(255, 210, 60, 0.0); }
   }
 
   .note-bar.rap {

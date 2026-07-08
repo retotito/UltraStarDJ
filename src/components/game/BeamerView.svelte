@@ -207,8 +207,7 @@
               P{id}
             </div>
             <div class="score-bar-wrap">
-              {@const pct = getMaxScore(id) > 0 ? Math.round(getScore(id) / getMaxScore(id) * 100) : 0}
-              <div class="score-bar" style="width: {pct}%; background: {PLAYER_COLORS[id] ?? '#888'}"></div>
+              <div class="score-bar" style="width: {getMaxScore(id) > 0 ? Math.round(getScore(id) / getMaxScore(id) * 100) : 0}%; background: {PLAYER_COLORS[id] ?? '#888'}"></div>
             </div>
             <span class="score-value">{getScore(id).toLocaleString()}</span>
           </div>
