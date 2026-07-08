@@ -39,6 +39,7 @@
       // Keep _lastKnownAt fresh while paused so resume has no elapsed-time jump
       _lastKnownAt = performance.now()
     }
+    _drawPlayhead()
     _rafId = requestAnimationFrame(_tick)
   }
   _rafId = requestAnimationFrame(_tick)
@@ -202,12 +203,64 @@
     return hits
   })
 
-  // ── Playhead position (0–1, clamped to phrase) ────────────────────────────
-  const playheadFrac = $derived.by(() => {
-    if (!activeLine || phraseBeats <= 0) return -1
-    const phraseFirstBeat = activeLine.notes[0].startBeat
-    return (currentBeat - phraseFirstBeat) / phraseBeats
+  // ── Canvas overlay: playhead drawn directly in rAF ────────────────────────
+  let canvasEl: HTMLCanvasElement | undefined
+  let _ctx: CanvasRenderingContext2D | null = null
+  let _cw = 0, _ch = 0
+  let _padX = 0, _padY = 0
+
+  // Cache phrase time boundaries as plain JS — updated by $effect, read in rAF
+  let _phraseStartSec = 0
+  let _phraseDurSec   = 0   // 0 = no active phrase
+
+  $effect(() => {
+    const line = activeLine
+    if (!line || !line.notes.length) { _phraseDurSec = 0; return }
+    const secPerBeat   = 60 / bpm / 4
+    const last         = line.notes[line.notes.length - 1]
+    _phraseStartSec    = line.notes[0].startBeat * secPerBeat + gap / 1000
+    const phraseEndSec = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000
+    _phraseDurSec      = phraseEndSec - _phraseStartSec
   })
+
+  $effect(() => {
+    if (!canvasEl) return
+    const ro = new ResizeObserver((entries) => {
+      if (!canvasEl) return
+      const rect = entries[0]?.contentRect
+      _cw = rect?.width  ?? canvasEl.offsetWidth
+      _ch = rect?.height ?? canvasEl.offsetHeight
+      canvasEl.width  = Math.round(_cw)
+      canvasEl.height = Math.round(_ch)
+      const cs = getComputedStyle(canvasEl.parentElement!)
+      _padX = parseFloat(cs.paddingLeft) || 0
+      _padY = parseFloat(cs.paddingTop)  || 0
+      _ctx = canvasEl.getContext('2d')
+    })
+    ro.observe(canvasEl)
+    return () => ro.disconnect()
+  })
+
+  function _drawPlayhead() {
+    if (!_ctx || _cw === 0 || _phraseDurSec <= 0) {
+      _ctx?.clearRect(0, 0, _cw, _ch)
+      return
+    }
+    const frac = (smoothTime - _phraseStartSec) / _phraseDurSec
+    _ctx.clearRect(0, 0, _cw, _ch)
+    if (frac < 0 || frac > 1) return
+    const x = _padX + frac * (_cw - _padX * 2)
+    _ctx.save()
+    _ctx.beginPath()
+    _ctx.moveTo(x, _padY)
+    _ctx.lineTo(x, _ch - _padY)
+    _ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+    _ctx.lineWidth   = 2
+    _ctx.shadowColor = 'rgba(255,255,255,0.2)'
+    _ctx.shadowBlur  = 6
+    _ctx.stroke()
+    _ctx.restore()
+  }
 
   // ── Perfect line flash ─────────────────────────────────────────────────────
   // Fires once per completed line where every singable beat was correct.
@@ -344,20 +397,14 @@
     {/each}
   {/if}
 
-  <!-- Playhead: vertical line moving left→right across the phrase -->
-  {#if playheadFrac >= 0 && playheadFrac <= 1}
-    <div
-      class="playhead"
-      style="left: calc(var(--space-4) + {playheadFrac} * (100% - var(--space-4) * 2));"
-    ></div>
-  {/if}
-
   <!-- Perfect line flash overlay -->
   {#if perfectFlash}
     <div class="perfect-overlay" style="grid-row: 1 / -1; grid-column: 1 / -1;">
       <span class="perfect-text">PERFECT!</span>
     </div>
   {/if}
+
+  <canvas bind:this={canvasEl} class="overlay-canvas" aria-hidden="true"></canvas>
 </div>
 
 <style>
@@ -371,6 +418,16 @@
     gap: 2px;
     padding: var(--space-2) var(--space-4);
     box-sizing: border-box;
+  }
+
+  .overlay-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 15;
+    display: block;
   }
 
   /* ── Playhead ── */
