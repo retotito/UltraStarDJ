@@ -110,11 +110,11 @@ function startPitchLoop() {
       const currentBeat = (getTime() - song.gap / 1000) * (song.bpm / 60) * 4
       pitchSession.tick(song.notes, currentBeat, appSettings.difficulty, appSettings.micDelay, song.bpm)
       const ticks = Object.values(pitchSession.notes).map(r => ({
-        playerId: r.playerId,
-        midiNote: r.midiNote,
-        correct:  r.correct,
-        rowPitch: r.rowPitch,
-        noteFills: r.noteFills,
+        playerId:       r.playerId,
+        midiNote:       r.midiNote,
+        correct:        r.correct,
+        rowPitch:       r.rowPitch,
+        processedBeats: r.processedBeats,
       }))
       if (ticks.length > 0) {
         sendPitchTick({ ticks, beat: currentBeat }).catch(() => {})

@@ -89,7 +89,50 @@
     return last.startBeat + last.lengthBeats - first
   })
 
-  // ── Sung note: which note is active right now + its row ────────────────────
+  // ── Sung segments: group processedBeats into continuous runs ───────────────
+  type SungSegment = {
+    startCol:  number   // 1-indexed grid column
+    length:    number   // span in beats
+    row:       number   // 1-indexed grid row
+    correct:   boolean
+  }
+
+  const sungSegments = $derived.by((): SungSegment[] => {
+    if (!pitchTick?.processedBeats?.length || !activeLine) return []
+
+    const phraseFirstBeat = activeLine.notes[0].startBeat
+    const phraseLastBeat  = activeLine.notes[activeLine.notes.length - 1].startBeat
+                          + activeLine.notes[activeLine.notes.length - 1].lengthBeats
+    const avg = avgPitch(activeLine)
+
+    // Filter to beats within current phrase only
+    const beats = pitchTick.processedBeats
+      .filter(b => b.beat >= phraseFirstBeat && b.beat < phraseLastBeat)
+      .sort((a, b) => a.beat - b.beat)
+
+    if (!beats.length) return []
+
+    const segments: SungSegment[] = []
+    for (const beat of beats) {
+      const col = beat.beat - phraseFirstBeat + 1
+      const row = pitchToRow(beat.midiNote, avg, rowCount)
+      const last = segments.at(-1)
+
+      const shouldStartNew =
+        !last ||
+        beat.isFirstInNote ||
+        last.row !== row ||
+        last.startCol + last.length !== col  // gap in beat sequence
+
+      if (shouldStartNew) {
+        segments.push({ startCol: col, length: 1, row, correct: beat.correct })
+      } else {
+        last.length++
+        last.correct = last.correct || beat.correct  // segment is "correct" if any beat was correct
+      }
+    }
+    return segments
+  })
 </script>
 
 <div
@@ -121,16 +164,24 @@
         class:rap={isRap}
         class:freestyle={isFreestyle}
       >
-      <!-- Sung fill: grows as player correctly hits this note -->
-      {#if (pitchTick?.noteFills?.[cell.note.startBeat] ?? 0) > 0}
-        <div class="note-fill-sung" style="width: {((pitchTick?.noteFills?.[cell.note.startBeat] ?? 0) * 100).toFixed(1)}%"></div>
-      {/if}
       <!-- Syllable label (optional, only when bar is wide enough) -->
       {#if showNoteSyllables && cell.colSpan >= 2}
         <span class="note-syllable">{cell.note.syllable.trim()}</span>
       {/if}
       </div>
     </div>
+  {/each}
+
+  <!-- Sung segments: one div per grouped segment, rendered in front of note bars -->
+  {#each sungSegments as seg (seg.startCol + '_' + seg.row)}
+    <div
+      class="sung-segment"
+      class:correct={seg.correct}
+      style="
+        grid-column: {seg.startCol} / span {seg.length};
+        grid-row: {seg.row};
+      "
+    ></div>
   {/each}
 
   <!-- Piano-roll row lines (optional, for visual reference) -->
@@ -160,7 +211,21 @@
     z-index: 0;
   }
 
-  /* ── Sung note indicator ── */
+  /* ── Sung segments (one per consecutive same-pitch run) ── */
+  .sung-segment {
+    pointer-events: none;
+    z-index: 4;
+    align-self: center;
+    height: max(70%, var(--bar-min-h, 24px));
+    border-radius: var(--bar-radius, 4px);
+    background: var(--player-color);
+    opacity: 0.45;
+  }
+
+  .sung-segment.correct {
+    opacity: 0.85;
+  }
+
   /* ── Note cell (grid item, full cell height) ── */
   .note-cell {
     position: relative;
@@ -202,21 +267,6 @@
     background: transparent;
   }
 
-  /* ── Fill overlay (current beat progress) ── */
-  .note-fill-sung {
-    position: absolute;
-    inset: 0;
-    right: auto;
-    background: var(--player-color);
-    opacity: 0.8;
-    pointer-events: none;
-    transition: width 80ms linear;
-  }
-
-  .note-bar.golden .note-fill-sung {
-    background: #ffd23c;
-    opacity: 0.9;
-  }
 
   /* ── Syllable text ── */
   .note-syllable {

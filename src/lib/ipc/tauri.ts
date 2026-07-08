@@ -185,13 +185,20 @@ export async function sendBeamerReady(): Promise<void> {
 }
 
 // ── Pitch tick ─────────────────────────────────────────────────
+export interface ProcessedBeatEntry {
+  beat:          number
+  midiNote:      number   // octave-corrected midi
+  correct:       boolean
+  isFirstInNote: boolean
+}
+
 export interface PitchTickEntry {
-  playerId:  number
-  midiNote:  number   // -1 = no pitch
-  correct:   boolean
-  rowPitch:  number   // pitch row to draw (-1 = hide)
-  /** noteStartBeat → fill fraction 0–1 */
-  noteFills: Record<number, number>
+  playerId:       number
+  midiNote:       number   // -1 = no pitch (latest raw sample)
+  correct:        boolean
+  rowPitch:       number   // pitch row to draw (-1 = hide)
+  /** All processed beats accumulated so far this session */
+  processedBeats: ProcessedBeatEntry[]
 }
 
 export interface PitchTickPayload {
