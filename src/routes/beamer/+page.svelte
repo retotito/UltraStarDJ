@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import { onPlaySong, onPreviewSong, onStopSong, onPauseSong, onResumeSong, onScreenConfig, onTimeTick, getWindowLabel, sendCountdownDone, onBeamerSettings, onPitchTick } from '$lib/ipc/tauri'
+  import { layout } from '$lib/stores/layout.svelte'
   import type { UnlistenFn } from '@tauri-apps/api/event'
   import type { PlaySongPayload, PreviewSongPayload } from '$lib/ultrastar/types'
   import type { PitchTickEntry } from '$lib/ipc/tauri'
@@ -14,10 +15,10 @@
   let currentTime = $state(0)
   let unlisteners: UnlistenFn[] = []
 
-  // Beamer display settings (synced from DJ window via IPC)
-  let showPianoRollLines = $state(true)
-  let showNoteSyllables  = $state(true)
-  let noteBarStyle       = $state<'white' | 'black'>('white')
+  // Beamer display settings — initialised from localStorage, then kept in sync via IPC
+  let showPianoRollLines = $state(layout.showPianoRollLines)
+  let showNoteSyllables  = $state(layout.showNoteSyllables)
+  let noteBarStyle       = $state<'white' | 'black'>(layout.noteBarStyle)
   let pitchTicks         = $state<PitchTickEntry[]>([])
 
   const windowLabel = getWindowLabel()
