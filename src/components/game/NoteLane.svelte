@@ -91,10 +91,11 @@
 
   // ── Sung segments: group processedBeats into continuous runs ───────────────
   type SungSegment = {
-    startCol:  number   // 1-indexed grid column
-    length:    number   // span in beats
-    row:       number   // 1-indexed grid row
+    startCol:  number
+    length:    number
+    row:       number
     correct:   boolean
+    noteType:  string
   }
 
   const sungSegments = $derived.by((): SungSegment[] => {
@@ -108,7 +109,7 @@
     // Filter to beats within current phrase only, excluding rap (handled separately)
     const beats = pitchTick.processedBeats
       .filter(b => b.beat >= phraseFirstBeat && b.beat < phraseLastBeat
-        && b.noteType !== 'rap' && b.noteType !== 'rap-golden')
+        && b.noteType !== 'rap' && b.noteType !== 'rap-golden' && b.noteType !== 'freestyle')
       .sort((a, b) => a.beat - b.beat)
 
     if (!beats.length) return []
@@ -126,7 +127,7 @@
         last.startCol + last.length !== col  // gap in beat sequence
 
       if (shouldStartNew) {
-        segments.push({ startCol: col, length: 1, row, correct: beat.correct })
+        segments.push({ startCol: col, length: 1, row, correct: beat.correct, noteType: beat.noteType ?? 'normal' })
       } else {
         last.length++
         last.correct = last.correct || beat.correct  // segment is "correct" if any beat was correct
@@ -207,6 +208,8 @@
     {@const isGolden = cell.note.type === 'golden'}
     {@const isRap = cell.note.type === 'rap' || cell.note.type === 'rap-golden'}
     {@const isFreestyle = cell.note.type === 'freestyle'}
+    {@const isFreestyleActive = isFreestyle && currentBeat >= cell.note.startBeat}
+
     <div
       class="note-cell"
       style="
@@ -220,15 +223,15 @@
         class:rap={isRap}
         class:rap-hit={isRap && rapHitNotes.has(cell.note.startBeat)}
         class:freestyle={isFreestyle}
+        class:freestyle-active={isFreestyleActive}
       >
+      </div>
       {#if isRap}
         <span class="rap-badge">{cell.note.type === 'rap-golden' ? '★' : 'R'}</span>
       {/if}
-      <!-- Syllable label (optional, only when bar is wide enough) -->
-      {#if showNoteSyllables && cell.colSpan >= 2}
-        <span class="note-syllable">{cell.note.syllable.trim()}</span>
+      {#if isFreestyle}
+        <span class="freestyle-badge">F</span>
       {/if}
-      </div>
     </div>
   {/each}
 
@@ -237,12 +240,28 @@
     <div
       class="sung-segment"
       class:correct={seg.correct}
+      class:golden={seg.noteType === 'golden'}
+      class:freestyle={seg.noteType === 'freestyle'}
       style="
         grid-column: {seg.startCol} / span {seg.length};
         grid-row: {seg.row};
       "
     ></div>
   {/each}
+
+  <!-- Syllable labels: rendered after sung-segments so they appear on top -->
+  {#if showNoteSyllables}
+    {#each cells as cell (cell.note.startBeat + '_' + cell.note.pitch + '_syl')}
+      {#if cell.colSpan >= 2}
+        <div
+          class="syllable-overlay"
+          style="grid-column: {cell.col} / span {cell.colSpan}; grid-row: {cell.row};"
+        >
+          <span class="note-syllable">{cell.note.syllable.trim()}</span>
+        </div>
+      {/if}
+    {/each}
+  {/if}
 
   <!-- Piano-roll row lines (optional, for visual reference) -->
   {#if showPianoRollLines}
@@ -293,6 +312,11 @@
     opacity: 0.85;
   }
 
+  .sung-segment.golden {
+    background: #ffd700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+  }
+
   /* ── Note cell (grid item, full cell height) ── */
   .note-cell {
     position: relative;
@@ -341,11 +365,22 @@
     border-style: solid;
   }
 
+  .note-bar.freestyle-active {
+    animation: freestyle-pulse 0.6s ease-out 1 forwards;
+  }
+
+  @keyframes freestyle-pulse {
+    0%   { border-color: rgba(255, 255, 255, 0.25); box-shadow: none; }
+    40%  { border-color: rgba(255, 255, 255, 0.9);  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35); }
+    100% { border-color: rgba(255, 255, 255, 0.65); box-shadow: 0 0 8px rgba(255, 255, 255, 0.2); }
+  }
+
   .rap-badge {
     position: absolute;
-    top: 2px;
+    bottom: 100%;
     right: 3px;
-    font-size: 0.6rem;
+    margin-bottom: 13px;
+    font-size: 0.9rem;
     font-weight: 900;
     line-height: 1;
     color: #ff8c00;
@@ -353,12 +388,29 @@
     border-radius: 2px;
     padding: 1px 2px;
     pointer-events: none;
-    z-index: 2;
+    z-index: 6;
   }
 
-  .note-bar.rap-hit .rap-badge {
+  .rap-badge.rap-hit {
     color: #fff;
     background: rgba(0, 0, 0, 0.5);
+  }
+
+  .freestyle-badge {
+    position: absolute;
+    bottom: 100%;
+    right: 3px;
+    margin-bottom: 13px;
+    font-size: 0.9rem;
+    font-weight: 900;
+    line-height: 1;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.55);
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 2px;
+    padding: 1px 2px;
+    pointer-events: none;
+    z-index: 6;
   }
 
   .note-bar.freestyle {
@@ -369,6 +421,18 @@
 
 
   /* ── Syllable text ── */
+  /* Syllable overlay: separate grid pass, always on top of sung segments */
+  .syllable-overlay {
+    pointer-events: none;
+    z-index: 6;
+    align-self: center;
+    justify-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: max(80%, var(--bar-min-h, 28px));
+  }
+
   .note-syllable {
     position: relative;
     z-index: 1;

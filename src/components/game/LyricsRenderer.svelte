@@ -82,14 +82,31 @@
     return ((currentBeat - note.startBeat) / note.lengthBeats) * 100
   }
 
+  // Sung fill colours per note type
+  // normal/freestyle use player colour; golden = amber; rap = orange; freestyle = grey when done
+  function sweepColor(note: Note): string {
+    if (note.type === 'golden')    return '#ffd700'
+    if (note.type === 'rap' || note.type === 'rap-golden') return '#ff8c42'
+    if (note.type === 'freestyle') return 'rgba(255,255,255,0.5)'
+    return '#4f8ef7'  // normal — fixed blue
+  }
+
   /** Inline gradient style for a note syllable */
   function syllableStyle(note: Note): string {
     const pct = sweepPct(note)
-    const c = note.type === 'golden' ? '#ffd700' : '#4f8ef7'
-    if (pct <= 0)  return 'color: rgba(255,255,255,0.85)'
-    if (pct >= 100) return note.type === 'golden'
-      ? `color: #ffd700; text-shadow: 0 0 16px #ffd700aa`
-      : `color: ${c}; text-shadow: 0 0 14px ${c}66`
+    const c   = sweepColor(note)
+
+    if (pct <= 0) {
+      // Before playhead: golden gets a soft tint, rest are plain white
+      if (note.type === 'golden')    return 'color: rgba(255,215,0,0.35)'
+      if (note.type === 'freestyle') return 'color: rgba(255,255,255,0.55)'
+      return 'color: rgba(255,255,255,0.85)'
+    }
+
+    if (pct >= 100) {
+      return `color: ${c}; text-shadow: 0 0 16px ${c}99`
+    }
+
     return `background-image: linear-gradient(to right, ${c} ${pct}%, rgba(255,255,255,0.85) ${pct}%); background-clip: text; -webkit-background-clip: text; color: transparent`
   }
 
@@ -129,7 +146,7 @@
     <div class="lead-in-col">
       <div
         class="lead-in-bar"
-        style="{leadIn.style}; opacity: {leadIn.visible ? 1 : 0}"
+        style="--lead-color: {color}; {leadIn.style}; opacity: {leadIn.visible ? 1 : 0}"
       ></div>
     </div>
 
@@ -140,6 +157,7 @@
             class="syllable"
             class:golden={note.type === 'golden'}
             class:freestyle={note.type === 'freestyle'}
+            class:rap={note.type === 'rap' || note.type === 'rap-golden'}
             style={syllableStyle(note)}
           >{note.syllable}{needsTrailingSpace(activeLine.notes, i) ? ' ' : ''}</span>
         {/each}
@@ -153,7 +171,11 @@
   <div class="line-next">
     {#if nextLine}
       {#each nextLine.notes as note, i (note.startBeat)}
-        <span class="syllable" class:freestyle={note.type === 'freestyle'}>{note.syllable}{needsTrailingSpace(nextLine.notes, i) ? ' ' : ''}</span>
+        <span
+          class="syllable"
+          class:freestyle={note.type === 'freestyle'}
+          class:rap={note.type === 'rap' || note.type === 'rap-golden'}
+        >{note.syllable}{needsTrailingSpace(nextLine.notes, i) ? ' ' : ''}</span>
       {/each}
     {/if}
   </div>
@@ -196,6 +218,7 @@
   .lead-in-bar {
     width: 100%;
     height: 100%;
+    --lead-color: #4f8ef7;
   }
 
   .text-col {
@@ -222,5 +245,9 @@
   .syllable.freestyle {
     font-style: italic;
     opacity: 0.7;
+  }
+
+  .syllable.rap {
+    font-style: normal;
   }
 </style>
