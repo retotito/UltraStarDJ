@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
   import type { PitchTickEntry } from '$lib/ipc/tauri'
+  import { onDestroy } from 'svelte'
 
   let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', noteBarMinHeight = 28, noteBarRadius = 4, pitchTick = null }: {
     tracks: NoteTrack[]
@@ -18,9 +19,28 @@
     pitchTick?: PitchTickEntry | null
   } = $props()
 
+  // ── Smooth currentTime via rAF interpolation (same pattern as LyricsRenderer) ──
+  let smoothTime = $state(currentTime)
+  let _lastKnownTime = currentTime
+  let _lastKnownAt   = performance.now()
+  let _rafId: number
+
+  $effect(() => {
+    _lastKnownTime = currentTime
+    _lastKnownAt   = performance.now()
+  })
+
+  function _tick() {
+    const elapsed = (performance.now() - _lastKnownAt) / 1000
+    smoothTime = _lastKnownTime + elapsed
+    _rafId = requestAnimationFrame(_tick)
+  }
+  _rafId = requestAnimationFrame(_tick)
+  onDestroy(() => cancelAnimationFrame(_rafId))
+
   // ── Beat math ──────────────────────────────────────────────────────────────
   const currentBeat = $derived(
-    (currentTime - gap / 1000) * (bpm / 60) * 4
+    (smoothTime - gap / 1000) * (bpm / 60) * 4
   )
 
   const track = $derived(tracks[trackIndex] ?? null)
@@ -117,7 +137,13 @@
     const segments: SungSegment[] = []
     for (const beat of beats) {
       const col = beat.beat - phraseFirstBeat + 1
-      const row = pitchToRow(beat.midiNote, avg, rowCount)
+      // For correct beats, snap to the target note's pitch so vibrato doesn't
+      // cause row flickering and segment splits on long held notes.
+      const ownerNote = activeLine.notes.find(
+        n => beat.beat >= n.startBeat && beat.beat < n.startBeat + n.lengthBeats
+      )
+      const pitchForRow = (beat.correct && ownerNote) ? ownerNote.pitch : beat.midiNote
+      const row = pitchToRow(pitchForRow, avg, rowCount)
       const last = segments.at(-1)
 
       const shouldStartNew =
@@ -395,9 +421,16 @@
   }
 
   .note-bar.rap-hit {
-    background: rgba(255, 140, 0, 0.8);
-    border-color: rgba(255, 165, 50, 0.9);
+    background: rgba(255, 140, 0, 0.35);
+    border-color: rgba(255, 165, 50, 0.8);
     border-style: solid;
+    animation: rap-hit-pop 0.25s ease-out 1 forwards;
+  }
+
+  @keyframes rap-hit-pop {
+    0%   { background: rgba(255, 140, 0, 0.75); box-shadow: 0 0 10px rgba(255, 140, 0, 0.6); }
+    60%  { background: rgba(255, 140, 0, 0.45); box-shadow: 0 0 6px rgba(255, 140, 0, 0.3); }
+    100% { background: rgba(255, 140, 0, 0.35); box-shadow: none; }
   }
 
   .note-bar.freestyle-active {
