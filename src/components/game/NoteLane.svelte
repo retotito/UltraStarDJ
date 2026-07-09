@@ -176,9 +176,12 @@
     const last           = line.notes[line.notes.length - 1]
     const phraseStartSec = line.notes[0].startBeat * secPerBeat + gap / 1000
     const phraseDurSec   = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - phraseStartSec
-    const elapsed = Math.max(0, untrack(() => currentTime) - phraseStartSec)
+    const ct            = untrack(() => currentTime)
+    const timeUntilStart = phraseStartSec - ct
+    // Positive delay = wait before starting; negative = seek into already-started phrase
+    const animDelay     = timeUntilStart > 0 ? timeUntilStart : -Math.max(0, ct - phraseStartSec)
 
-    console.log(`[playhead] start=${phraseStartSec.toFixed(2)}s dur=${phraseDurSec.toFixed(2)}s elapsed=${elapsed.toFixed(2)}s`)
+    console.log(`[playhead] start=${phraseStartSec.toFixed(2)}s dur=${phraseDurSec.toFixed(2)}s animDelay=${animDelay.toFixed(2)}s`)
 
     if (phraseDurSec <= 0) { playheadEl.style.opacity = '0'; return }
 
@@ -187,7 +190,7 @@
     // Reset by setting animationName='none', force reflow, re-enable.
     playheadEl.style.animationName     = 'none'
     playheadEl.style.animationDuration = `${phraseDurSec}s`
-    playheadEl.style.animationDelay    = `-${elapsed}s`
+    playheadEl.style.animationDelay    = `${animDelay}s`
     playheadEl.style.animationTimingFunction = 'linear'
     playheadEl.style.animationFillMode = 'forwards'
     playheadEl.style.opacity           = '1'
