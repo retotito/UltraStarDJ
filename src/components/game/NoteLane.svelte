@@ -51,7 +51,9 @@
     _lastTickAt = now
 
     if (playing) {
-      const elapsed = (now - _lastKnownAt) / 1000
+      // Cap elapsed at 50ms — prevents startup frame drops from causing
+      // smoothTime to race ahead of the actual audio position
+      const elapsed = Math.min((now - _lastKnownAt) / 1000, 0.05)
       smoothTime = _lastKnownTime + elapsed
 
       // Set reference point once playback is underway
