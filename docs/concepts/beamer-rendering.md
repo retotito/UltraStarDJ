@@ -211,9 +211,73 @@ Advantage: width never changes → no reflow. Only clip-path changes → GPU com
 **Recommendation: Option C** for correctness + Option A (CSS transition on clip-path) for smoothness.
 `transition: clip-path 80ms linear` — GPU composited, zero JS per frame, smooth interpolation.
 
+## 6. Playhead — working parameters (canvas implementation)
+
+The canvas playhead works correctly. These are the parameters that must be preserved
+when replacing canvas with a CSS div approach.
+
+### Data sources
+```
+smoothTime       plain JS var (NOT $state) — updated in rAF loop:
+                   smoothTime = min(_lastKnownTime + elapsed, smoothTime + 0.05)
+                 _lastKnownTime is set from currentTime prop (10fps time-tick)
+
+_phraseStartSec  plain JS var — set by $effect when activeLine changes:
+                   notes[0].startBeat * (60/bpm/4) + gap/1000
+
+_phraseDurSec    plain JS var — set by $effect when activeLine changes:
+                   (lastNote.startBeat + lastNote.lengthBeats) * (60/bpm/4) + gap/1000 - _phraseStartSec
+```
+
+### Position calculation (runs every rAF frame, ~60fps)
+```
+frac = (smoothTime - _phraseStartSec) / _phraseDurSec   → 0.0 at phrase start, 1.0 at phrase end
+x    = frac * canvasWidth                                → pixel position
+```
+
+### Canvas draw
+```ts
+_ctx.clearRect(0, 0, _cw, _ch)
+if (frac >= 0 && frac <= 1) {
+  x = frac * _cw
+  // draw vertical line at x
+}
+```
+
 ---
 
-## 5. What's independent of singing
+## 7. Replacing canvas playhead with CSS div (future work)
+
+Instead of drawing on canvas, use a DOM element driven by the same rAF loop.
+
+### Structure
+```
+.lane-content (position: absolute, inset from padding)
+  └── .playhead-track (position: absolute, inset: 0, pointer-events: none)
+        └── .playhead-line (position: absolute, top:0, bottom:0, left:0,
+                            width: 100%, border-left: 2px solid white)
+```
+
+### Position update — in `_tick()` (plain JS, NOT Svelte reactive)
+```ts
+if (playheadEl && frac >= 0 && frac <= 1) {
+  playheadEl.style.transform = `translateX(${frac * 100}%)`
+  playheadEl.style.opacity = '1'
+} else if (playheadEl) {
+  playheadEl.style.opacity = '0'
+}
+```
+
+`translateX(X%)` on a full-width element moves by X% of container width.
+So `translateX(0%)` = left edge, `translateX(100%)` = right edge (line off-screen).
+The `border-left` is always at the left edge of the element = the playhead position.
+
+### Why this works without jitter
+- `playheadEl.style.transform` is a direct DOM write — no Svelte reactivity
+- `transform` is GPU composited — does not trigger layout
+- The rAF loop drives it at 60fps independently of pitch/IPC events
+- Same isolation as canvas but no canvas API needed
+
 
 The `<canvas>` rAF loop reads only:
 - `smoothTime` — plain `$state`, updated in the same rAF loop
