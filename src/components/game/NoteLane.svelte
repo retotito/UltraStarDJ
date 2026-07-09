@@ -302,6 +302,7 @@
           class:sung-correct={isFullyCorrect && !isGolden}
           class:golden-correct={isGolden && isFullyCorrect}
         >
+          <!-- NOTE FILL DISABLED FOR PLAYHEAD TESTING
           {#if state && state.fillPct > 0}
             <div
               class="note-fill"
@@ -310,6 +311,7 @@
               style="clip-path: inset(0 {Math.max(0, 100 - state.fillPct)}% 0 0)"
             ></div>
           {/if}
+          -->
 
           {#if showNoteSyllables && cell.note.syllable?.trim()}
             <span class="note-syllable">{cell.note.syllable.trim()}</span>
