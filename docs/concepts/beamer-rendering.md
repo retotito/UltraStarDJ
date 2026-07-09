@@ -246,42 +246,62 @@ if (frac >= 0 && frac <= 1) {
 
 ---
 
-## 7. Replacing canvas playhead with CSS div (future work)
+## 7. CSS div playhead — final working implementation
 
-Instead of drawing on canvas, use a DOM element driven by the same rAF loop.
+### Why CSS animation instead of canvas/rAF
+- Canvas/rAF runs on the JS main thread → blocked by IPC events (pitch ticks), causing visible jitter when singing
+- CSS animation runs on the GPU compositor thread → completely immune to JS/IPC pressure
+- `will-change: transform` promotes the element to its own GPU layer
 
-### Structure
+### DOM structure
 ```
 .lane-content (position: absolute, inset from padding)
-  └── .playhead-track (position: absolute, inset: 0, pointer-events: none)
-        └── .playhead-line (position: absolute, top:0, bottom:0, left:0,
-                            width: 100%, border-left: 2px solid white)
+  └── .playhead-line (position: absolute, top:0, bottom:0, left:0, width:100%)
+        border-left: 2px solid white  ← the visible line
+        will-change: transform
+        animation: playhead-slide     ← set via JS inline styles
 ```
 
-### Position update — in `_tick()` (plain JS, NOT Svelte reactive)
-```ts
-if (playheadEl && frac >= 0 && frac <= 1) {
-  playheadEl.style.transform = `translateX(${frac * 100}%)`
-  playheadEl.style.opacity = '1'
-} else if (playheadEl) {
-  playheadEl.style.opacity = '0'
+`translateX(0%)` = left edge = phrase start  
+`translateX(100%)` = right edge = phrase end  
+(Works because the element is `width: 100%` of container — 100% in translateX equals container width)
+
+### @keyframes — must be global (in app.css, NOT in component `<style>`)
+```css
+@keyframes playhead-slide {
+  from { transform: translateX(0%);   opacity: 1; }
+  to   { transform: translateX(100%); opacity: 1; }
 }
 ```
+Reason: Svelte hashes `@keyframes` names inside `<style>` blocks. JS `style.animationName = 'playhead-slide'` would not match the hashed name. Global keyframe = no hashing.
 
-`translateX(X%)` on a full-width element moves by X% of container width.
-So `translateX(0%)` = left edge, `translateX(100%)` = right edge (line off-screen).
-The `border-left` is always at the left edge of the element = the playhead position.
+### Trigger: audio-clock driven via $derived + $effect
+```ts
+const phraseActive = $derived(currentTime >= _phraseStartSec && _phraseDurSec > 0)
 
-### Why this works without jitter
-- `playheadEl.style.transform` is a direct DOM write — no Svelte reactivity
-- `transform` is GPU composited — does not trigger layout
-- The rAF loop drives it at 60fps independently of pitch/IPC events
-- Same isolation as canvas but no canvas API needed
+$effect(() => {
+  if (!phraseActive || !playheadEl) return
 
+  const elapsed   = untrack(() => currentTime) - untrack(() => _phraseStartSec)
+  const phraseDur = untrack(() => _phraseDurSec)
+  const animDelay = -Math.max(0, elapsed)   // seek to compensate for ≤16ms tick latency
 
-The `<canvas>` rAF loop reads only:
-- `smoothTime` — plain `$state`, updated in the same rAF loop
-- `_phraseStartSec`, `_phraseDurSec` — plain JS vars, set by `$effect` on phrase switch
+  playheadEl.style.animationName           = 'none'
+  playheadEl.style.animationDuration       = `${phraseDur}s`
+  playheadEl.style.animationDelay          = `${animDelay}s`
+  playheadEl.style.animationTimingFunction = 'linear'
+  playheadEl.style.animationFillMode       = 'none'
+  void playheadEl.offsetWidth              // force reflow to reset animation state
+  playheadEl.style.animationName           = 'playhead-slide'
+})
+```
+
+### Key lessons learned
+- `untrack(() => currentTime)` — reads without registering as reactive dependency → effect only fires when `phraseActive` changes (once per phrase), NOT every 16ms tick. Without this, the effect fires 60fps and the animation resets continuously.
+- `animationName = 'none'` + reflow + re-enable = standard browser technique to restart CSS animation on same element
+- `fill-mode: none` = element returns to base style before/after animation
+- `phraseActive` mirrors the canvas check: `frac >= 0` (audio-clock driven, not wall-clock)
+- Time tick frequency = 16ms → `phraseActive` triggers ≤16ms after phrase start → `animDelay = -elapsed` seeks ≤0.7% of phrase width (imperceptible)
 
 It **never reads** `pitchTick`, `noteStates`, or any pitch data.
 Singing updates → DOM only → canvas is on its own GPU layer → never blocked.
