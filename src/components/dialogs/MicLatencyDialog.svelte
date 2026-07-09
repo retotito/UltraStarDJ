@@ -14,7 +14,19 @@
   let errorMsg = $state('')
 
   // ── Audio context (created on demand) ─────────────────────────────────────
-  let audioCtx: AudioContext | null = null
+  let micRms = $state(0)  // live level for meter
+  let meterRaf = 0
+
+  function startMeter() {
+    const tick = () => {
+      if (!analyser) return
+      const buf = new Uint8Array(analyser.frequencyBinCount)
+      analyser.getByteTimeDomainData(buf)
+      micRms = calcRms(buf)
+      meterRaf = requestAnimationFrame(tick)
+    }
+    meterRaf = requestAnimationFrame(tick)
+  }
   let mediaStream: MediaStream | null = null
   let analyser: AnalyserNode | null = null
   let measureRaf = 0
@@ -34,6 +46,27 @@
     phase = 'ready'
     countdown = 3
 
+    // Open mic stream during countdown so meter is live
+    try {
+      audioCtx = new AudioContext()
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: {
+        deviceId: player.mic?.deviceId ? { ideal: player.mic.deviceId } : undefined,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      }})
+      console.log('[latency] mic stream opened')
+      const source = audioCtx.createMediaStreamSource(mediaStream)
+      analyser = audioCtx.createAnalyser()
+      analyser.fftSize = 256
+      source.connect(analyser)
+      startMeter()
+    } catch (e) {
+      errorMsg = `Mic error: ${(e as Error).message}`
+      phase = 'error'
+      return
+    }
+
     countdownTimer = setInterval(() => {
       countdown--
       if (countdown <= 0) {
@@ -46,20 +79,7 @@
   async function runTrials() {
     phase = 'measuring'
     try {
-      audioCtx = new AudioContext()
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: {
-        deviceId: player.mic?.deviceId ? { ideal: player.mic.deviceId } : undefined,
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      }})
-      console.log('[latency] mic stream opened')
-
-      const source = audioCtx.createMediaStreamSource(mediaStream)
-      analyser = audioCtx.createAnalyser()
-      analyser.fftSize = 256
-      source.connect(analyser)
-
+      // mic/analyser already opened in startTest()
       for (let t = 0; t < TRIALS; t++) {
         const ms = await runOneTrial()
         console.log(`[latency] trial ${t + 1}: ${ms !== null ? ms + 'ms' : 'no echo'}`)
@@ -103,35 +123,35 @@
         if (ambientCount >= AMBIENT_SAMPLES) {
           clearInterval(ambientInterval)
           const ambientRms = ambientSum / ambientCount
-          const threshold = Math.max(0.01, ambientRms * THRESHOLD_MULT)
+          const threshold = Math.max(0.005, ambientRms * THRESHOLD_MULT)
+          console.log(`[latency] ambient=${ambientRms.toFixed(4)} threshold=${threshold.toFixed(4)}`)
 
-          // 2. Play beep
-          const tStart = audioCtx!.currentTime
-          playBeep(audioCtx!, BEEP_FREQ, BEEP_DURATION)
+          // 2. Play beep and listen immediately (echo arrives during/after beep)
           const wallStart = performance.now()
+          playBeep(audioCtx!, BEEP_FREQ, BEEP_DURATION)
 
-          // 3. Listen for spike
+          // 3. Listen from beep start, ignore first 10ms (direct pickup)
           const deadline = performance.now() + DETECT_WINDOW
           let detected = false
 
           const listen = () => {
             if (detected || performance.now() > deadline) {
-              resolve(detected ? null : null)
+              if (!detected) resolve(null)
               return
             }
             analyser!.getByteTimeDomainData(buf)
             const rms = calcRms(buf)
             if (rms > threshold) {
+              const elapsed = performance.now() - wallStart
+              console.log(`[latency] spike rms=${rms.toFixed(4)} at ${elapsed.toFixed(0)}ms`)
               detected = true
-              resolve(Math.round(performance.now() - wallStart))
+              resolve(Math.round(elapsed))
               return
             }
             measureRaf = requestAnimationFrame(listen)
           }
-          // Start listening after the beep ends
-          setTimeout(() => {
-            measureRaf = requestAnimationFrame(listen)
-          }, BEEP_DURATION * 1000 + 10)
+          // Wait 10ms to avoid detecting the direct sound of the speaker
+          setTimeout(() => { measureRaf = requestAnimationFrame(listen) }, 10)
         }
       }, 16)
     })
@@ -163,6 +183,8 @@
 
   function cleanup() {
     cancelAnimationFrame(measureRaf)
+    cancelAnimationFrame(meterRaf)
+    micRms = 0
     mediaStream?.getTracks().forEach(t => t.stop())
     audioCtx?.close()
     mediaStream = null; audioCtx = null; analyser = null
@@ -206,6 +228,11 @@
 
     {:else if phase === 'ready'}
       <p class="hint">Get ready — hold the mic to the speaker!</p>
+      <div class="mic-meter">
+        <span class="meter-label">Mic input</span>
+        <div class="meter-bar"><div class="meter-fill" style="width: {Math.min(100, micRms * 800)}%"></div></div>
+        <span class="meter-val">{(micRms * 100).toFixed(1)}%</span>
+      </div>
       <div class="countdown-ring">
         <svg viewBox="0 0 64 64" class="ring-svg">
           <circle cx="32" cy="32" r="28" class="ring-bg" />
@@ -217,6 +244,11 @@
 
     {:else if phase === 'measuring'}
       <p class="hint">Measuring… trial {trialResults.length + 1} of {TRIALS}</p>
+      <div class="mic-meter">
+        <span class="meter-label">Mic input</span>
+        <div class="meter-bar"><div class="meter-fill" style="width: {Math.min(100, micRms * 800)}%"></div></div>
+        <span class="meter-val">{(micRms * 100).toFixed(1)}%</span>
+      </div>
       <div class="trials-row">
         {#each Array(TRIALS) as _, i}
           <div class="trial-dot" class:done={i < trialResults.length} class:active={i === trialResults.length}>
@@ -291,5 +323,9 @@
   .result-value { display: block; font-size: 2.5rem; font-weight: 800; color: var(--md-sys-color-primary); }
   .result-sub { display: block; font-size: 0.8rem; color: var(--md-sys-color-on-surface-variant); margin-top: var(--space-1); }
 
-  .error-msg { color: var(--md-sys-color-error); font-size: 0.9rem; }
+  .mic-meter { display: flex; align-items: center; gap: var(--space-2); }
+  .meter-label { font-size: 0.8rem; white-space: nowrap; min-width: 64px; color: var(--md-sys-color-on-surface-variant); }
+  .meter-bar { flex: 1; height: 8px; background: var(--md-sys-color-surface-variant); border-radius: 4px; overflow: hidden; }
+  .meter-fill { height: 100%; background: var(--md-sys-color-primary); border-radius: 4px; transition: width 50ms linear; }
+  .meter-val { font-size: 0.8rem; min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
 </style>
