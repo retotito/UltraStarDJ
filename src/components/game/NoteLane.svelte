@@ -25,8 +25,8 @@
     playing?: boolean
   } = $props()
 
-  // ── Smooth currentTime via rAF interpolation ──────────────────────────────
-  let smoothTime = $state(currentTime)
+  // ── Plain JS clock for canvas — NOT $state, zero Svelte reactivity ────────
+  let smoothTime = currentTime
   let _lastKnownTime = currentTime
   let _lastKnownAt   = performance.now()
   let _rafId: number
@@ -90,9 +90,9 @@
   _rafId = requestAnimationFrame(_tick)
   onDestroy(() => cancelAnimationFrame(_rafId))
 
-  // ── Beat math ──────────────────────────────────────────────────────────────
+  // ── Beat math — derived from currentTime prop (10fps), not smoothTime ──────
   const currentBeat = $derived(
-    (smoothTime - gap / 1000) * (bpm / 60) * 4
+    (currentTime - gap / 1000) * (bpm / 60) * 4
   )
 
   const track = $derived(tracks[trackIndex] ?? null)
