@@ -6,6 +6,7 @@
   import { gainCurve } from '$lib/audio/gainCurve'
   import Select from '$components/ui/Select.svelte'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
+  import MicLatencyDialog from '$components/dialogs/MicLatencyDialog.svelte'
 
   let { player, devices }: { player: PlayerConfig; devices: AudioInputDevice[] } = $props()
 
@@ -54,6 +55,8 @@
   const isMonitoring = $derived(playersStore.monitoringIds.has(player.id))
   const isDisconnected = $derived(playersStore.disconnectedIds.has(player.id))
   const level = $derived(playersStore.levels[player.id] ?? 0)
+
+  let showLatencyDialog = $state(false)
 
   // Update input gain instantly via hot-reload (no stream restart needed).
   function onGainChange(v: number) {
@@ -126,7 +129,7 @@
       />
     </div>
 
-    <!-- Test button + disconnected badge -->
+    <!-- Test button + latency + disconnected badge -->
     {#if player.mic}
     <div class="test-row">
       <button
@@ -140,12 +143,21 @@
         {isMonitoring ? 'Stop test' : 'Test mic'}
       </button>
 
+      <button class="btn btn-icon latency-btn" title="Set mic latency" onclick={() => showLatencyDialog = true}>
+        <span class="icon">timer</span>
+        <span class="latency-val">{player.micDelayMs ?? 40} ms</span>
+      </button>
+
       {#if isDisconnected}
         <span class="disconnected-badge">
           <span class="icon">cable</span> Disconnected
         </span>
       {/if}
     </div>
+
+    {#if showLatencyDialog}
+      <MicLatencyDialog {player} onclose={() => showLatencyDialog = false} />
+    {/if}
 
     <!-- Combined Gain + Gate fader -->
     <HorizontalFader
@@ -272,6 +284,9 @@
     align-items: center;
     gap: var(--space-2);
   }
+
+  .latency-btn { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; }
+  .latency-val { font-variant-numeric: tabular-nums; }
 
   .monitor-row {
     display: flex;
