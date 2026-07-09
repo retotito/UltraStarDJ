@@ -185,9 +185,8 @@
 
     const elapsed    = untrack(() => currentTime) - untrack(() => _phraseStartSec)
     const phraseDur  = untrack(() => _phraseDurSec)
-    // Always start at position 0 — timing is audio-clock driven (phraseActive),
-    // so elapsed is ≤16ms (time tick frequency). No visible seek needed.
-    const animDelay  = 0
+    // Negative delay = seek to compensate for IPC tick latency (≤16ms at 16ms tick rate)
+    const animDelay  = -Math.max(0, elapsed)
 
     playheadEl.style.animationName          = 'none'
     playheadEl.style.animationDuration      = `${phraseDur}s`
