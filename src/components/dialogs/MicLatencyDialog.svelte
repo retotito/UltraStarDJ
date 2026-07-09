@@ -20,12 +20,12 @@
   let measureRaf = 0
   let countdownTimer = 0
 
-  const TRIALS       = 3
+  const TRIALS       = 5
   const BEEP_FREQ    = 1000   // Hz
-  const BEEP_DURATION = 0.015 // 15ms beep
+  const BEEP_DURATION = 0.05 // 50ms beep — more detectable
   const DETECT_WINDOW = 2000  // ms to listen for echo after beep
   const AMBIENT_SAMPLES = 20  // frames to sample before beep
-  const THRESHOLD_MULT = 4    // spike = ambient * this
+  const THRESHOLD_MULT = 3    // spike = ambient * this
 
   async function startTest() {
     errorMsg = ''
@@ -48,11 +48,12 @@
     try {
       audioCtx = new AudioContext()
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: {
-        deviceId: player.mic?.deviceId ? { exact: player.mic.deviceId } : undefined,
+        deviceId: player.mic?.deviceId ? { ideal: player.mic.deviceId } : undefined,
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
       }})
+      console.log('[latency] mic stream opened')
 
       const source = audioCtx.createMediaStreamSource(mediaStream)
       analyser = audioCtx.createAnalyser()
@@ -61,8 +62,9 @@
 
       for (let t = 0; t < TRIALS; t++) {
         const ms = await runOneTrial()
+        console.log(`[latency] trial ${t + 1}: ${ms !== null ? ms + 'ms' : 'no echo'}`)
         if (ms !== null) trialResults = [...trialResults, ms]
-        await sleep(300)  // gap between trials
+        await sleep(400)  // gap between trials
       }
 
       cleanup()
@@ -75,6 +77,7 @@
 
       const sorted = [...trialResults].sort((a, b) => a - b)
       detectedMs = sorted[Math.floor(sorted.length / 2)]
+      console.log(`[latency] results: ${trialResults.join(', ')}ms → median: ${detectedMs}ms`)
       manualMs = detectedMs
       phase = 'done'
     } catch (e) {
@@ -138,12 +141,13 @@
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.frequency.value = freq
-    gain.gain.setValueAtTime(0.8, ctx.currentTime)
+    gain.gain.setValueAtTime(1.0, ctx.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur)
     osc.connect(gain)
     gain.connect(ctx.destination)
     osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + dur + 0.01)
+    osc.stop(ctx.currentTime + dur + 0.05)
+    console.log(`[latency] beep played — ${freq}Hz ${dur*1000}ms`)
   }
 
   function calcRms(buf: Uint8Array): number {
