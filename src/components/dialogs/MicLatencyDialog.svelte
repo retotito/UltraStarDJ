@@ -17,6 +17,13 @@
   let micRms = $state(0)  // live level for meter
   let meterRaf = 0
 
+  // ── Audio context (created on demand) ─────────────────────────────────────
+  let audioCtx: AudioContext | null = null
+  let mediaStream: MediaStream | null = null
+  let analyser: AnalyserNode | null = null
+  let measureRaf = 0
+  let countdownTimer = 0
+
   function startMeter() {
     const tick = () => {
       if (!analyser) return
@@ -27,10 +34,6 @@
     }
     meterRaf = requestAnimationFrame(tick)
   }
-  let mediaStream: MediaStream | null = null
-  let analyser: AnalyserNode | null = null
-  let measureRaf = 0
-  let countdownTimer = 0
 
   const TRIALS       = 5
   const BEEP_FREQ    = 1000   // Hz
