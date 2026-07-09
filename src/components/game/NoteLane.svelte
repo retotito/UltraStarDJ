@@ -112,31 +112,7 @@
     void _line; void _tick
   })
 
-  // ── CSS playhead: seek once on mount, run freely after ───────────────────
-  // _phraseStartSec/_phraseDurSec are $state so template has fresh values
-  // when {#key activeLine} remounts the div.
-  let _phraseStartSec = $state(0)
-  let _phraseDurSec   = $state(0)
-
-  $effect(() => {
-    const line = activeLine
-    if (!line || !line.notes.length) { _phraseDurSec = 0; return }
-    const secPerBeat = 60 / bpm / 4
-    const last       = line.notes[line.notes.length - 1]
-    _phraseStartSec  = line.notes[0].startBeat * secPerBeat + gap / 1000
-    _phraseDurSec    = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - _phraseStartSec
-  })
-
-  // Svelte action: seek CSS animation to correct position on mount only.
-  // After that the GPU runs it freely — no JS seeks, no backward jumps.
-  function seekPlayhead(node: HTMLElement, elapsedSec: number) {
-    requestAnimationFrame(() => {
-      const anim = node.getAnimations()[0]
-      if (!anim || elapsedSec <= 0) return
-      anim.currentTime = Math.min(elapsedSec, _phraseDurSec) * 1000
-    })
-    // No update() — never re-seek after mount
-  }
+  // ── CSS playhead timing computed inline in template — no $state needed ────
 </script>
 
 <div
@@ -213,15 +189,20 @@
       </div>
     {/if}
 
-    <!-- CSS playhead: GPU compositor thread, seeks once on mount -->
+    <!-- CSS playhead: GPU compositor, duration + delay computed from activeLine -->
     {#key activeLine}
-      {#if _phraseDurSec > 0 && playing}
-        {@const _elapsed = currentTime - _phraseStartSec}
-        <div
-          class="playhead-line"
-          style="animation-duration: {_phraseDurSec}s"
-          use:seekPlayhead={_elapsed}
-        ></div>
+      {#if activeLine && playing}
+        {@const _sb       = 60 / bpm / 4}
+        {@const _lastNote = activeLine.notes[activeLine.notes.length - 1]}
+        {@const _startSec = activeLine.notes[0].startBeat * _sb + gap / 1000}
+        {@const _durSec   = (_lastNote.startBeat + _lastNote.lengthBeats) * _sb + gap / 1000 - _startSec}
+        {@const _elapsed  = Math.max(0, currentTime - _startSec)}
+        {#if _durSec > 0}
+          <div
+            class="playhead-line"
+            style="animation-duration: {_durSec}s; animation-delay: -{_elapsed}s;"
+          ></div>
+        {/if}
       {/if}
     {/key}
 
