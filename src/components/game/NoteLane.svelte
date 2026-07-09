@@ -196,6 +196,12 @@
     void playheadEl.offsetWidth
     playheadEl.style.animationName          = 'playhead-slide'
   })
+
+  // Pause/resume the CSS animation when playing prop changes
+  $effect(() => {
+    if (!playheadEl) return
+    playheadEl.style.animationPlayState = playing ? 'running' : 'paused'
+  })
 </script>
 
 <div
