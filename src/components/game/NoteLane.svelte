@@ -178,16 +178,15 @@
 
     if (phraseDurSec <= 0) { playheadEl.style.opacity = '0'; return }
 
-    // Standard browser technique to restart a CSS animation:
-    // set animationName to 'none', force reflow, re-enable.
-    playheadEl.style.animationName     = 'none'
+    // Remove class to reset animation, set timing via inline style,
+    // force reflow, then re-add class to start the GPU animation.
+    // Class-based: Svelte correctly maps the scoped @keyframes name.
+    playheadEl.classList.remove('playing')
     playheadEl.style.animationDuration = `${phraseDurSec}s`
     playheadEl.style.animationDelay    = `-${elapsed}s`
-    playheadEl.style.animationTimingFunction = 'linear'
-    playheadEl.style.animationFillMode = 'forwards'
     playheadEl.style.opacity           = '1'
-    void playheadEl.offsetWidth        // force reflow to reset animation state
-    playheadEl.style.animationName     = 'playhead-slide'
+    void playheadEl.offsetWidth        // force reflow
+    playheadEl.classList.add('playing')
   })
 </script>
 
@@ -466,6 +465,11 @@
     will-change: transform;
     pointer-events: none;
     z-index: 15;
+  }
+
+  /* Class added by $effect — Svelte maps this to the correct scoped keyframe */
+  .playhead-line.playing {
+    animation: playhead-slide linear forwards;
   }
 
   @keyframes playhead-slide {
