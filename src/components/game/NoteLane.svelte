@@ -198,33 +198,6 @@
     playheadEl.style.animationName          = 'playhead-slide'
   })
 
-  // ── Delay indicator: red line at (micDelayMs + systemLatencyMs) behind playhead ──
-  // systemLatencyMs accounts for pitch IPC latency (~50ms at 20fps) + processing overhead
-  const SYSTEM_LATENCY_MS = 72
-  let delayIndicatorEl = $state<HTMLElement | undefined>(undefined)
-
-  $effect(() => {
-    if (!phraseActive || !delayIndicatorEl) return
-
-    const elapsed   = untrack(() => currentTime) - untrack(() => _phraseStartSec)
-    const phraseDur = untrack(() => _phraseDurSec)
-    const totalDelayMs = micDelayMs + SYSTEM_LATENCY_MS
-    const indDelay  = -Math.max(0, elapsed) + totalDelayMs / 1000
-
-    delayIndicatorEl.style.animationName          = 'none'
-    delayIndicatorEl.style.animationDuration      = `${phraseDur}s`
-    delayIndicatorEl.style.animationDelay         = `${indDelay}s`
-    delayIndicatorEl.style.animationTimingFunction = 'linear'
-    delayIndicatorEl.style.animationFillMode      = 'none'
-    void delayIndicatorEl.offsetWidth
-    delayIndicatorEl.style.animationName          = 'playhead-slide'
-  })
-
-  $effect(() => {
-    if (!delayIndicatorEl) return
-    delayIndicatorEl.style.animationPlayState = playing ? 'running' : 'paused'
-  })
-
   // Pause/resume the CSS animation when playing prop changes
   $effect(() => {
     if (!playheadEl) return
@@ -307,7 +280,6 @@
     {/if}
 
     <div bind:this={playheadEl} class="playhead-line" aria-hidden="true"></div>
-    <div bind:this={delayIndicatorEl} class="delay-indicator" aria-hidden="true"></div>
 
   </div>
 </div>
@@ -498,21 +470,12 @@
     text-transform: uppercase;
   }
 
-  /* ── Delay indicator: red line showing expected fill right edge ── */
-  .delay-indicator {
-    position: absolute;
-    top: 0; bottom: 0; left: 0;
-    width: 100%;
-    border-left: 2px solid rgba(255, 80, 80, 0.8);
-    will-change: transform;
-    pointer-events: none;
-    z-index: 14;
-  }
   .playhead-line {
     position: absolute;
     top: 0; bottom: 0; left: 0;
     width: 100%;
     border-left: 2px solid rgba(255, 255, 255, 0.6);
+    opacity: 0; /* hidden — kept for future use */
     opacity: 1;
     will-change: transform;
     pointer-events: none;
