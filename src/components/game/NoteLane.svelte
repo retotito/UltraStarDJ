@@ -198,7 +198,9 @@
     playheadEl.style.animationName          = 'playhead-slide'
   })
 
-  // ── Delay indicator: red line at micDelayMs behind playhead ─────────────
+  // ── Delay indicator: red line at (micDelayMs + systemLatencyMs) behind playhead ──
+  // systemLatencyMs accounts for pitch IPC latency (~50ms at 20fps) + processing overhead
+  const SYSTEM_LATENCY_MS = 72
   let delayIndicatorEl = $state<HTMLElement | undefined>(undefined)
 
   $effect(() => {
@@ -206,8 +208,8 @@
 
     const elapsed   = untrack(() => currentTime) - untrack(() => _phraseStartSec)
     const phraseDur = untrack(() => _phraseDurSec)
-    // Indicator is micDelayMs behind the playhead
-    const indDelay  = -Math.max(0, elapsed) + micDelayMs / 1000
+    const totalDelayMs = micDelayMs + SYSTEM_LATENCY_MS
+    const indDelay  = -Math.max(0, elapsed) + totalDelayMs / 1000
 
     delayIndicatorEl.style.animationName          = 'none'
     delayIndicatorEl.style.animationDuration      = `${phraseDur}s`
@@ -499,7 +501,7 @@
   /* ── Delay indicator: red line showing expected fill right edge ── */
   .delay-indicator {
     position: absolute;
-    top: 0; bottom: 0; left: -100px;
+    top: 0; bottom: 0; left: 0;
     width: 100%;
     border-left: 2px solid rgba(255, 80, 80, 0.8);
     will-change: transform;
