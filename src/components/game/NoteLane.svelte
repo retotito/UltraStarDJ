@@ -189,15 +189,15 @@
       </div>
     {/if}
 
-    <!-- CSS playhead: GPU compositor, duration + delay computed from activeLine -->
-    {#key activeLine}
+    <!-- CSS playhead: keyed on primitive first-beat number, not object ref -->
+    {#key activeLine?.notes[0]?.startBeat ?? -1}
       {#if activeLine && playing}
         {@const _sb       = 60 / bpm / 4}
         {@const _lastNote = activeLine.notes[activeLine.notes.length - 1]}
         {@const _startSec = activeLine.notes[0].startBeat * _sb + gap / 1000}
         {@const _durSec   = (_lastNote.startBeat + _lastNote.lengthBeats) * _sb + gap / 1000 - _startSec}
         {@const _elapsed  = Math.max(0, currentTime - _startSec)}
-        {#if _durSec > 0}
+        {#if _durSec > 0 && _elapsed < _durSec}
           <div
             class="playhead-line"
             style="animation-duration: {_durSec}s; animation-delay: -{_elapsed}s;"
