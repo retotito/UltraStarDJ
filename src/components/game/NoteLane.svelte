@@ -172,8 +172,11 @@
   let perfectFlash = $state(false)
 
   $effect(() => {
-    const line = activeLine
-    const tick = pitchTick
+    const _line = activeLine
+    const _tick = pitchTick
+    // ── TEST: receive data but do nothing — checking if IPC alone causes jitter ──
+    void _line; void _tick
+  })
 
     if (line !== _lastLine) {
       for (const k in noteStates) delete (noteStates as any)[k]
