@@ -169,7 +169,6 @@
 
   $effect(() => {
     const line = activeLine
-    console.log('[playhead-effect] fired — line:', line?.notes[0]?.startBeat, 'el:', !!playheadEl)
     if (!line || !line.notes.length || !playheadEl) return
 
     const secPerBeat     = 60 / bpm / 4
@@ -179,9 +178,7 @@
     const ct            = untrack(() => currentTime)
     const timeUntilStart = phraseStartSec - ct
     // Positive delay = wait before starting; negative = seek into already-started phrase
-    const animDelay     = timeUntilStart > 0 ? timeUntilStart : -Math.max(0, ct - phraseStartSec)
-
-    console.log(`[playhead] start=${phraseStartSec.toFixed(2)}s dur=${phraseDurSec.toFixed(2)}s animDelay=${animDelay.toFixed(2)}s`)
+    const animDelay = timeUntilStart > 0 ? timeUntilStart : -Math.max(0, ct - phraseStartSec)
 
     if (phraseDurSec <= 0) { playheadEl.style.opacity = '0'; return }
 
