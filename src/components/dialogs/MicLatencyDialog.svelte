@@ -62,13 +62,22 @@
     // Open mic stream during countdown so meter is live
     try {
       audioCtx = new AudioContext()
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: {
-        deviceId: player.mic?.deviceId ? { exact: player.mic.deviceId } : undefined,
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      }})
-      console.log('[latency] mic stream opened, device:', player.mic?.deviceId)
+      // Try exact deviceId first, fall back to ideal, then any mic
+      const deviceId = player.mic?.deviceId
+      const constraints = [
+        deviceId ? { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : null,
+        deviceId ? { deviceId: { ideal: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : null,
+        { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      ].filter(Boolean) as MediaTrackConstraints[]
+
+      for (const c of constraints) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: c })
+          console.log('[latency] mic stream opened with constraint:', JSON.stringify(c.deviceId ?? 'any'))
+          break
+        } catch { /* try next */ }
+      }
+      if (!mediaStream) throw new Error('Could not open any mic')
       const source = audioCtx.createMediaStreamSource(mediaStream)
       analyser = audioCtx.createAnalyser()
       analyser.fftSize = 256
@@ -216,7 +225,7 @@
   }
 </script>
 
-<Modal title="Mic Latency — Player {player.id}" open={true} onclose={cancel}>
+<Modal title="Mic Latency — Player {player.id}{deviceLabel ? ' · ' + deviceLabel : ''}" open={true} onclose={cancel}>
   <div class="latency-dialog">
 
     {#if phase === 'idle'}
