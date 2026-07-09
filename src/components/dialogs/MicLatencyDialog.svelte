@@ -4,6 +4,16 @@
 
   let { player, onclose }: { player: PlayerConfig; onclose: () => void } = $props()
 
+  // Resolve device label for display
+  let deviceLabel = $state('')
+  $effect(() => {
+    if (!player.mic) return
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      const d = devices.find(d => d.deviceId === player.mic!.deviceId)
+      deviceLabel = d ? `${d.label} (${player.mic!.channel})` : player.mic!.channel
+    }).catch(() => {})
+  })
+
   // ── State ──────────────────────────────────────────────────────────────────
   type Phase = 'idle' | 'ready' | 'measuring' | 'done' | 'error'
   let phase = $state<Phase>('idle')
@@ -53,12 +63,12 @@
     try {
       audioCtx = new AudioContext()
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: {
-        deviceId: player.mic?.deviceId ? { ideal: player.mic.deviceId } : undefined,
+        deviceId: player.mic?.deviceId ? { exact: player.mic.deviceId } : undefined,
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
       }})
-      console.log('[latency] mic stream opened')
+      console.log('[latency] mic stream opened, device:', player.mic?.deviceId)
       const source = audioCtx.createMediaStreamSource(mediaStream)
       analyser = audioCtx.createAnalyser()
       analyser.fftSize = 256
@@ -210,6 +220,9 @@
   <div class="latency-dialog">
 
     {#if phase === 'idle'}
+      {#if deviceLabel}
+        <p class="mic-name"><span class="icon">mic</span> {deviceLabel}</p>
+      {/if}
       <p class="hint">
         Hold your microphone close to your headphone or speaker output.<br>
         The app will play a short beep and measure how long it takes to reach the mic.
@@ -330,5 +343,7 @@
   .meter-label { font-size: 0.8rem; white-space: nowrap; min-width: 64px; color: var(--md-sys-color-on-surface-variant); }
   .meter-bar { flex: 1; height: 8px; background: var(--md-sys-color-surface-variant); border-radius: 4px; overflow: hidden; }
   .meter-fill { height: 100%; background: var(--md-sys-color-primary); border-radius: 4px; transition: width 50ms linear; }
+  .mic-name { display: flex; align-items: center; gap: 6px; font-size: 0.85rem;
+              color: var(--md-sys-color-primary); font-weight: 500; }
   .meter-val { font-size: 0.8rem; min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
 </style>
