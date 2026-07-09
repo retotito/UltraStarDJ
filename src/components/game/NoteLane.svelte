@@ -461,7 +461,7 @@
     text-transform: uppercase;
   }
 
-  /* ── CSS playhead: GPU animation, reset via $effect on phrase change ── */
+  /* ── CSS playhead: GPU animation, keyframe defined globally in app.css ── */
   .playhead-line {
     position: absolute;
     top: 0; bottom: 0; left: 0;
@@ -471,11 +471,5 @@
     will-change: transform;
     pointer-events: none;
     z-index: 15;
-  }
-
-  /* :global so the keyframe name is never hashed — JS can reference it by name */
-  :global(@keyframes playhead-slide) {
-    from { transform: translateX(0%); }
-    to   { transform: translateX(100%); }
   }
 </style>

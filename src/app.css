@@ -685,3 +685,9 @@ a {
 }
 
 
+
+/* ── Playhead animation (global — referenced by name in NoteLane JS) ── */
+@keyframes playhead-slide {
+  from { transform: translateX(0%); }
+  to   { transform: translateX(100%); }
+}
