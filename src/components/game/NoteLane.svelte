@@ -42,6 +42,8 @@
 
   let _lastTickAt = 0
   let _dbgFrameLog = 0
+  let _refSmoothTime = 0
+  let _refWallTime   = 0
 
   function _tick() {
     const now = performance.now()
@@ -52,14 +54,28 @@
       const elapsed = (now - _lastKnownAt) / 1000
       smoothTime = _lastKnownTime + elapsed
 
-      // Log every ~500ms: frame gap (should be ~16ms) and smoothTime delta
-      if (now - _dbgFrameLog > 500) {
-        _dbgFrameLog = now
-        console.log(`[playhead] frame=${frameGap.toFixed(1)}ms  smoothTime=${(smoothTime*1000).toFixed(0)}ms  elapsed=${(elapsed*1000).toFixed(1)}ms`)
+      // Set reference point once playback is underway
+      if (_refWallTime === 0 && smoothTime > 0.1) {
+        _refSmoothTime = smoothTime
+        _refWallTime   = now
       }
-      // Warn on dropped frames (>40ms = missed ~2 frames)
+
+      // Every 100ms: log actual vs expected smoothTime
+      if (_refWallTime > 0 && now - _dbgFrameLog > 100) {
+        _dbgFrameLog = now
+        const expectedSmooth = _refSmoothTime + (now - _refWallTime) / 1000
+        const deviation = (smoothTime - expectedSmooth) * 1000
+        console.log(
+          `[pos] wall=${now.toFixed(0)}ms  smooth=${(smoothTime*1000).toFixed(1)}ms` +
+          `  expected=${(expectedSmooth*1000).toFixed(1)}ms  dev=${deviation.toFixed(1)}ms` +
+          `  frame=${frameGap.toFixed(1)}ms`
+        )
+      }
+
       if (_lastTickAt > 0 && frameGap > 40) {
-        console.warn(`[playhead] DROPPED FRAME: gap=${frameGap.toFixed(1)}ms at smoothTime=${(smoothTime*1000).toFixed(0)}ms`)
+        const expectedSmooth = _refSmoothTime + (now - _refWallTime) / 1000
+        const deviation = (smoothTime - expectedSmooth) * 1000
+        console.warn(`[DROP] gap=${frameGap.toFixed(1)}ms  dev=${deviation.toFixed(1)}ms  smooth=${(smoothTime*1000).toFixed(0)}ms`)
       }
     } else {
       _lastKnownAt = now
