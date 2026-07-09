@@ -304,18 +304,17 @@
       </div>
     {/if}
 
+    <canvas bind:this={canvasEl} class="overlay-canvas" aria-hidden="true"></canvas>
+
     <!-- CSS animation playhead: runs on compositor thread, immune to JS/IPC jitter -->
     {#key activeLine}
-      {#if activeLine && playing}
-        {@const _secPerBeat  = 60 / bpm / 4}
-        {@const _lastNote    = activeLine.notes[activeLine.notes.length - 1]}
-        {@const _startSec    = activeLine.notes[0].startBeat * _secPerBeat + gap / 1000}
-        {@const _endSec      = (_lastNote.startBeat + _lastNote.lengthBeats) * _secPerBeat + gap / 1000}
-        {@const _durSec      = _endSec - _startSec}
-        {@const _offsetSec   = Math.max(0, currentTime - _startSec)}
+      {#if _phraseDurSec > 0 && playing}
         <div
           class="playhead-line"
-          style="animation-duration: {_durSec}s; animation-delay: -{_offsetSec}s;"
+          style="
+            animation-duration: {_phraseDurSec}s;
+            animation-delay: -{Math.max(0, currentTime - _phraseStartSec)}s;
+          "
         ></div>
       {/if}
     {/key}
