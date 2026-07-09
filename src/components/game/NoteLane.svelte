@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
   import type { PitchTickEntry } from '$lib/ipc/tauri'
+  import { onDestroy } from 'svelte'
 
   let {
     tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap,
@@ -23,6 +24,71 @@
     pitchTick?: PitchTickEntry | null
     playing?: boolean
   } = $props()
+
+  // ── Plain JS clock for canvas — NOT $state, zero Svelte reactivity ────────
+  let smoothTime = currentTime
+  let _lastKnownTime = currentTime
+  let _lastKnownAt   = performance.now()
+  let _rafId: number
+
+  $effect(() => {
+    const prev = _lastKnownTime
+    _lastKnownTime = currentTime
+    _lastKnownAt   = performance.now()
+    if (Math.abs(currentTime - prev) > 0.05) {
+      console.warn(`[time-anchor] currentTime jumped: ${(prev*1000).toFixed(1)} → ${(currentTime*1000).toFixed(1)}ms (delta=${((currentTime-prev)*1000).toFixed(1)}ms)`)
+    }
+  })
+
+  let _lastTickAt = 0
+  let _dbgFrameLog = 0
+  let _refSmoothTime = 0
+  let _refWallTime   = 0
+
+  function _tick() {
+    const now = performance.now()
+    const frameGap = now - _lastTickAt
+    _lastTickAt = now
+
+    if (playing) {
+      const elapsed    = (now - _lastKnownAt) / 1000
+      const candidate  = _lastKnownTime + elapsed
+      // Cap per-frame advance to 50ms — prevents frame drops from causing
+      // smoothTime to race ahead and then snap back when time-tick corrects it.
+      // Normal 16ms frames are never capped. Only drop frames (>50ms) are limited.
+      smoothTime = Math.min(candidate, smoothTime + 0.05)
+
+      // Set reference point once playback is underway
+      if (_refWallTime === 0 && smoothTime > 0.1) {
+        _refSmoothTime = smoothTime
+        _refWallTime   = now
+      }
+
+      // Every 100ms: log actual vs expected smoothTime
+      if (_refWallTime > 0 && now - _dbgFrameLog > 100) {
+        _dbgFrameLog = now
+        const expectedSmooth = _refSmoothTime + (now - _refWallTime) / 1000
+        const deviation = (smoothTime - expectedSmooth) * 1000
+        console.log(
+          `[pos] wall=${now.toFixed(0)}ms  smooth=${(smoothTime*1000).toFixed(1)}ms` +
+          `  expected=${(expectedSmooth*1000).toFixed(1)}ms  dev=${deviation.toFixed(1)}ms` +
+          `  frame=${frameGap.toFixed(1)}ms`
+        )
+      }
+
+      if (_lastTickAt > 0 && frameGap > 40) {
+        const expectedSmooth = _refSmoothTime + (now - _refWallTime) / 1000
+        const deviation = (smoothTime - expectedSmooth) * 1000
+        console.warn(`[DROP] gap=${frameGap.toFixed(1)}ms  dev=${deviation.toFixed(1)}ms  smooth=${(smoothTime*1000).toFixed(0)}ms`)
+      }
+    } else {
+      _lastKnownAt = now
+    }
+    _drawPlayhead()
+    _rafId = requestAnimationFrame(_tick)
+  }
+  _rafId = requestAnimationFrame(_tick)
+  onDestroy(() => cancelAnimationFrame(_rafId))
 
   // ── Beat math — derived from currentTime prop (10fps), not smoothTime ──────
   const currentBeat = $derived(
@@ -106,13 +172,112 @@
   let perfectFlash = $state(false)
 
   $effect(() => {
-    const _line = activeLine
-    const _tick = pitchTick
-    // ── TEST: receive data but do nothing — checking if IPC alone causes jitter ──
-    void _line; void _tick
+    const line = activeLine
+    const tick = pitchTick
+
+    if (line !== _lastLine) {
+      for (const k in noteStates) delete (noteStates as any)[k]
+      if (line) {
+        for (const note of line.notes) {
+          noteStates[note.startBeat] = { fillPct: 0, correct: false, rapHit: false, correctBeats: 0 }
+        }
+      }
+      _lastBeat = -1
+      _evaluatedForPerfect = false
+      _lastLine = line
+    }
+
+    if (!tick || !line || tick.beat < 0) return
+
+    const intBeat = Math.floor(tick.beat)
+    if (intBeat === _lastBeat) return
+    _lastBeat = intBeat
+
+    const note = line.notes.find(
+      n => intBeat >= n.startBeat && intBeat < n.startBeat + n.lengthBeats
+    )
+    if (!note) return
+
+    const state = noteStates[note.startBeat]
+    if (!state) return
+
+    state.fillPct = Math.min(100, ((intBeat - note.startBeat + 1) / note.lengthBeats) * 100)
+
+    if (tick.correct) {
+      state.correct      = true
+      state.correctBeats++
+    }
+
+    if (tick.correct && (note.type === 'rap' || note.type === 'rap-golden')) {
+      state.rapHit = true
+    }
+
+    if (!_evaluatedForPerfect) {
+      const lastNote       = line.notes[line.notes.length - 1]
+      const phraseLastBeat = lastNote.startBeat + lastNote.lengthBeats - 1
+      if (intBeat >= phraseLastBeat) {
+        _evaluatedForPerfect = true
+        const allPerfect = line.notes
+          .filter(n => n.type !== 'freestyle')
+          .every(n => (noteStates[n.startBeat]?.correctBeats ?? 0) >= n.lengthBeats)
+        if (allPerfect) {
+          perfectFlash = true
+          setTimeout(() => { perfectFlash = false }, 1600)
+        }
+      }
+    }
   })
 
-  // ── CSS playhead timing computed inline in template — no $state needed ────
+  // ── Canvas: playhead only ──────────────────────────────────────────────────
+  let canvasEl: HTMLCanvasElement | undefined
+  let _ctx: CanvasRenderingContext2D | null = null
+  let _cw = 0, _ch = 0
+
+  let _phraseStartSec = 0
+  let _phraseDurSec   = 0
+
+  $effect(() => {
+    const line = activeLine
+    if (!line || !line.notes.length) { _phraseDurSec = 0; return }
+    const secPerBeat = 60 / bpm / 4
+    const last       = line.notes[line.notes.length - 1]
+    _phraseStartSec  = line.notes[0].startBeat * secPerBeat + gap / 1000
+    _phraseDurSec    = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - _phraseStartSec
+  })
+
+  $effect(() => {
+    if (!canvasEl) return
+    const ro = new ResizeObserver((entries) => {
+      if (!canvasEl) return
+      const rect = entries[0]?.contentRect
+      _cw = rect?.width  ?? canvasEl.offsetWidth
+      _ch = rect?.height ?? canvasEl.offsetHeight
+      canvasEl.width  = Math.round(_cw)
+      canvasEl.height = Math.round(_ch)
+      _ctx = canvasEl.getContext('2d')
+    })
+    ro.observe(canvasEl)
+    return () => ro.disconnect()
+  })
+
+  function _drawPlayhead() {
+    if (!_ctx || _cw === 0 || _phraseDurSec <= 0) {
+      _ctx?.clearRect(0, 0, _cw, _ch)
+      return
+    }
+    const frac = (smoothTime - _phraseStartSec) / _phraseDurSec
+    _ctx.clearRect(0, 0, _cw, _ch)
+    if (frac < 0 || frac > 1) return
+    const x = frac * _cw
+    _ctx.save()
+    _ctx.beginPath()
+    _ctx.moveTo(x, 0)
+    _ctx.lineTo(x, _ch)
+    _ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+    _ctx.lineWidth   = 2
+    _ctx.stroke()
+    _ctx.restore()
+  }
 </script>
 
 <div
@@ -189,22 +354,7 @@
       </div>
     {/if}
 
-    <!-- CSS playhead: keyed on primitive first-beat number, not object ref -->
-    {#key activeLine?.notes[0]?.startBeat ?? -1}
-      {#if activeLine && playing}
-        {@const _sb       = 60 / bpm / 4}
-        {@const _lastNote = activeLine.notes[activeLine.notes.length - 1]}
-        {@const _startSec = activeLine.notes[0].startBeat * _sb + gap / 1000}
-        {@const _durSec   = (_lastNote.startBeat + _lastNote.lengthBeats) * _sb + gap / 1000 - _startSec}
-        {@const _elapsed  = Math.max(0, currentTime - _startSec)}
-        {#if _durSec > 0 && _elapsed < _durSec}
-          <div
-            class="playhead-line"
-            style="animation-duration: {_durSec}s; animation-delay: -{_elapsed}s;"
-          ></div>
-        {/if}
-      {/if}
-    {/key}
+    <canvas bind:this={canvasEl} class="overlay-canvas" aria-hidden="true"></canvas>
 
   </div>
 </div>
@@ -403,24 +553,5 @@
     pointer-events: none;
     z-index: 15;
     display: block;
-  }
-
-  /* ── CSS playhead: compositor-thread animation, immune to JS jitter ── */
-  .playhead-line {
-    position: absolute;
-    top: 0; bottom: 0;
-    left: 0;
-    width: 100%;
-    border-left: 2px solid rgba(255, 255, 255, 0.6);
-    animation: playhead-slide linear both;
-    animation-play-state: running;
-    will-change: transform;
-    pointer-events: none;
-    z-index: 15;
-  }
-
-  @keyframes playhead-slide {
-    from { transform: translateX(0%); }
-    to   { transform: translateX(100%); }
   }
 </style>
