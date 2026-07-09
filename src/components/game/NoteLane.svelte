@@ -112,12 +112,11 @@
     void _line; void _tick
   })
 
-  // ── CSS playhead: Web Animations API action ───────────────────────────────
-  // Svelte action that seeks the CSS animation to the correct position.
-  // Called on mount (sets initial position) and on every currentTime update.
-  // The GPU runs the animation between updates — no JS per frame needed.
-  let _phraseStartSec = 0
-  let _phraseDurSec   = 0
+  // ── CSS playhead: seek once on mount, run freely after ───────────────────
+  // _phraseStartSec/_phraseDurSec are $state so template has fresh values
+  // when {#key activeLine} remounts the div.
+  let _phraseStartSec = $state(0)
+  let _phraseDurSec   = $state(0)
 
   $effect(() => {
     const line = activeLine
@@ -128,17 +127,15 @@
     _phraseDurSec    = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - _phraseStartSec
   })
 
+  // Svelte action: seek CSS animation to correct position on mount only.
+  // After that the GPU runs it freely — no JS seeks, no backward jumps.
   function seekPlayhead(node: HTMLElement, elapsedSec: number) {
-    function seek(elapsed: number) {
+    requestAnimationFrame(() => {
       const anim = node.getAnimations()[0]
-      if (!anim) return
-      const clamped = Math.max(0, Math.min(elapsed, _phraseDurSec))
-      anim.currentTime = clamped * 1000   // Web Animations API uses ms
-    }
-    seek(elapsedSec)
-    return {
-      update(elapsed: number) { seek(elapsed) }
-    }
+      if (!anim || elapsedSec <= 0) return
+      anim.currentTime = Math.min(elapsedSec, _phraseDurSec) * 1000
+    })
+    // No update() — never re-seek after mount
   }
 </script>
 
@@ -216,13 +213,14 @@
       </div>
     {/if}
 
-    <!-- CSS playhead: GPU compositor thread, Web Animations API for precise seek -->
+    <!-- CSS playhead: GPU compositor thread, seeks once on mount -->
     {#key activeLine}
       {#if _phraseDurSec > 0 && playing}
+        {@const _elapsed = currentTime - _phraseStartSec}
         <div
           class="playhead-line"
           style="animation-duration: {_phraseDurSec}s"
-          use:seekPlayhead={currentTime - _phraseStartSec}
+          use:seekPlayhead={_elapsed}
         ></div>
       {/if}
     {/key}
