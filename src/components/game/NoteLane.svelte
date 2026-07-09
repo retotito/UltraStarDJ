@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
   import type { PitchTickEntry } from '$lib/ipc/tauri'
-  import { onDestroy } from 'svelte'
 
   let {
     tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap,
@@ -24,71 +23,6 @@
     pitchTick?: PitchTickEntry | null
     playing?: boolean
   } = $props()
-
-  // ── Plain JS clock for canvas — NOT $state, zero Svelte reactivity ────────
-  let smoothTime = currentTime
-  let _lastKnownTime = currentTime
-  let _lastKnownAt   = performance.now()
-  let _rafId: number
-
-  $effect(() => {
-    const prev = _lastKnownTime
-    _lastKnownTime = currentTime
-    _lastKnownAt   = performance.now()
-    if (Math.abs(currentTime - prev) > 0.05) {
-      console.warn(`[time-anchor] currentTime jumped: ${(prev*1000).toFixed(1)} → ${(currentTime*1000).toFixed(1)}ms (delta=${((currentTime-prev)*1000).toFixed(1)}ms)`)
-    }
-  })
-
-  let _lastTickAt = 0
-  let _dbgFrameLog = 0
-  let _refSmoothTime = 0
-  let _refWallTime   = 0
-
-  function _tick() {
-    const now = performance.now()
-    const frameGap = now - _lastTickAt
-    _lastTickAt = now
-
-    if (playing) {
-      const elapsed    = (now - _lastKnownAt) / 1000
-      const candidate  = _lastKnownTime + elapsed
-      // Cap per-frame advance to 50ms — prevents frame drops from causing
-      // smoothTime to race ahead and then snap back when time-tick corrects it.
-      // Normal 16ms frames are never capped. Only drop frames (>50ms) are limited.
-      smoothTime = Math.min(candidate, smoothTime + 0.05)
-
-      // Set reference point once playback is underway
-      if (_refWallTime === 0 && smoothTime > 0.1) {
-        _refSmoothTime = smoothTime
-        _refWallTime   = now
-      }
-
-      // Every 100ms: log actual vs expected smoothTime
-      if (_refWallTime > 0 && now - _dbgFrameLog > 100) {
-        _dbgFrameLog = now
-        const expectedSmooth = _refSmoothTime + (now - _refWallTime) / 1000
-        const deviation = (smoothTime - expectedSmooth) * 1000
-        console.log(
-          `[pos] wall=${now.toFixed(0)}ms  smooth=${(smoothTime*1000).toFixed(1)}ms` +
-          `  expected=${(expectedSmooth*1000).toFixed(1)}ms  dev=${deviation.toFixed(1)}ms` +
-          `  frame=${frameGap.toFixed(1)}ms`
-        )
-      }
-
-      if (_lastTickAt > 0 && frameGap > 40) {
-        const expectedSmooth = _refSmoothTime + (now - _refWallTime) / 1000
-        const deviation = (smoothTime - expectedSmooth) * 1000
-        console.warn(`[DROP] gap=${frameGap.toFixed(1)}ms  dev=${deviation.toFixed(1)}ms  smooth=${(smoothTime*1000).toFixed(0)}ms`)
-      }
-    } else {
-      _lastKnownAt = now
-    }
-    _drawPlayhead()
-    _rafId = requestAnimationFrame(_tick)
-  }
-  _rafId = requestAnimationFrame(_tick)
-  onDestroy(() => cancelAnimationFrame(_rafId))
 
   // ── Beat math — derived from currentTime prop (10fps), not smoothTime ──────
   const currentBeat = $derived(
@@ -178,11 +112,10 @@
     void _line; void _tick
   })
 
-  // ── Canvas: playhead only ──────────────────────────────────────────────────
-  let canvasEl: HTMLCanvasElement | undefined
-  let _ctx: CanvasRenderingContext2D | null = null
-  let _cw = 0, _ch = 0
-
+  // ── CSS playhead: Web Animations API action ───────────────────────────────
+  // Svelte action that seeks the CSS animation to the correct position.
+  // Called on mount (sets initial position) and on every currentTime update.
+  // The GPU runs the animation between updates — no JS per frame needed.
   let _phraseStartSec = 0
   let _phraseDurSec   = 0
 
@@ -195,38 +128,17 @@
     _phraseDurSec    = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - _phraseStartSec
   })
 
-  $effect(() => {
-    if (!canvasEl) return
-    const ro = new ResizeObserver((entries) => {
-      if (!canvasEl) return
-      const rect = entries[0]?.contentRect
-      _cw = rect?.width  ?? canvasEl.offsetWidth
-      _ch = rect?.height ?? canvasEl.offsetHeight
-      canvasEl.width  = Math.round(_cw)
-      canvasEl.height = Math.round(_ch)
-      _ctx = canvasEl.getContext('2d')
-    })
-    ro.observe(canvasEl)
-    return () => ro.disconnect()
-  })
-
-  function _drawPlayhead() {
-    if (!_ctx || _cw === 0 || _phraseDurSec <= 0) {
-      _ctx?.clearRect(0, 0, _cw, _ch)
-      return
+  function seekPlayhead(node: HTMLElement, elapsedSec: number) {
+    function seek(elapsed: number) {
+      const anim = node.getAnimations()[0]
+      if (!anim) return
+      const clamped = Math.max(0, Math.min(elapsed, _phraseDurSec))
+      anim.currentTime = clamped * 1000   // Web Animations API uses ms
     }
-    const frac = (smoothTime - _phraseStartSec) / _phraseDurSec
-    _ctx.clearRect(0, 0, _cw, _ch)
-    if (frac < 0 || frac > 1) return
-    const x = frac * _cw
-    _ctx.save()
-    _ctx.beginPath()
-    _ctx.moveTo(x, 0)
-    _ctx.lineTo(x, _ch)
-    _ctx.strokeStyle = 'rgba(255,255,255,0.5)'
-    _ctx.lineWidth   = 2
-    _ctx.stroke()
-    _ctx.restore()
+    seek(elapsedSec)
+    return {
+      update(elapsed: number) { seek(elapsed) }
+    }
   }
 </script>
 
@@ -304,17 +216,13 @@
       </div>
     {/if}
 
-    <canvas bind:this={canvasEl} class="overlay-canvas" aria-hidden="true"></canvas>
-
-    <!-- CSS animation playhead: runs on compositor thread, immune to JS/IPC jitter -->
+    <!-- CSS playhead: GPU compositor thread, Web Animations API for precise seek -->
     {#key activeLine}
       {#if _phraseDurSec > 0 && playing}
         <div
           class="playhead-line"
-          style="
-            animation-duration: {_phraseDurSec}s;
-            animation-delay: -{Math.max(0, currentTime - _phraseStartSec)}s;
-          "
+          style="animation-duration: {_phraseDurSec}s"
+          use:seekPlayhead={currentTime - _phraseStartSec}
         ></div>
       {/if}
     {/key}
@@ -525,7 +433,8 @@
     left: 0;
     width: 100%;
     border-left: 2px solid rgba(255, 255, 255, 0.6);
-    animation: playhead-slide linear forwards;
+    animation: playhead-slide linear both;
+    animation-play-state: running;
     will-change: transform;
     pointer-events: none;
     z-index: 15;
