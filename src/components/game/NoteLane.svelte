@@ -163,35 +163,37 @@
     }
   })
 
-  // ── CSS playhead: GPU animation, triggered once per phrase ───────────────
-  // playheadEl is $state so the $effect re-runs when bind:this assigns it.
+  // ── CSS playhead: GPU animation, triggered by audio clock ────────────────
   let playheadEl = $state<HTMLElement | undefined>(undefined)
 
+  // phraseStartSec as $derived so it updates when activeLine changes
+  const _phraseStartSec = $derived.by(() => {
+    if (!activeLine || !activeLine.notes.length) return Infinity
+    return activeLine.notes[0].startBeat * (60 / bpm / 4) + gap / 1000
+  })
+  const _phraseDurSec = $derived.by(() => {
+    if (!activeLine || !activeLine.notes.length) return 0
+    const last = activeLine.notes[activeLine.notes.length - 1]
+    return (last.startBeat + last.lengthBeats) * (60 / bpm / 4) + gap / 1000 - _phraseStartSec
+  })
+
+  // True once currentTime reaches phrase start — this is the audio-clock trigger
+  const phraseActive = $derived(currentTime >= _phraseStartSec && _phraseDurSec > 0)
+
   $effect(() => {
-    const line = activeLine
-    if (!line || !line.notes.length || !playheadEl) return
+    if (!phraseActive || !playheadEl) return
 
-    const secPerBeat     = 60 / bpm / 4
-    const last           = line.notes[line.notes.length - 1]
-    const phraseStartSec = line.notes[0].startBeat * secPerBeat + gap / 1000
-    const phraseDurSec   = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - phraseStartSec
-    const ct            = untrack(() => currentTime)
-    const timeUntilStart = phraseStartSec - ct
-    // Positive delay = wait before starting; negative = seek into already-started phrase
-    const animDelay = timeUntilStart > 0 ? timeUntilStart : -Math.max(0, ct - phraseStartSec)
+    const elapsed    = untrack(() => currentTime) - untrack(() => _phraseStartSec)
+    const phraseDur  = untrack(() => _phraseDurSec)
+    const animDelay  = -Math.max(0, elapsed)   // always negative or zero = seek to current position
 
-    if (phraseDurSec <= 0) return
-
-    // opacity is controlled by keyframes (opacity:1 during animation).
-    // Base style opacity:0 keeps it hidden during positive delay.
-    // fill-mode:none means base style applies before/after animation.
-    playheadEl.style.animationName     = 'none'
-    playheadEl.style.animationDuration = `${phraseDurSec}s`
-    playheadEl.style.animationDelay    = `${animDelay}s`
+    playheadEl.style.animationName          = 'none'
+    playheadEl.style.animationDuration      = `${phraseDur}s`
+    playheadEl.style.animationDelay         = `${animDelay}s`
     playheadEl.style.animationTimingFunction = 'linear'
-    playheadEl.style.animationFillMode = 'none'
+    playheadEl.style.animationFillMode      = 'none'
     void playheadEl.offsetWidth
-    playheadEl.style.animationName     = 'playhead-slide'
+    playheadEl.style.animationName          = 'playhead-slide'
   })
 </script>
 
