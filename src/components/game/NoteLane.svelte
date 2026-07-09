@@ -168,6 +168,7 @@
 
   $effect(() => {
     const line = activeLine
+    console.log('[playhead-effect] fired — line:', line?.notes[0]?.startBeat, 'el:', !!playheadEl)
     if (!line || !line.notes.length || !playheadEl) return
 
     const secPerBeat     = 60 / bpm / 4
@@ -175,6 +176,8 @@
     const phraseStartSec = line.notes[0].startBeat * secPerBeat + gap / 1000
     const phraseDurSec   = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - phraseStartSec
     const elapsed        = Math.max(0, currentTime - phraseStartSec)
+
+    console.log(`[playhead] start=${phraseStartSec.toFixed(2)}s dur=${phraseDurSec.toFixed(2)}s elapsed=${elapsed.toFixed(2)}s`)
 
     if (phraseDurSec <= 0) { playheadEl.style.opacity = '0'; return }
 
