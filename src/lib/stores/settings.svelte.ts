@@ -47,7 +47,7 @@ const DEFAULTS: AppSettings = {
   lyricsOffsetMs: 0,
   volume: 1,
   difficulty: 'medium',
-  micDelay: 0,
+  micDelay: 232,
 }
 
 let settings = $state<AppSettings>({ ...DEFAULTS })

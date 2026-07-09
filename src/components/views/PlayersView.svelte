@@ -78,7 +78,7 @@
       <span class="delay-label">Mic Delay</span>
       <input
         type="range"
-        min="0" max="300" step="10"
+        min="0" max="500" step="10"
         value={appSettings.micDelay}
         oninput={e => appSettings.set('micDelay', Number((e.target as HTMLInputElement).value))}
         class="delay-slider"
