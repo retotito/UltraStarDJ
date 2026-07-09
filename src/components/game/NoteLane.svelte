@@ -178,59 +178,6 @@
     void _line; void _tick
   })
 
-    if (line !== _lastLine) {
-      for (const k in noteStates) delete (noteStates as any)[k]
-      if (line) {
-        for (const note of line.notes) {
-          noteStates[note.startBeat] = { fillPct: 0, correct: false, rapHit: false, correctBeats: 0 }
-        }
-      }
-      _lastBeat = -1
-      _evaluatedForPerfect = false
-      _lastLine = line
-    }
-
-    if (!tick || !line || tick.beat < 0) return
-
-    const intBeat = Math.floor(tick.beat)
-    if (intBeat === _lastBeat) return
-    _lastBeat = intBeat
-
-    const note = line.notes.find(
-      n => intBeat >= n.startBeat && intBeat < n.startBeat + n.lengthBeats
-    )
-    if (!note) return
-
-    const state = noteStates[note.startBeat]
-    if (!state) return
-
-    state.fillPct = Math.min(100, ((intBeat - note.startBeat + 1) / note.lengthBeats) * 100)
-
-    if (tick.correct) {
-      state.correct      = true
-      state.correctBeats++
-    }
-
-    if (tick.correct && (note.type === 'rap' || note.type === 'rap-golden')) {
-      state.rapHit = true
-    }
-
-    if (!_evaluatedForPerfect) {
-      const lastNote       = line.notes[line.notes.length - 1]
-      const phraseLastBeat = lastNote.startBeat + lastNote.lengthBeats - 1
-      if (intBeat >= phraseLastBeat) {
-        _evaluatedForPerfect = true
-        const allPerfect = line.notes
-          .filter(n => n.type !== 'freestyle')
-          .every(n => (noteStates[n.startBeat]?.correctBeats ?? 0) >= n.lengthBeats)
-        if (allPerfect) {
-          perfectFlash = true
-          setTimeout(() => { perfectFlash = false }, 1600)
-        }
-      }
-    }
-  })
-
   // ── Canvas: playhead only ──────────────────────────────────────────────────
   let canvasEl: HTMLCanvasElement | undefined
   let _ctx: CanvasRenderingContext2D | null = null
