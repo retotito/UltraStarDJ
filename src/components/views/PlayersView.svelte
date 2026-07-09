@@ -80,7 +80,7 @@
         type="range"
         min="0" max="500" step="10"
         value={appSettings.micDelay}
-        oninput={e => appSettings.set('micDelay', Number((e.target as HTMLInputElement).value))}
+        oninput={e => { appSettings.set('micDelay', Number((e.target as HTMLInputElement).value)); appSettings.save() }}
         class="delay-slider"
         aria-label="Global mic delay"
       />

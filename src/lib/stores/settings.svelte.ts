@@ -99,7 +99,7 @@ export const appSettings = {
   load() {
     try {
       const raw = localStorage.getItem('ultrastardj-settings')
-      if (raw) Object.assign(settings, JSON.parse(raw))
+      if (raw) Object.assign(settings, { ...DEFAULTS, ...JSON.parse(raw) })
       document.documentElement.classList.toggle('light', settings.theme === 'light')
     } catch {}
   },
