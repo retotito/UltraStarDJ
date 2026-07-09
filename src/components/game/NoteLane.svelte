@@ -32,16 +32,37 @@
   let _rafId: number
 
   $effect(() => {
+    const prev = _lastKnownTime
     _lastKnownTime = currentTime
     _lastKnownAt   = performance.now()
+    if (Math.abs(currentTime - prev) > 0.05) {
+      console.warn(`[time-anchor] currentTime jumped: ${(prev*1000).toFixed(1)} → ${(currentTime*1000).toFixed(1)}ms (delta=${((currentTime-prev)*1000).toFixed(1)}ms)`)
+    }
   })
 
+  let _lastTickAt = 0
+  let _dbgFrameLog = 0
+
   function _tick() {
+    const now = performance.now()
+    const frameGap = now - _lastTickAt
+    _lastTickAt = now
+
     if (playing) {
-      const elapsed = (performance.now() - _lastKnownAt) / 1000
+      const elapsed = (now - _lastKnownAt) / 1000
       smoothTime = _lastKnownTime + elapsed
+
+      // Log every ~500ms: frame gap (should be ~16ms) and smoothTime delta
+      if (now - _dbgFrameLog > 500) {
+        _dbgFrameLog = now
+        console.log(`[playhead] frame=${frameGap.toFixed(1)}ms  smoothTime=${(smoothTime*1000).toFixed(0)}ms  elapsed=${(elapsed*1000).toFixed(1)}ms`)
+      }
+      // Warn on dropped frames (>40ms = missed ~2 frames)
+      if (_lastTickAt > 0 && frameGap > 40) {
+        console.warn(`[playhead] DROPPED FRAME: gap=${frameGap.toFixed(1)}ms at smoothTime=${(smoothTime*1000).toFixed(0)}ms`)
+      }
     } else {
-      _lastKnownAt = performance.now()
+      _lastKnownAt = now
     }
     _drawPlayhead()
     _rafId = requestAnimationFrame(_tick)
@@ -232,10 +253,8 @@
     _ctx.beginPath()
     _ctx.moveTo(x, 0)
     _ctx.lineTo(x, _ch)
-    _ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+    _ctx.strokeStyle = 'rgba(255,255,255,0.5)'
     _ctx.lineWidth   = 2
-    _ctx.shadowColor = 'rgba(255,255,255,0.2)'
-    _ctx.shadowBlur  = 6
     _ctx.stroke()
     _ctx.restore()
   }
