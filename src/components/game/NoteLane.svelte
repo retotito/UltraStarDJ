@@ -162,56 +162,33 @@
     }
   })
 
-  // ── Canvas: playhead only ──────────────────────────────────────────────────
-  let canvasEl: HTMLCanvasElement | undefined
-  let _ctx: CanvasRenderingContext2D | null = null
-  let _cw = 0, _ch = 0
-
-  let _phraseStartSec = 0
-  let _phraseDurSec   = 0
+  // ── CSS playhead: GPU animation, triggered once per phrase ───────────────
+  // playheadEl is $state so the $effect re-runs when bind:this assigns it.
+  let playheadEl = $state<HTMLElement | undefined>(undefined)
 
   $effect(() => {
     const line = activeLine
-    if (!line || !line.notes.length) { _phraseDurSec = 0; return }
-    const secPerBeat = 60 / bpm / 4
-    const last       = line.notes[line.notes.length - 1]
-    _phraseStartSec  = line.notes[0].startBeat * secPerBeat + gap / 1000
-    _phraseDurSec    = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - _phraseStartSec
-  })
+    if (!line || !line.notes.length || !playheadEl) return
 
-  $effect(() => {
-    if (!canvasEl) return
-    const ro = new ResizeObserver((entries) => {
-      if (!canvasEl) return
-      const rect = entries[0]?.contentRect
-      _cw = rect?.width  ?? canvasEl.offsetWidth
-      _ch = rect?.height ?? canvasEl.offsetHeight
-      canvasEl.width  = Math.round(_cw)
-      canvasEl.height = Math.round(_ch)
-      _ctx = canvasEl.getContext('2d')
-    })
-    ro.observe(canvasEl)
-    return () => ro.disconnect()
-  })
+    const secPerBeat     = 60 / bpm / 4
+    const last           = line.notes[line.notes.length - 1]
+    const phraseStartSec = line.notes[0].startBeat * secPerBeat + gap / 1000
+    const phraseDurSec   = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - phraseStartSec
+    const elapsed        = Math.max(0, currentTime - phraseStartSec)
 
-  function _drawPlayhead() {
-    if (!_ctx || _cw === 0 || _phraseDurSec <= 0) {
-      _ctx?.clearRect(0, 0, _cw, _ch)
-      return
-    }
-    const frac = (smoothTime - _phraseStartSec) / _phraseDurSec
-    _ctx.clearRect(0, 0, _cw, _ch)
-    if (frac < 0 || frac > 1) return
-    const x = frac * _cw
-    _ctx.save()
-    _ctx.beginPath()
-    _ctx.moveTo(x, 0)
-    _ctx.lineTo(x, _ch)
-    _ctx.strokeStyle = 'rgba(255,255,255,0.5)'
-    _ctx.lineWidth   = 2
-    _ctx.stroke()
-    _ctx.restore()
-  }
+    if (phraseDurSec <= 0) { playheadEl.style.opacity = '0'; return }
+
+    // Standard browser technique to restart a CSS animation:
+    // set animationName to 'none', force reflow, re-enable.
+    playheadEl.style.animationName     = 'none'
+    playheadEl.style.animationDuration = `${phraseDurSec}s`
+    playheadEl.style.animationDelay    = `-${elapsed}s`
+    playheadEl.style.animationTimingFunction = 'linear'
+    playheadEl.style.animationFillMode = 'forwards'
+    playheadEl.style.opacity           = '1'
+    void playheadEl.offsetWidth        // force reflow to reset animation state
+    playheadEl.style.animationName     = 'playhead-slide'
+  })
 </script>
 
 <div
@@ -489,8 +466,6 @@
     will-change: transform;
     pointer-events: none;
     z-index: 15;
-    animation: playhead-slide linear forwards;
-    animation-duration: 0s;   /* overwritten by $effect */
   }
 
   @keyframes playhead-slide {
