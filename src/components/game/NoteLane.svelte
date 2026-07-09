@@ -279,7 +279,11 @@
       </div>
     {/if}
 
+    <!-- PLAYHEAD DISABLED — kept for future use
+    <!-- PLAYHEAD DISABLED — kept for future use
     <div bind:this={playheadEl} class="playhead-line" aria-hidden="true"></div>
+    -->
+    -->
 
   </div>
 </div>
