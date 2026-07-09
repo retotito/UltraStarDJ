@@ -499,7 +499,7 @@
   /* ── Delay indicator: red line showing expected fill right edge ── */
   .delay-indicator {
     position: absolute;
-    top: 0; bottom: 0; left: 0;
+    top: 0; bottom: 0; left: -100px;
     width: 100%;
     border-left: 2px solid rgba(255, 80, 80, 0.8);
     will-change: transform;
