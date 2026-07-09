@@ -1,16 +1,30 @@
 <script lang="ts">
   import { playersStore, type PlayerConfig } from '$lib/stores/players.svelte'
+  import { listAudioInputDevices } from '$lib/ipc/tauri'
   import Modal from '$components/ui/Modal.svelte'
 
   let { player, onclose }: { player: PlayerConfig; onclose: () => void } = $props()
 
   // Resolve device label for display
   let deviceLabel = $state('')
+  let webDeviceId = $state<string | undefined>(undefined)
+
   $effect(() => {
     if (!player.mic) return
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-      const d = devices.find(d => d.deviceId === player.mic!.deviceId)
-      deviceLabel = d ? `${d.label} (${player.mic!.channel})` : player.mic!.channel
+    // Get Tauri device name, then match to Web API deviceId by label
+    listAudioInputDevices().then(async tauriDevices => {
+      const tauriDev = tauriDevices.find(d => d.id === player.mic!.deviceId)
+      if (!tauriDev) return
+      deviceLabel = `${tauriDev.name}${ tauriDev.channels >= 2 ? ' · ' + player.mic!.channel : '' }`
+      // Unlock device labels by getting any mic stream first
+      try {
+        const tmp = await navigator.mediaDevices.getUserMedia({ audio: true })
+        tmp.getTracks().forEach(t => t.stop())
+      } catch {}
+      const webDevices = await navigator.mediaDevices.enumerateDevices()
+      const match = webDevices.find(d => d.kind === 'audioinput' && d.label.includes(tauriDev.name))
+      if (match) { webDeviceId = match.deviceId; console.log('[latency] matched web deviceId:', match.deviceId, match.label) }
+      else console.warn('[latency] no web device match for:', tauriDev.name)
     }).catch(() => {})
   })
 
@@ -62,11 +76,10 @@
     // Open mic stream during countdown so meter is live
     try {
       audioCtx = new AudioContext()
-      // Try exact deviceId first, fall back to ideal, then any mic
-      const deviceId = player.mic?.deviceId
+      // Try matched web deviceId first, then ideal, then any mic
       const constraints = [
-        deviceId ? { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : null,
-        deviceId ? { deviceId: { ideal: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : null,
+        webDeviceId ? { deviceId: { exact: webDeviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : null,
+        webDeviceId ? { deviceId: { ideal: webDeviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : null,
         { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       ].filter(Boolean) as MediaTrackConstraints[]
 
@@ -225,13 +238,11 @@
   }
 </script>
 
-<Modal title="Mic Latency — Player {player.id}{deviceLabel ? ' · ' + deviceLabel : ''}" open={true} onclose={cancel}>
+<Modal title="Mic Latency — Player {player.id}" open={true} onclose={cancel}>
   <div class="latency-dialog">
+    {#if deviceLabel}<p class="device-label"><span class="icon">mic</span> {deviceLabel}</p>{/if}
 
     {#if phase === 'idle'}
-      {#if deviceLabel}
-        <p class="mic-name"><span class="icon">mic</span> {deviceLabel}</p>
-      {/if}
       <p class="hint">
         Hold your microphone close to your headphone or speaker output.<br>
         The app will play a short beep and measure how long it takes to reach the mic.
@@ -352,6 +363,9 @@
   .meter-label { font-size: 0.8rem; white-space: nowrap; min-width: 64px; color: var(--md-sys-color-on-surface-variant); }
   .meter-bar { flex: 1; height: 8px; background: var(--md-sys-color-surface-variant); border-radius: 4px; overflow: hidden; }
   .meter-fill { height: 100%; background: var(--md-sys-color-primary); border-radius: 4px; transition: width 50ms linear; }
+  .device-label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem;
+                  color: var(--md-sys-color-primary); font-weight: 500;
+                  padding-bottom: var(--space-1); border-bottom: 1px solid var(--md-sys-color-outline-variant); }
   .mic-name { display: flex; align-items: center; gap: 6px; font-size: 0.85rem;
               color: var(--md-sys-color-primary); font-weight: 500; }
   .meter-val { font-size: 0.8rem; min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
