@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
   import type { PitchTickEntry } from '$lib/ipc/tauri'
-  import { onDestroy } from 'svelte'
 
   let {
     tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap,
@@ -25,45 +24,7 @@
     playing?: boolean
   } = $props()
 
-  // ── Pure wall-clock smoothTime — anchored once per phrase, no IPC during phrase
-  // Eliminates all coupling between pitch IPC delivery and playhead position.
-  let smoothTime    = currentTime
-  let _anchorTime   = currentTime   // audio time at anchor point
-  let _anchorWallMs = performance.now()
-  let _lastLine: LyricLine | null = null
-  let _rafId: number
-
-  // Re-anchor when phrase changes (activeLine is derived from currentTime prop)
-  $effect(() => {
-    const line = activeLine
-    if (line !== _lastLine) {
-      _anchorTime   = currentTime
-      _anchorWallMs = performance.now()
-      _lastLine     = line
-    }
-  })
-
-  let _lastTickAt = 0
-
-  function _tick() {
-    const now = performance.now()
-    _lastTickAt = now
-
-    if (playing) {
-      // Pure wall clock from last anchor — zero IPC influence within a phrase
-      smoothTime = _anchorTime + (now - _anchorWallMs) / 1000
-    } else {
-      // Paused: keep anchor fresh so resume has no jump
-      _anchorTime   = currentTime
-      _anchorWallMs = now
-    }
-    _drawPlayhead()
-    _rafId = requestAnimationFrame(_tick)
-  }
-  _rafId = requestAnimationFrame(_tick)
-  onDestroy(() => cancelAnimationFrame(_rafId))
-
-  // ── Beat math — derived from currentTime prop (10fps), not smoothTime ──────
+  // ── Beat math — derived from currentTime prop (10fps) ────────────────────
   const currentBeat = $derived(
     (currentTime - gap / 1000) * (bpm / 60) * 4
   )
@@ -139,19 +100,72 @@
   }
 
   const noteStates = $state<Record<number, NoteState>>({})
+  let _lastLine:            LyricLine | null = null
   let _lastBeat:            number           = -1
   let _evaluatedForPerfect: boolean          = false
   let perfectFlash = $state(false)
 
   $effect(() => {
-    void activeLine
-    void pitchTick
-    // TEST: receive data, write nothing — isolating playhead jitter
+    const line = activeLine
+    const tick = pitchTick
+
+    if (line !== _lastLine) {
+      for (const k in noteStates) delete (noteStates as any)[k]
+      if (line) {
+        for (const note of line.notes) {
+          noteStates[note.startBeat] = { fillPct: 0, correct: false, rapHit: false, correctBeats: 0 }
+        }
+      }
+      _lastBeat = -1
+      _evaluatedForPerfect = false
+      _lastLine = line
+    }
+
+    if (!tick || !line || tick.beat < 0) return
+
+    const intBeat = Math.floor(tick.beat)
+    if (intBeat === _lastBeat) return
+    _lastBeat = intBeat
+
+    const note = line.notes.find(
+      n => intBeat >= n.startBeat && intBeat < n.startBeat + n.lengthBeats
+    )
+    if (!note) return
+
+    const state = noteStates[note.startBeat]
+    if (!state) return
+
+    state.fillPct = Math.min(100, ((intBeat - note.startBeat + 1) / note.lengthBeats) * 100)
+
+    if (tick.correct) {
+      state.correct      = true
+      state.correctBeats++
+    }
+
+    if (tick.correct && (note.type === 'rap' || note.type === 'rap-golden')) {
+      state.rapHit = true
+    }
+
+    if (!_evaluatedForPerfect) {
+      const lastNote       = line.notes[line.notes.length - 1]
+      const phraseLastBeat = lastNote.startBeat + lastNote.lengthBeats - 1
+      if (intBeat >= phraseLastBeat) {
+        _evaluatedForPerfect = true
+        const allPerfect = line.notes
+          .filter(n => n.type !== 'freestyle')
+          .every(n => (noteStates[n.startBeat]?.correctBeats ?? 0) >= n.lengthBeats)
+        if (allPerfect) {
+          perfectFlash = true
+          setTimeout(() => { perfectFlash = false }, 1600)
+        }
+      }
+    }
   })
 
   // ── Canvas: playhead only ──────────────────────────────────────────────────
-  // ── Playhead div: position set directly in _tick(), zero Svelte reactivity ──
-  let playheadEl: HTMLElement | undefined
+  let canvasEl: HTMLCanvasElement | undefined
+  let _ctx: CanvasRenderingContext2D | null = null
+  let _cw = 0, _ch = 0
 
   let _phraseStartSec = 0
   let _phraseDurSec   = 0
@@ -165,18 +179,38 @@
     _phraseDurSec    = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - _phraseStartSec
   })
 
+  $effect(() => {
+    if (!canvasEl) return
+    const ro = new ResizeObserver((entries) => {
+      if (!canvasEl) return
+      const rect = entries[0]?.contentRect
+      _cw = rect?.width  ?? canvasEl.offsetWidth
+      _ch = rect?.height ?? canvasEl.offsetHeight
+      canvasEl.width  = Math.round(_cw)
+      canvasEl.height = Math.round(_ch)
+      _ctx = canvasEl.getContext('2d')
+    })
+    ro.observe(canvasEl)
+    return () => ro.disconnect()
+  })
+
   function _drawPlayhead() {
-    if (!playheadEl || _phraseDurSec <= 0) {
-      if (playheadEl) playheadEl.style.opacity = '0'
+    if (!_ctx || _cw === 0 || _phraseDurSec <= 0) {
+      _ctx?.clearRect(0, 0, _cw, _ch)
       return
     }
     const frac = (smoothTime - _phraseStartSec) / _phraseDurSec
-    if (frac < 0 || frac > 1) {
-      playheadEl.style.opacity = '0'
-      return
-    }
-    playheadEl.style.opacity = '1'
-    playheadEl.style.transform = `translateX(${frac * 100}%)`
+    _ctx.clearRect(0, 0, _cw, _ch)
+    if (frac < 0 || frac > 1) return
+    const x = frac * _cw
+    _ctx.save()
+    _ctx.beginPath()
+    _ctx.moveTo(x, 0)
+    _ctx.lineTo(x, _ch)
+    _ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+    _ctx.lineWidth   = 2
+    _ctx.stroke()
+    _ctx.restore()
   }
 </script>
 
@@ -223,7 +257,6 @@
           class:sung-correct={isFullyCorrect && !isGolden}
           class:golden-correct={isGolden && isFullyCorrect}
         >
-          <!-- NOTE FILL DISABLED FOR PLAYHEAD TESTING
           {#if state && state.fillPct > 0}
             <div
               class="note-fill"
@@ -232,7 +265,6 @@
               style="clip-path: inset(0 {Math.max(0, 100 - state.fillPct)}% 0 0)"
             ></div>
           {/if}
-          -->
 
           {#if showNoteSyllables && cell.note.syllable?.trim()}
             <span class="note-syllable">{cell.note.syllable.trim()}</span>
@@ -447,7 +479,7 @@
     text-transform: uppercase;
   }
 
-  /* ── Playhead div: transform driven directly by rAF, no Svelte reactivity ── */
+  /* ── CSS playhead: GPU animation, reset via $effect on phrase change ── */
   .playhead-line {
     position: absolute;
     top: 0; bottom: 0; left: 0;
@@ -457,5 +489,12 @@
     will-change: transform;
     pointer-events: none;
     z-index: 15;
+    animation: playhead-slide linear forwards;
+    animation-duration: 0s;   /* overwritten by $effect */
+  }
+
+  @keyframes playhead-slide {
+    from { transform: translateX(0%); }
+    to   { transform: translateX(100%); }
   }
 </style>
