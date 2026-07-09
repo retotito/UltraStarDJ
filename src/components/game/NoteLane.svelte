@@ -51,10 +51,12 @@
     _lastTickAt = now
 
     if (playing) {
-      // Cap elapsed at 50ms — prevents startup frame drops from causing
-      // smoothTime to race ahead of the actual audio position
-      const elapsed = Math.min((now - _lastKnownAt) / 1000, 0.05)
-      smoothTime = _lastKnownTime + elapsed
+      const elapsed    = (now - _lastKnownAt) / 1000
+      const candidate  = _lastKnownTime + elapsed
+      // Cap per-frame advance to 50ms — prevents frame drops from causing
+      // smoothTime to race ahead and then snap back when time-tick corrects it.
+      // Normal 16ms frames are never capped. Only drop frames (>50ms) are limited.
+      smoothTime = Math.min(candidate, smoothTime + 0.05)
 
       // Set reference point once playback is underway
       if (_refWallTime === 0 && smoothTime > 0.1) {
