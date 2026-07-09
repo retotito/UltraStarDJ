@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { NoteTrack, LyricLine, Note } from '$lib/ultrastar/types'
   import type { PitchTickEntry } from '$lib/ipc/tauri'
+  import { untrack } from 'svelte'
 
   let {
     tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap,
@@ -175,7 +176,7 @@
     const last           = line.notes[line.notes.length - 1]
     const phraseStartSec = line.notes[0].startBeat * secPerBeat + gap / 1000
     const phraseDurSec   = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - phraseStartSec
-    const elapsed        = Math.max(0, currentTime - phraseStartSec)
+    const elapsed = Math.max(0, untrack(() => currentTime) - phraseStartSec)
 
     console.log(`[playhead] start=${phraseStartSec.toFixed(2)}s dur=${phraseDurSec.toFixed(2)}s elapsed=${elapsed.toFixed(2)}s`)
 
