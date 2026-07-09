@@ -187,6 +187,7 @@
     const phraseDur  = untrack(() => _phraseDurSec)
     // Negative delay = seek to compensate for IPC tick latency (≤16ms at 16ms tick rate)
     const animDelay  = -Math.max(0, elapsed)
+    console.log(`[playhead] elapsed=${(elapsed*1000).toFixed(1)}ms animDelay=${animDelay.toFixed(3)}s dur=${phraseDur.toFixed(2)}s`)
 
     playheadEl.style.animationName          = 'none'
     playheadEl.style.animationDuration      = `${phraseDur}s`
