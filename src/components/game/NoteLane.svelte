@@ -182,15 +182,17 @@
 
     if (phraseDurSec <= 0) { playheadEl.style.opacity = '0'; return }
 
-    // Remove class to reset animation, set timing via inline style,
-    // force reflow, then re-add class to start the GPU animation.
-    // Class-based: Svelte correctly maps the scoped @keyframes name.
-    playheadEl.classList.remove('playing')
+    // Set all animation properties as inline styles.
+    // @keyframes is :global so the name 'playhead-slide' is never hashed.
+    // Reset by setting animationName='none', force reflow, re-enable.
+    playheadEl.style.animationName     = 'none'
     playheadEl.style.animationDuration = `${phraseDurSec}s`
     playheadEl.style.animationDelay    = `-${elapsed}s`
+    playheadEl.style.animationTimingFunction = 'linear'
+    playheadEl.style.animationFillMode = 'forwards'
     playheadEl.style.opacity           = '1'
-    void playheadEl.offsetWidth        // force reflow
-    playheadEl.classList.add('playing')
+    void playheadEl.offsetWidth
+    playheadEl.style.animationName     = 'playhead-slide'
   })
 </script>
 
@@ -471,12 +473,8 @@
     z-index: 15;
   }
 
-  /* Class added by $effect — Svelte maps this to the correct scoped keyframe */
-  .playhead-line.playing {
-    animation: playhead-slide linear forwards;
-  }
-
-  @keyframes playhead-slide {
+  /* :global so the keyframe name is never hashed — JS can reference it by name */
+  :global(@keyframes playhead-slide) {
     from { transform: translateX(0%); }
     to   { transform: translateX(100%); }
   }
