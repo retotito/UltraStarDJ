@@ -306,6 +306,19 @@
 
     <canvas bind:this={canvasEl} class="overlay-canvas" aria-hidden="true"></canvas>
 
+    <!-- CSS animation playhead: runs on compositor thread, immune to JS/IPC jitter -->
+    {#key activeLine}
+      {#if _phraseDurSec > 0 && playing}
+        <div
+          class="playhead-line"
+          style="
+            animation-duration: {_phraseDurSec}s;
+            animation-delay: -{Math.max(0, currentTime - _phraseStartSec)}s;
+          "
+        ></div>
+      {/if}
+    {/key}
+
   </div>
 </div>
 
@@ -503,5 +516,23 @@
     pointer-events: none;
     z-index: 15;
     display: block;
+  }
+
+  /* ── CSS playhead: compositor-thread animation, immune to JS jitter ── */
+  .playhead-line {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 0;
+    width: 100%;
+    border-left: 2px solid rgba(255, 255, 255, 0.6);
+    animation: playhead-slide linear forwards;
+    will-change: transform;
+    pointer-events: none;
+    z-index: 15;
+  }
+
+  @keyframes playhead-slide {
+    from { transform: translateX(0%); }
+    to   { transform: translateX(100%); }
   }
 </style>
