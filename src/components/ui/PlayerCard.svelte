@@ -58,6 +58,21 @@
 
   let showLatencyDialog = $state(false)
 
+  async function stopAllTestMics() {
+    if (playback.isActive) return
+    const ids = [...playersStore.monitoringIds]
+    for (const id of ids) {
+      await stopMicMonitor(id).catch(() => {})
+      playersStore.setMonitoring(id, false)
+      playersStore.setLevel(id, 0)
+    }
+  }
+
+  async function openLatencyDialog() {
+    await stopAllTestMics()
+    showLatencyDialog = true
+  }
+
   // Update input gain instantly via hot-reload (no stream restart needed).
   function onGainChange(v: number) {
     playersStore.setInputGain(player.id, v)
@@ -143,7 +158,7 @@
         {isMonitoring ? 'Stop test' : 'Test mic'}
       </button>
 
-      <button class="btn btn-icon latency-btn" title="Set mic latency" onclick={() => showLatencyDialog = true}>
+      <button class="btn btn-icon latency-btn" title="Set mic latency" onclick={openLatencyDialog}>
         <span class="icon">timer</span>
         <span class="latency-val">{player.micDelayMs ?? 40} ms</span>
       </button>
