@@ -218,10 +218,10 @@ export const pitchSession = {
       }
 
       // Collect all processedBeats for this player as an array (sent to beamer)
-      const playerBeats = _processedBeats.get(playerId)
       // Collect processedBeats internally for scoring (not sent to beamer)
-      const playerBeats = _processedBeats.get(playerId)
-      const processedBeatsForScore: ProcessedBeat[] = playerBeats ? [...playerBeats.values()] : []
+      const processedBeatsForScore: ProcessedBeat[] = _processedBeats.get(playerId)
+        ? [..._processedBeats.get(playerId)!.values()]
+        : []
 
       // Compute running score
       const { score, maxScore } = calcScore(processedBeatsForScore, track)
