@@ -177,7 +177,7 @@
   }
 </script>
 
-<Modal title="Mic Latency — Player {player.id}" onclose={cancel}>
+<Modal title="Mic Latency — Player {player.id}" open={true} onclose={cancel}>
   <div class="latency-dialog">
 
     {#if phase === 'idle'}
