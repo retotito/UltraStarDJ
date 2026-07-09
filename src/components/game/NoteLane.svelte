@@ -203,6 +203,28 @@
     if (!playheadEl) return
     playheadEl.style.animationPlayState = playing ? 'running' : 'paused'
   })
+
+  // ── CSS fill animation: one-shot per note, GPU-driven ────────────────────
+  const _activeFills = new Set<HTMLElement>()
+
+  function noteFillAnim(node: HTMLElement, params: { noteStartSec: number, noteDurSec: number }) {
+    const elapsed = Math.max(0, currentTime - micDelayMs / 1000 - params.noteStartSec)
+    node.style.animationName          = 'none'
+    node.style.animationDuration      = `${params.noteDurSec}s`
+    node.style.animationDelay         = `${-elapsed}s`
+    node.style.animationTimingFunction = 'linear'
+    node.style.animationFillMode      = 'forwards'
+    node.style.animationPlayState     = playing ? 'running' : 'paused'
+    void node.offsetWidth
+    node.style.animationName          = 'fill-slide'
+    _activeFills.add(node)
+    return { destroy() { _activeFills.delete(node) } }
+  }
+
+  $effect(() => {
+    const s = playing ? 'running' : 'paused'
+    for (const el of _activeFills) el.style.animationPlayState = s
+  })
 </script>
 
 <div
@@ -253,7 +275,10 @@
               class="note-fill"
               class:correct={state.correct}
               class:golden={isGolden}
-              style="clip-path: inset(0 {Math.max(0, 100 - state.fillPct)}% 0 0)"
+              use:noteFillAnim={{
+                noteStartSec: cell.note.startBeat * (60 / bpm / 4) + gap / 1000,
+                noteDurSec:   cell.note.lengthBeats * (60 / bpm / 4),
+              }}
             ></div>
           {/if}
 
@@ -397,7 +422,7 @@
     inset: 0;
     background: var(--player-color);
     opacity: 0.45;
-    transition: clip-path 80ms linear;
+    clip-path: inset(0 100% 0 0);  /* starts hidden; animation takes over */
     pointer-events: none;
     z-index: 1;
   }

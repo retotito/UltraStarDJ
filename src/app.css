@@ -691,3 +691,9 @@ a {
   from { transform: translateX(0%);   opacity: 1; }
   to   { transform: translateX(100%); opacity: 1; }
 }
+
+/* ── Fill animation (global — referenced by name in NoteLane JS) ── */
+@keyframes fill-slide {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0% 0 0); }
+}
