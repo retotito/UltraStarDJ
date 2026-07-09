@@ -185,23 +185,16 @@ export async function sendBeamerReady(): Promise<void> {
 }
 
 // ── Pitch tick ─────────────────────────────────────────────────
-export interface ProcessedBeatEntry {
-  beat:          number
-  midiNote:      number   // octave-corrected midi
-  correct:       boolean
-  isFirstInNote: boolean
-  noteType:      string
-}
-
 export interface PitchTickEntry {
-  playerId:       number
-  midiNote:       number   // -1 = no pitch (latest raw sample)
-  correct:        boolean
-  rowPitch:       number   // pitch row to draw (-1 = hide)
-  score:          number
-  maxScore:       number
-  /** All processed beats accumulated so far this session */
-  processedBeats: ProcessedBeatEntry[]
+  playerId:      number
+  beat:          number   // current beat position (float)
+  midiNote:      number   // latest detected pitch (-1 = silence)
+  correct:       boolean  // was this beat correct?
+  isFirstInNote: boolean  // first beat of a new note
+  noteType:      string   // 'normal' | 'golden' | 'rap' | 'rap-golden' | 'freestyle'
+  rowPitch:      number   // pitch row for mic dot on canvas (-1 = hide)
+  score:         number   // accumulated score
+  maxScore:      number
 }
 
 export interface PitchTickPayload {

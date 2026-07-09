@@ -3,13 +3,18 @@
   import type { PitchTickEntry } from '$lib/ipc/tauri'
   import { onDestroy } from 'svelte'
 
-  let { tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap, rowCount = 16, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', noteBarMinHeight = 28, noteBarRadius = 4, pitchTick = null, playing = true }: {
+  let {
+    tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap,
+    rowCount = 16, showPianoRollLines = true, showNoteSyllables = true,
+    noteBarStyle = 'white', noteBarMinHeight = 28, noteBarRadius = 4,
+    pitchTick = null, playing = true
+  }: {
     tracks: NoteTrack[]
     trackIndex?: number
     playerColor?: string
     currentTime: number
     bpm: number
-    gap: number     // ms
+    gap: number
     rowCount?: number
     showPianoRollLines?: boolean
     showNoteSyllables?: boolean
@@ -20,7 +25,7 @@
     playing?: boolean
   } = $props()
 
-  // ── Smooth currentTime via rAF interpolation (same pattern as LyricsRenderer) ──
+  // ── Smooth currentTime via rAF interpolation ──────────────────────────────
   let smoothTime = $state(currentTime)
   let _lastKnownTime = currentTime
   let _lastKnownAt   = performance.now()
@@ -36,7 +41,6 @@
       const elapsed = (performance.now() - _lastKnownAt) / 1000
       smoothTime = _lastKnownTime + elapsed
     } else {
-      // Keep _lastKnownAt fresh while paused so resume has no elapsed-time jump
       _lastKnownAt = performance.now()
     }
     _drawPlayhead()
@@ -53,10 +57,8 @@
   const track = $derived(tracks[trackIndex] ?? null)
 
   // ── Active phrase ──────────────────────────────────────────────────────────
-  /** Find the phrase currently being sung (or the next upcoming one) */
   const activeLine = $derived.by(() => {
     if (!track) return null
-    // Find the phrase where currentBeat falls inside, with a small lookahead
     let upcoming: LyricLine | null = null
     for (const line of track.lines) {
       if (!line.notes.length) continue
@@ -77,37 +79,23 @@
   }
 
   function pitchToRow(pitch: number, avg: number, rows: number): number {
-    // Wrap pitch into the visible window via octave shifts
     let p = pitch
     const min = Math.floor(avg - rows / 2)
     const max = min + rows - 1
     while (p > max) p -= 12
     while (p < min) p += 12
     const offset = p - avg
-    // row 1 = top (highest pitch), row N = bottom
     const row = Math.ceil(rows / 2 - offset)
     return Math.max(1, Math.min(rows, row))
   }
 
-  // ── Grid geometry ──────────────────────────────────────────────────────────
+  // ── Note cells: absolute % positions, computed once per phrase ─────────────
   type NoteCell = {
-    note: Note
-    col: number       // 1-indexed grid column start
-    colSpan: number
-    row: number       // 1-indexed grid row
+    note:     Note
+    leftPct:  number
+    widthPct: number
+    row:      number
   }
-
-  const cells = $derived.by((): NoteCell[] => {
-    if (!activeLine) return []
-    const firstBeat = activeLine.notes[0].startBeat
-    const avg = avgPitch(activeLine)
-    return activeLine.notes.map(note => ({
-      note,
-      col:     note.startBeat - firstBeat + 1,
-      colSpan: Math.max(1, note.lengthBeats),
-      row:     pitchToRow(note.pitch, avg, rowCount),
-    }))
-  })
 
   const phraseBeats = $derived.by(() => {
     if (!activeLine || !activeLine.notes.length) return 16
@@ -116,111 +104,104 @@
     return last.startBeat + last.lengthBeats - first
   })
 
-  // ── Sung segments: group processedBeats into continuous runs ───────────────
-  type SungSegment = {
-    startCol:  number
-    length:    number
-    row:       number
-    correct:   boolean
-    noteType:  string
+  const cells = $derived.by((): NoteCell[] => {
+    if (!activeLine) return []
+    const firstBeat = activeLine.notes[0].startBeat
+    const avg       = avgPitch(activeLine)
+    return activeLine.notes.map(note => ({
+      note,
+      leftPct:  (note.startBeat - firstBeat) / phraseBeats * 100,
+      widthPct: Math.max(1, note.lengthBeats) / phraseBeats * 100,
+      row:      pitchToRow(note.pitch, avg, rowCount),
+    }))
+  })
+
+  // ── Per-note state: updated incrementally from pitch tick ─────────────────
+  type NoteState = {
+    fillPct:      number
+    correct:      boolean
+    rapHit:       boolean
+    correctBeats: number
   }
 
-  const sungSegments = $derived.by((): SungSegment[] => {
-    if (!pitchTick?.processedBeats?.length || !activeLine) return []
+  const noteStates = $state<Record<number, NoteState>>({})
+  let _lastLine:            LyricLine | null = null
+  let _lastBeat:            number           = -1
+  let _evaluatedForPerfect: boolean          = false
+  let perfectFlash = $state(false)
 
-    const phraseFirstBeat = activeLine.notes[0].startBeat
-    const phraseLastBeat  = activeLine.notes[activeLine.notes.length - 1].startBeat
-                          + activeLine.notes[activeLine.notes.length - 1].lengthBeats
-    const avg = avgPitch(activeLine)
+  $effect(() => {
+    const line = activeLine
+    const tick = pitchTick
 
-    // Filter to beats within current phrase only, excluding rap (handled separately)
-    const beats = pitchTick.processedBeats
-      .filter(b => b.beat >= phraseFirstBeat && b.beat < phraseLastBeat
-        && b.noteType !== 'rap' && b.noteType !== 'rap-golden' && b.noteType !== 'freestyle')
-      .sort((a, b) => a.beat - b.beat)
+    if (line !== _lastLine) {
+      for (const k in noteStates) delete (noteStates as any)[k]
+      if (line) {
+        for (const note of line.notes) {
+          noteStates[note.startBeat] = { fillPct: 0, correct: false, rapHit: false, correctBeats: 0 }
+        }
+      }
+      _lastBeat = -1
+      _evaluatedForPerfect = false
+      _lastLine = line
+    }
 
-    if (!beats.length) return []
+    if (!tick || !line || tick.beat < 0) return
 
-    const segments: SungSegment[] = []
-    for (const beat of beats) {
-      const col = beat.beat - phraseFirstBeat + 1
-      // For correct beats, snap to the target note's pitch so vibrato doesn't
-      // cause row flickering and segment splits on long held notes.
-      const ownerNote = activeLine.notes.find(
-        n => beat.beat >= n.startBeat && beat.beat < n.startBeat + n.lengthBeats
-      )
-      const pitchForRow = (beat.correct && ownerNote) ? ownerNote.pitch : beat.midiNote
-      const row = pitchToRow(pitchForRow, avg, rowCount)
-      const last = segments.at(-1)
+    const intBeat = Math.floor(tick.beat)
+    if (intBeat === _lastBeat) return
+    _lastBeat = intBeat
 
-      const shouldStartNew =
-        !last ||
-        beat.isFirstInNote ||
-        last.row !== row ||
-        last.startCol + last.length !== col  // gap in beat sequence
+    const note = line.notes.find(
+      n => intBeat >= n.startBeat && intBeat < n.startBeat + n.lengthBeats
+    )
+    if (!note) return
 
-      if (shouldStartNew) {
-        segments.push({ startCol: col, length: 1, row, correct: beat.correct, noteType: beat.noteType ?? 'normal' })
-      } else {
-        last.length++
-        last.correct = last.correct || beat.correct  // segment is "correct" if any beat was correct
+    const state = noteStates[note.startBeat]
+    if (!state) return
+
+    state.fillPct = Math.min(100, ((intBeat - note.startBeat + 1) / note.lengthBeats) * 100)
+
+    if (tick.correct) {
+      state.correct      = true
+      state.correctBeats++
+    }
+
+    if (tick.correct && (note.type === 'rap' || note.type === 'rap-golden')) {
+      state.rapHit = true
+    }
+
+    if (!_evaluatedForPerfect) {
+      const lastNote       = line.notes[line.notes.length - 1]
+      const phraseLastBeat = lastNote.startBeat + lastNote.lengthBeats - 1
+      if (intBeat >= phraseLastBeat) {
+        _evaluatedForPerfect = true
+        const allPerfect = line.notes
+          .filter(n => n.type !== 'freestyle')
+          .every(n => (noteStates[n.startBeat]?.correctBeats ?? 0) >= n.lengthBeats)
+        if (allPerfect) {
+          perfectFlash = true
+          setTimeout(() => { perfectFlash = false }, 1600)
+        }
       }
     }
-    return segments
   })
 
-  // ── Rap note hit detection ─────────────────────────────────────────────────
-  // A rap note is "hit" when any beat within it was detected (midiNote >= 0 = correct)
-  const rapHitNotes = $derived.by((): Set<number> => {
-    if (!pitchTick?.processedBeats || !activeLine) return new Set()
-    const hits = new Set<number>()
-    for (const note of activeLine.notes) {
-      if (note.type !== 'rap' && note.type !== 'rap-golden') continue
-      const wasHit = pitchTick.processedBeats.some(
-        b => b.beat >= note.startBeat && b.beat < note.startBeat + note.lengthBeats && b.correct
-      )
-      if (wasHit) hits.add(note.startBeat)
-    }
-    return hits
-  })
-
-  // ── Fully-correct note detection (normal + golden) ─────────────────────────
-  // A note is "fully correct" when every beat in it has correct=true
-  const fullyCorrectNotes = $derived.by((): Set<number> => {
-    if (!pitchTick?.processedBeats || !activeLine) return new Set()
-    const beatMap = new Map(pitchTick.processedBeats.map(b => [b.beat, b]))
-    const hits = new Set<number>()
-    for (const note of activeLine.notes) {
-      if (note.type !== 'normal' && note.type !== 'golden') continue
-      // Note must be fully passed (playhead beyond end)
-      if (currentBeat < note.startBeat + note.lengthBeats) continue
-      let allCorrect = true
-      for (let b = note.startBeat; b < note.startBeat + note.lengthBeats; b++) {
-        if (!beatMap.get(b)?.correct) { allCorrect = false; break }
-      }
-      if (allCorrect) hits.add(note.startBeat)
-    }
-    return hits
-  })
-
-  // ── Canvas overlay: playhead drawn directly in rAF ────────────────────────
+  // ── Canvas: playhead only ──────────────────────────────────────────────────
   let canvasEl: HTMLCanvasElement | undefined
   let _ctx: CanvasRenderingContext2D | null = null
   let _cw = 0, _ch = 0
-  let _padX = 0, _padY = 0
 
-  // Cache phrase time boundaries as plain JS — updated by $effect, read in rAF
   let _phraseStartSec = 0
-  let _phraseDurSec   = 0   // 0 = no active phrase
+  let _phraseDurSec   = 0
 
   $effect(() => {
     const line = activeLine
     if (!line || !line.notes.length) { _phraseDurSec = 0; return }
-    const secPerBeat   = 60 / bpm / 4
-    const last         = line.notes[line.notes.length - 1]
-    _phraseStartSec    = line.notes[0].startBeat * secPerBeat + gap / 1000
-    const phraseEndSec = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000
-    _phraseDurSec      = phraseEndSec - _phraseStartSec
+    const secPerBeat = 60 / bpm / 4
+    const last       = line.notes[line.notes.length - 1]
+    _phraseStartSec  = line.notes[0].startBeat * secPerBeat + gap / 1000
+    _phraseDurSec    = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - _phraseStartSec
   })
 
   $effect(() => {
@@ -232,9 +213,6 @@
       _ch = rect?.height ?? canvasEl.offsetHeight
       canvasEl.width  = Math.round(_cw)
       canvasEl.height = Math.round(_ch)
-      const cs = getComputedStyle(canvasEl.parentElement!)
-      _padX = parseFloat(cs.paddingLeft) || 0
-      _padY = parseFloat(cs.paddingTop)  || 0
       _ctx = canvasEl.getContext('2d')
     })
     ro.observe(canvasEl)
@@ -249,11 +227,11 @@
     const frac = (smoothTime - _phraseStartSec) / _phraseDurSec
     _ctx.clearRect(0, 0, _cw, _ch)
     if (frac < 0 || frac > 1) return
-    const x = _padX + frac * (_cw - _padX * 2)
+    const x = frac * _cw
     _ctx.save()
     _ctx.beginPath()
-    _ctx.moveTo(x, _padY)
-    _ctx.lineTo(x, _ch - _padY)
+    _ctx.moveTo(x, 0)
+    _ctx.lineTo(x, _ch)
     _ctx.strokeStyle = 'rgba(255,255,255,0.35)'
     _ctx.lineWidth   = 2
     _ctx.shadowColor = 'rgba(255,255,255,0.2)'
@@ -261,229 +239,122 @@
     _ctx.stroke()
     _ctx.restore()
   }
-
-  // ── Perfect line flash ─────────────────────────────────────────────────────
-  // Fires once per completed line where every singable beat was correct.
-  let _evaluatedLineBeats = new Set<number>()   // plain JS — not reactive, no loop risk
-  let perfectFlash = $state(false)
-
-  $effect(() => {
-    if (!pitchTick?.processedBeats || !track) {
-      _evaluatedLineBeats.clear()
-      return
-    }
-    const beatMap = new Map(pitchTick.processedBeats.map(b => [b.beat, b]))
-
-    for (const line of track.lines) {
-      if (!line.notes.length) continue
-      const firstBeat = line.notes[0].startBeat
-      const lastNote  = line.notes[line.notes.length - 1]
-      const lineEnd   = lastNote.startBeat + lastNote.lengthBeats
-
-      if (currentBeat < lineEnd) continue          // line not yet finished
-      if (_evaluatedLineBeats.has(firstBeat)) continue  // already evaluated
-
-      _evaluatedLineBeats.add(firstBeat)
-
-      const singableBeats: number[] = []
-      for (const note of line.notes) {
-        if (note.type === 'freestyle') continue
-        for (let b = note.startBeat; b < note.startBeat + note.lengthBeats; b++) {
-          singableBeats.push(b)
-        }
-      }
-      if (!singableBeats.length) continue
-
-      const allCorrect = singableBeats.every(b => beatMap.get(b)?.correct === true)
-      if (allCorrect) {
-        perfectFlash = true
-        setTimeout(() => { perfectFlash = false }, 1600)
-      }
-    }
-  })
 </script>
 
 <div
   class="note-lane"
   style="
-    --rows: {rowCount};
-    --cols: {phraseBeats};
     --player-color: {playerColor};
-    --bar-min-h: {noteBarMinHeight}px;
-    --bar-radius: {noteBarRadius}px;
-    --bar-bg:     {noteBarStyle === 'black' ? 'rgba(0,0,0,0.45)'   : 'rgba(255,255,255,0.18)'};
-    --bar-border: {noteBarStyle === 'black' ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'};
+    --bar-min-h:    {noteBarMinHeight}px;
+    --bar-radius:   {noteBarRadius}px;
+    --bar-bg:       {noteBarStyle === 'black' ? 'rgba(0,0,0,0.45)'      : 'rgba(255,255,255,0.18)'};
+    --bar-border:   {noteBarStyle === 'black' ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'};
   "
 >
-  {#each cells as cell (cell.note.startBeat + '_' + cell.note.pitch)}
-    {@const isGolden = cell.note.type === 'golden'}
-    {@const isRap = cell.note.type === 'rap' || cell.note.type === 'rap-golden'}
-    {@const isFreestyle = cell.note.type === 'freestyle'}
-    {@const isFreestyleActive = isFreestyle && currentBeat >= cell.note.startBeat}
+  <div class="lane-content">
 
-    <div
-      class="note-cell"
-      style="
-        grid-column: {cell.col} / span {cell.colSpan};
-        grid-row: {cell.row};
-      "
-    >
+    {#if showPianoRollLines}
+      {#each Array(rowCount) as _, i}
+        <div class="row-line" style="top: {i / rowCount * 100}%; height: {1 / rowCount * 100}%"></div>
+      {/each}
+    {/if}
+
+    {#each cells as cell (cell.note.startBeat)}
+      {@const state         = noteStates[cell.note.startBeat]}
+      {@const isGolden      = cell.note.type === 'golden'}
+      {@const isRap         = cell.note.type === 'rap' || cell.note.type === 'rap-golden'}
+      {@const isFreestyle   = cell.note.type === 'freestyle'}
+      {@const isFullyCorrect = (state?.correctBeats ?? 0) >= cell.note.lengthBeats && cell.note.lengthBeats > 0}
+
       <div
-        class="note-bar"
-        class:golden={isGolden}
-        class:rap={isRap}
-        class:rap-hit={isRap && rapHitNotes.has(cell.note.startBeat)}
-        class:freestyle={isFreestyle}
-        class:freestyle-active={isFreestyleActive}
+        class="note-cell"
+        style="
+          left:   {cell.leftPct}%;
+          width:  {cell.widthPct}%;
+          top:    {(cell.row - 1) / rowCount * 100}%;
+          height: {1 / rowCount * 100}%;
+        "
       >
-      </div>
-      {#if isRap}
-        <span class="rap-badge">{cell.note.type === 'rap-golden' ? '★' : 'R'}</span>
-      {/if}
-      {#if isFreestyle}
-        <span class="freestyle-badge">F</span>
-      {/if}
-    </div>
-  {/each}
-
-  <!-- Sung segments: one div per grouped segment, rendered in front of note bars -->
-  {#each sungSegments as seg (seg.startCol + '_' + seg.row)}
-    <div
-      class="sung-segment"
-      class:correct={seg.correct}
-      class:golden={seg.noteType === 'golden'}
-      class:freestyle={seg.noteType === 'freestyle'}
-      style="
-        grid-column: {seg.startCol} / span {seg.length};
-        grid-row: {seg.row};
-      "
-    ></div>
-  {/each}
-
-  <!-- Syllable labels: rendered after sung-segments so they appear on top -->
-  {#if showNoteSyllables}
-    {#each cells as cell (cell.note.startBeat + '_' + cell.note.pitch + '_syl')}
-      {#if cell.colSpan >= 2}
         <div
-          class="syllable-overlay"
-          style="grid-column: {cell.col} / span {cell.colSpan}; grid-row: {cell.row};"
+          class="note-bar"
+          class:golden={isGolden}
+          class:rap={isRap}
+          class:rap-hit={isRap && state?.rapHit}
+          class:freestyle={isFreestyle}
+          class:sung-correct={isFullyCorrect && !isGolden}
+          class:golden-correct={isGolden && isFullyCorrect}
         >
-          <span class="note-syllable">{cell.note.syllable.trim()}</span>
+          {#if state && state.fillPct > 0}
+            <div
+              class="note-fill"
+              class:correct={state.correct}
+              class:golden={isGolden}
+              style="clip-path: inset(0 {Math.max(0, 100 - state.fillPct)}% 0 0)"
+            ></div>
+          {/if}
+
+          {#if showNoteSyllables && cell.note.syllable?.trim()}
+            <span class="note-syllable">{cell.note.syllable.trim()}</span>
+          {/if}
         </div>
-      {/if}
+
+        {#if isRap}
+          <span class="rap-badge" class:rap-hit={state?.rapHit}>
+            {cell.note.type === 'rap-golden' ? '★' : 'R'}
+          </span>
+        {/if}
+        {#if isFreestyle}
+          <span class="freestyle-badge">F</span>
+        {/if}
+      </div>
     {/each}
-  {/if}
 
-  <!-- Border overlay: transparent fill, just the border, always on top of sung fill -->
-  {#each cells as cell (cell.note.startBeat + '_' + cell.note.pitch + '_brd')}
-    {@const isGolden = cell.note.type === 'golden'}
-    {@const isRap = cell.note.type === 'rap' || cell.note.type === 'rap-golden'}
-    {@const isFreestyle = cell.note.type === 'freestyle'}
-    {@const isFullyCorrect = fullyCorrectNotes.has(cell.note.startBeat)}
-    <div
-      class="note-border-overlay"
-      class:golden={isGolden}
-      class:rap={isRap}
-      class:freestyle={isFreestyle}
-      class:sung-correct={isFullyCorrect}
-      style="grid-column: {cell.col} / span {cell.colSpan}; grid-row: {cell.row};"
-    ></div>
-  {/each}
+    {#if perfectFlash}
+      <div class="perfect-overlay">
+        <span class="perfect-text">PERFECT!</span>
+      </div>
+    {/if}
 
-  <!-- Piano-roll row lines (optional, for visual reference) -->
-  {#if showPianoRollLines}
-    {#each Array(rowCount) as _, i}
-      <div class="row-line" style="grid-row: {i + 1}; grid-column: 1 / -1;"></div>
-    {/each}
-  {/if}
+    <canvas bind:this={canvasEl} class="overlay-canvas" aria-hidden="true"></canvas>
 
-  <!-- Perfect line flash overlay -->
-  {#if perfectFlash}
-    <div class="perfect-overlay" style="grid-row: 1 / -1; grid-column: 1 / -1;">
-      <span class="perfect-text">PERFECT!</span>
-    </div>
-  {/if}
-
-  <canvas bind:this={canvasEl} class="overlay-canvas" aria-hidden="true"></canvas>
+  </div>
 </div>
 
 <style>
   .note-lane {
     width: 100%;
-    height: 100%;            /* fills whatever the parent lane-wrap gives it */
+    height: 100%;
     position: relative;
-    display: grid;
-    grid-template-rows:    repeat(var(--rows), 1fr);
-    grid-template-columns: repeat(var(--cols), 1fr);
-    gap: 2px;
-    padding: var(--space-2) var(--space-4);
     box-sizing: border-box;
   }
 
-  .overlay-canvas {
+  .lane-content {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 15;
-    display: block;
-  }
-
-  /* ── Playhead ── */
-  .playhead {
-    position: absolute;
-    top: var(--space-2);
+    top:    var(--space-2);
+    left:   var(--space-4);
+    right:  var(--space-4);
     bottom: var(--space-2);
-    width: 2px;
-    background: rgba(255, 255, 255, 0.35);
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.2);
-    border-radius: 1px;
-    pointer-events: none;
-    z-index: 15;
-    transform: translateX(-50%);
   }
 
-  /* ── Piano-roll row lines (DEBUG) ── */
   .row-line {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    position: absolute;
+    left: 0; right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     pointer-events: none;
     z-index: 0;
   }
 
-  /* ── Sung segments (one per consecutive same-pitch run) ── */
-  .sung-segment {
-    pointer-events: none;
-    z-index: 4;
-    align-self: center;
-    height: max(70%, var(--bar-min-h, 24px));
-    border-radius: var(--bar-radius, 4px);
-    background: var(--player-color);
-    opacity: 0.45;
-  }
-
-  .sung-segment.correct {
-    opacity: 0.85;
-  }
-
-  .sung-segment.golden {
-    background: #ffd700;
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
-  }
-
-  /* ── Note cell (grid item, full cell height) ── */
   .note-cell {
-    position: relative;
+    position: absolute;
+    box-sizing: border-box;
   }
 
-  /* ── Note bar (centered inside cell) ── */
   .note-bar {
     position: absolute;
-    left: 0;
-    right: 0;
+    left: 1px; right: 1px;
     height: max(80%, var(--bar-min-h, 28px));
     top: 50%;
-    transform: translateY(calc(-50% - 1.75px));  /* compensate for 1.5px border */
+    transform: translateY(calc(-50% - 1px));
     background: var(--bar-bg);
     border: 2px solid var(--bar-border);
     border-radius: var(--bar-radius, 4px);
@@ -499,12 +370,13 @@
     border-color: rgba(255, 210, 60, 0.85);
     box-shadow: 0 0 8px rgba(255, 210, 60, 0.45);
     animation: golden-shimmer 1.4s ease-in-out infinite;
+    will-change: opacity;
   }
 
   @keyframes golden-shimmer {
-    0%   { box-shadow: 0 0 6px rgba(255, 210, 60, 0.35), inset 0 0 8px rgba(255, 210, 60, 0.0); }
-    50%  { box-shadow: 0 0 14px rgba(255, 215, 80, 0.75), inset 0 0 10px rgba(255, 215, 80, 0.18); }
-    100% { box-shadow: 0 0 6px rgba(255, 210, 60, 0.35), inset 0 0 8px rgba(255, 210, 60, 0.0); }
+    0%   { opacity: 0.75; }
+    50%  { opacity: 1.0; }
+    100% { opacity: 0.75; }
   }
 
   .note-bar.rap {
@@ -513,7 +385,7 @@
     background: rgba(255, 165, 50, 0.08);
   }
 
-  .note-bar.rap-hit {
+  .note-bar.rap.rap-hit {
     background: rgba(255, 140, 0, 0.35);
     border-color: rgba(255, 165, 50, 0.8);
     border-style: solid;
@@ -526,99 +398,24 @@
     100% { background: rgba(255, 140, 0, 0.35); box-shadow: none; }
   }
 
-  .note-bar.freestyle-active {
-    animation: freestyle-pulse 0.6s ease-out 1 forwards;
-  }
-
-  @keyframes freestyle-pulse {
-    0%   { border-color: rgba(255, 255, 255, 0.25); box-shadow: none; }
-    40%  { border-color: rgba(255, 255, 255, 0.9);  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35); }
-    100% { border-color: rgba(255, 255, 255, 0.65); box-shadow: 0 0 8px rgba(255, 255, 255, 0.2); }
-  }
-
-  .rap-badge {
-    position: absolute;
-    bottom: 100%;
-    right: 3px;
-    margin-bottom: 13px;
-    font-size: 0.9rem;
-    font-weight: 900;
-    line-height: 1;
-    color: #ff8c00;
-    background: rgba(0, 0, 0, 0.6);
-    border-radius: 2px;
-    padding: 1px 2px;
-    pointer-events: none;
-    z-index: 6;
-  }
-
-  .rap-badge.rap-hit {
-    color: #fff;
-    background: rgba(0, 0, 0, 0.5);
-  }
-
-  .freestyle-badge {
-    position: absolute;
-    bottom: 100%;
-    right: 3px;
-    margin-bottom: 13px;
-    font-size: 0.9rem;
-    font-weight: 900;
-    line-height: 1;
-    font-style: italic;
-    color: rgba(255, 255, 255, 0.55);
-    background: rgba(0, 0, 0, 0.45);
-    border-radius: 2px;
-    padding: 1px 2px;
-    pointer-events: none;
-    z-index: 6;
-  }
-
   .note-bar.freestyle {
     border-style: dotted;
     border-color: rgba(255, 255, 255, 0.2);
     background: transparent;
   }
 
-
-  /* ── Syllable text ── */
-  /* Border overlay: separate grid pass after sung-segments, shows note border on top of fill */
-  .note-border-overlay {
-    pointer-events: none;
-    z-index: 5;
-    align-self: center;
-    height: max(80%, var(--bar-min-h, 28px));
-    border-radius: var(--bar-radius, 4px);
-    background: transparent;
-    border: 2px solid var(--bar-border);
-  }
-
-  .note-border-overlay.golden {
-    border-color: rgba(255, 210, 60, 0.85);
-  }
-
-  .note-border-overlay.rap {
-    border-style: dashed;
-    border-color: rgba(255, 165, 50, 0.5);
-  }
-
-  .note-border-overlay.freestyle {
-    border-style: dotted;
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  .note-border-overlay.sung-correct {
+  .note-bar.sung-correct {
     animation: note-correct-pulse 0.5s ease-out 1 forwards;
   }
 
-  .note-border-overlay.golden.sung-correct {
+  .note-bar.golden-correct {
     animation: note-correct-pulse-golden 0.5s ease-out 1 forwards;
   }
 
   @keyframes note-correct-pulse {
     0%   { border-color: var(--bar-border); box-shadow: none; }
     40%  { border-color: rgba(255,255,255,0.95); box-shadow: 0 0 10px rgba(255,255,255,0.5); }
-    100% { border-color: rgba(255,255,255,0.7); box-shadow: 0 0 6px rgba(255,255,255,0.25); }
+    100% { border-color: rgba(255,255,255,0.7);  box-shadow: 0 0 6px rgba(255,255,255,0.25); }
   }
 
   @keyframes note-correct-pulse-golden {
@@ -627,21 +424,26 @@
     100% { border-color: rgba(255,215,0,0.9);   box-shadow: 0 0 8px rgba(255,215,0,0.4); }
   }
 
-  /* Syllable overlay: separate grid pass, always on top of sung segments */
-  .syllable-overlay {
+  .note-fill {
+    position: absolute;
+    inset: 0;
+    background: var(--player-color);
+    opacity: 0.45;
+    transition: clip-path 80ms linear;
     pointer-events: none;
-    z-index: 6;
-    align-self: center;
-    justify-self: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: max(80%, var(--bar-min-h, 28px));
+    z-index: 1;
+  }
+
+  .note-fill.correct { opacity: 0.85; }
+
+  .note-fill.golden {
+    background: #ffd700;
+    box-shadow: inset 0 0 6px rgba(255, 215, 0, 0.4);
   }
 
   .note-syllable {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     font-size: clamp(0.55rem, 1.2vw, 0.95rem);
     font-weight: 600;
     color: #fff;
@@ -653,42 +455,64 @@
     max-width: 100%;
     padding: 0 2px;
     line-height: 1;
+  }
+
+  .note-bar.golden .note-syllable { color: #ffe680; }
+
+  .rap-badge,
+  .freestyle-badge {
+    position: absolute;
+    bottom: 100%;
+    right: 3px;
     margin-bottom: 2px;
+    font-size: 0.75rem;
+    font-weight: 900;
+    line-height: 1;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 2px;
+    padding: 1px 2px;
+    pointer-events: none;
+    z-index: 6;
   }
 
-  .note-bar.golden .note-syllable {
-    color: #ffe680;
-  }
+  .rap-badge         { color: #ff8c00; }
+  .rap-badge.rap-hit { color: #fff; }
+  .freestyle-badge   { color: rgba(255,255,255,0.55); font-style: italic; }
 
-  /* ── Perfect flash ── */
   .perfect-overlay {
-    position: relative;
+    position: absolute;
+    inset: 0;
     display: flex;
-    align-items: flex-start;
-    justify-content: flex-end;
-    padding: calc(var(--space-2) + 30px) calc(var(--space-2) + 20px) var(--space-2) var(--space-2);
+    align-items: center;
+    justify-content: center;
     pointer-events: none;
     z-index: 20;
+    animation: perfect-fade 1.6s ease-out 1 forwards;
+  }
+
+  @keyframes perfect-fade {
+    0%   { opacity: 0; }
+    15%  { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
   }
 
   .perfect-text {
-    font-size: clamp(0.75rem, 1.6vw, 1.1rem);
+    font-size: clamp(1.2rem, 3vw, 2.2rem);
     font-weight: 900;
     letter-spacing: 0.12em;
     color: #fff;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: var(--radius-md, 8px);
-    padding: 3px 10px;
-    box-shadow: 0 0 12px var(--player-color), 0 0 4px rgba(0,0,0,0.6);
-    text-shadow: 0 0 12px var(--player-color);
-    animation: perfect-pop 1.6s ease forwards;
+    text-shadow: 0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(255,255,255,0.4);
+    text-transform: uppercase;
   }
 
-  @keyframes perfect-pop {
-    0%   { opacity: 0; transform: scale(0.4); }
-    12%  { opacity: 1; transform: scale(1.15); }
-    22%  { opacity: 1; transform: scale(0.97); }
-    65%  { opacity: 1; transform: scale(1.0); }
-    100% { opacity: 0; transform: scale(0.95) translateY(-16px); }
+  .overlay-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 15;
+    display: block;
   }
 </style>

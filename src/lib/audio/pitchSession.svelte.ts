@@ -38,8 +38,10 @@ export interface PitchResult {
   rowPitch:       number   // note pitch to display in lane (-1 = hide)
   score:          number
   maxScore:       number
-  /** All processed beats for current section: beat index → ProcessedBeat */
-  processedBeats: ProcessedBeat[]
+  // Latest processed beat — only set when we're inside a note this frame
+  beat:           number   // current integer beat (-1 = between notes)
+  isFirstInNote:  boolean
+  noteType:       string
 }
 
 let detectors = new Map<number, PitchDetector>()
@@ -217,10 +219,17 @@ export const pitchSession = {
 
       // Collect all processedBeats for this player as an array (sent to beamer)
       const playerBeats = _processedBeats.get(playerId)
-      const processedBeats: ProcessedBeat[] = playerBeats ? [...playerBeats.values()] : []
+      // Collect processedBeats internally for scoring (not sent to beamer)
+      const playerBeats = _processedBeats.get(playerId)
+      const processedBeatsForScore: ProcessedBeat[] = playerBeats ? [...playerBeats.values()] : []
 
       // Compute running score
-      const { score, maxScore } = calcScore(processedBeats, track)
+      const { score, maxScore } = calcScore(processedBeatsForScore, track)
+
+      // Latest beat info for beamer (scalar only — no history)
+      const intBeat = Math.floor(evalBeat)
+      const isInsideNote = sample.midiNote >= 0 && activeNoteStart >= 0
+      const isFirstInNote = intBeat === activeNoteStart
 
       next[playerId] = {
         playerId,
@@ -229,7 +238,9 @@ export const pitchSession = {
         rowPitch: correct ? targetPitch : displayMidi,
         score,
         maxScore,
-        processedBeats,
+        beat:          isInsideNote ? intBeat : -1,
+        isFirstInNote: isInsideNote ? isFirstInNote : false,
+        noteType:      activeNoteType,
       }
     }
 

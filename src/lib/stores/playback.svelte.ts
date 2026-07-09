@@ -121,20 +121,17 @@ function startPitchLoop() {
       const currentBeat = (getTime() - song.gap / 1000) * (song.bpm / 60) * 4
       pitchSession.tick(song.notes, currentBeat, appSettings.difficulty, appSettings.micDelay, song.bpm)
       const ticks = Object.values(pitchSession.notes).map(r => ({
-        playerId:       r.playerId,
-        midiNote:       r.midiNote,
-        correct:        r.correct,
-        rowPitch:       r.rowPitch,
-        score:          r.score,
-        maxScore:       r.maxScore,
-        processedBeats: r.processedBeats,
+        playerId:      r.playerId,
+        beat:          r.beat,
+        midiNote:      r.midiNote,
+        correct:       r.correct,
+        isFirstInNote: r.isFirstInNote,
+        noteType:      r.noteType,
+        rowPitch:      r.rowPitch,
+        score:         r.score,
+        maxScore:      r.maxScore,
       }))
       if (ticks.length > 0) {
-        // Debug: log processedBeats count per player once per second
-        if (Math.floor(currentBeat) % 16 === 0 && Math.floor(currentBeat) !== _lastTickLog) {
-          _lastTickLog = Math.floor(currentBeat)
-          console.log('[pitch ticks]', ticks.map(t => `P${t.playerId}:${t.processedBeats.length}beats`).join(' '))
-        }
         sendPitchTick({ ticks, beat: currentBeat }).catch(() => {})
       } else {
         // No detectors active — log once to help diagnose
