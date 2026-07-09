@@ -25,64 +25,37 @@
     playing?: boolean
   } = $props()
 
-  // ── Plain JS clock for canvas — NOT $state, zero Svelte reactivity ────────
-  let smoothTime = currentTime
-  let _lastKnownTime = currentTime
-  let _lastKnownAt   = performance.now()
+  // ── Pure wall-clock smoothTime — anchored once per phrase, no IPC during phrase
+  // Eliminates all coupling between pitch IPC delivery and playhead position.
+  let smoothTime    = currentTime
+  let _anchorTime   = currentTime   // audio time at anchor point
+  let _anchorWallMs = performance.now()
+  let _lastLine: LyricLine | null = null
   let _rafId: number
 
+  // Re-anchor when phrase changes (activeLine is derived from currentTime prop)
   $effect(() => {
-    const prev = _lastKnownTime
-    _lastKnownTime = currentTime
-    _lastKnownAt   = performance.now()
-    if (Math.abs(currentTime - prev) > 0.05) {
-      console.warn(`[time-anchor] currentTime jumped: ${(prev*1000).toFixed(1)} → ${(currentTime*1000).toFixed(1)}ms (delta=${((currentTime-prev)*1000).toFixed(1)}ms)`)
+    const line = activeLine
+    if (line !== _lastLine) {
+      _anchorTime   = currentTime
+      _anchorWallMs = performance.now()
+      _lastLine     = line
     }
   })
 
   let _lastTickAt = 0
-  let _dbgFrameLog = 0
-  let _refSmoothTime = 0
-  let _refWallTime   = 0
 
   function _tick() {
     const now = performance.now()
-    const frameGap = now - _lastTickAt
     _lastTickAt = now
 
     if (playing) {
-      const elapsed    = (now - _lastKnownAt) / 1000
-      const candidate  = _lastKnownTime + elapsed
-      // Cap per-frame advance to 50ms — prevents frame drops from causing
-      // smoothTime to race ahead and then snap back when time-tick corrects it.
-      // Normal 16ms frames are never capped. Only drop frames (>50ms) are limited.
-      smoothTime = Math.min(candidate, smoothTime + 0.05)
-
-      // Set reference point once playback is underway
-      if (_refWallTime === 0 && smoothTime > 0.1) {
-        _refSmoothTime = smoothTime
-        _refWallTime   = now
-      }
-
-      // Every 100ms: log actual vs expected smoothTime
-      if (_refWallTime > 0 && now - _dbgFrameLog > 100) {
-        _dbgFrameLog = now
-        const expectedSmooth = _refSmoothTime + (now - _refWallTime) / 1000
-        const deviation = (smoothTime - expectedSmooth) * 1000
-        console.log(
-          `[pos] wall=${now.toFixed(0)}ms  smooth=${(smoothTime*1000).toFixed(1)}ms` +
-          `  expected=${(expectedSmooth*1000).toFixed(1)}ms  dev=${deviation.toFixed(1)}ms` +
-          `  frame=${frameGap.toFixed(1)}ms`
-        )
-      }
-
-      if (_lastTickAt > 0 && frameGap > 40) {
-        const expectedSmooth = _refSmoothTime + (now - _refWallTime) / 1000
-        const deviation = (smoothTime - expectedSmooth) * 1000
-        console.warn(`[DROP] gap=${frameGap.toFixed(1)}ms  dev=${deviation.toFixed(1)}ms  smooth=${(smoothTime*1000).toFixed(0)}ms`)
-      }
+      // Pure wall clock from last anchor — zero IPC influence within a phrase
+      smoothTime = _anchorTime + (now - _anchorWallMs) / 1000
     } else {
-      _lastKnownAt = now
+      // Paused: keep anchor fresh so resume has no jump
+      _anchorTime   = currentTime
+      _anchorWallMs = now
     }
     _drawPlayhead()
     _rafId = requestAnimationFrame(_tick)
@@ -166,7 +139,6 @@
   }
 
   const noteStates = $state<Record<number, NoteState>>({})
-  let _lastLine:            LyricLine | null = null
   let _lastBeat:            number           = -1
   let _evaluatedForPerfect: boolean          = false
   let perfectFlash = $state(false)
