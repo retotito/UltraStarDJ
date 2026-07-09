@@ -180,17 +180,16 @@
     // Positive delay = wait before starting; negative = seek into already-started phrase
     const animDelay = timeUntilStart > 0 ? timeUntilStart : -Math.max(0, ct - phraseStartSec)
 
-    if (phraseDurSec <= 0) { playheadEl.style.opacity = '0'; return }
+    if (phraseDurSec <= 0) return
 
-    // Set all animation properties as inline styles.
-    // @keyframes is :global so the name 'playhead-slide' is never hashed.
-    // Reset by setting animationName='none', force reflow, re-enable.
+    // opacity is controlled by keyframes (opacity:1 during animation).
+    // Base style opacity:0 keeps it hidden during positive delay.
+    // fill-mode:none means base style applies before/after animation.
     playheadEl.style.animationName     = 'none'
     playheadEl.style.animationDuration = `${phraseDurSec}s`
     playheadEl.style.animationDelay    = `${animDelay}s`
     playheadEl.style.animationTimingFunction = 'linear'
-    playheadEl.style.animationFillMode = 'forwards'
-    playheadEl.style.opacity           = '1'
+    playheadEl.style.animationFillMode = 'none'
     void playheadEl.offsetWidth
     playheadEl.style.animationName     = 'playhead-slide'
   })
