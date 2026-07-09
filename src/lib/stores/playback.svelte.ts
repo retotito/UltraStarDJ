@@ -109,33 +109,33 @@ function stopTick() {
 // ── Pitch rAF loop ────────────────────────────────────────────
 let pitchRaf: number | null = null
 let _noTicksLogged = false
-let _lastTickLog = -1
+let _pitchSendFrame = 0   // throttle IPC sends to ~20fps (every 3rd rAF frame)
 
 function startPitchLoop() {
   _noTicksLogged = false
-  _lastTickLog = -1
+  _pitchSendFrame = 0
   if (pitchRaf !== null) return
   const loop = () => {
     const song = state.song
     if (song?.notes && getTime) {
       const currentBeat = (getTime() - song.gap / 1000) * (song.bpm / 60) * 4
       pitchSession.tick(song.notes, currentBeat, appSettings.difficulty, appSettings.micDelay, song.bpm)
-      const ticks = Object.values(pitchSession.notes).map(r => ({
-        playerId:      r.playerId,
-        beat:          r.beat,
-        midiNote:      r.midiNote,
-        correct:       r.correct,
-        isFirstInNote: r.isFirstInNote,
-        noteType:      r.noteType,
-        rowPitch:      r.rowPitch,
-        score:         r.score,
-        maxScore:      r.maxScore,
-      }))
-      if (ticks.length > 0) {
-        sendPitchTick({ ticks, beat: currentBeat }).catch(() => {})
-      } else {
-        // No detectors active — log once to help diagnose
-        if (!_noTicksLogged) {
+      _pitchSendFrame++
+      if (_pitchSendFrame % 3 === 0) {
+        const ticks = Object.values(pitchSession.notes).map(r => ({
+          playerId:      r.playerId,
+          beat:          r.beat,
+          midiNote:      r.midiNote,
+          correct:       r.correct,
+          isFirstInNote: r.isFirstInNote,
+          noteType:      r.noteType,
+          rowPitch:      r.rowPitch,
+          score:         r.score,
+          maxScore:      r.maxScore,
+        }))
+        if (ticks.length > 0) {
+          sendPitchTick({ ticks, beat: currentBeat }).catch(() => {})
+        } else if (!_noTicksLogged) {
           _noTicksLogged = true
           console.warn('[playback] pitch loop running but no active detectors — check mic assignment')
         }
