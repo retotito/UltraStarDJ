@@ -93,13 +93,11 @@ function startTick() {
   tickInterval = setInterval(() => {
     if (getTime) {
       _currentTime = getTime()
-      // log every ~1s
-      if (Math.round(_currentTime * 10) % 10 === 0) console.log('[playback] tick currentTime:', _currentTime)
       sendTimeTick(_currentTime)
     } else {
       console.warn('[playback] tick fired but getTime is null')
     }
-  }, 100)
+  }, 16)
 }
 
 function stopTick() {
