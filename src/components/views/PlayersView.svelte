@@ -72,21 +72,6 @@
   </div>
 
   <div class="cards">
-    <!-- Global mic delay row -->
-    <div class="delay-row">
-      <span class="icon delay-icon">timer</span>
-      <span class="delay-label">Mic Delay</span>
-      <input
-        type="range"
-        min="0" max="500" step="10"
-        value={appSettings.micDelay}
-        oninput={e => { appSettings.set('micDelay', Number((e.target as HTMLInputElement).value)); appSettings.save() }}
-        class="delay-slider"
-        aria-label="Global mic delay"
-      />
-      <span class="delay-value">{appSettings.micDelay} ms</span>
-    </div>
-
     {#each playersStore.all as player (player.id)}
       <PlayerCard {player} {devices} />
     {/each}

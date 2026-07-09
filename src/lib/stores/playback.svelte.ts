@@ -117,7 +117,9 @@ function startPitchLoop() {
     const song = state.song
     if (song?.notes && getTime) {
       const currentBeat = (getTime() - song.gap / 1000) * (song.bpm / 60) * 4
-      pitchSession.tick(song.notes, currentBeat, appSettings.difficulty, appSettings.micDelay, song.bpm)
+      // Use per-player mic delay; fall back to 0 if player not found
+      const activePlayers = activeMicPlayers()
+      pitchSession.tick(song.notes, currentBeat, appSettings.difficulty, 0, song.bpm, activePlayers.map(p => ({ id: p.id, micDelayMs: p.micDelayMs ?? 0 })))
       _pitchSendFrame++
       if (_pitchSendFrame % 3 === 0) {
         const ticks = Object.values(pitchSession.notes).map(r => ({

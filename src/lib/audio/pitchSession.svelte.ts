@@ -120,18 +120,20 @@ export const pitchSession = {
    * @param tracks    Song note tracks (for current-note lookup)
    * @param currentBeat  Current playback beat
    * @param difficulty   Tolerance level
-   * @param micDelayMs   Global mic latency offset in ms (shifts beat comparison back)
+   * @param micDelayMs   Unused (kept for compat) — use perPlayerDelays instead
    * @param songBpm      Song BPM (UltraStar quarter-BPM) for beat offset calculation
+   * @param perPlayerDelays  Per-player mic delay overrides [{id, micDelayMs}]
    */
-  tick(tracks: NoteTrack[], currentBeat: number, difficulty: Difficulty, micDelayMs = 0, songBpm = 120): void {
+  tick(tracks: NoteTrack[], currentBeat: number, difficulty: Difficulty, micDelayMs = 0, songBpm = 120, perPlayerDelays: { id: number, micDelayMs: number }[] = []): void {
     const tolerance = DIFFICULTY_TOLERANCE[difficulty]
-    // Shift beat comparison back by mic latency
-    const delayBeats = (micDelayMs / 1000) * (songBpm / 60) * 4
-    const evalBeat = currentBeat - delayBeats
     const next: Record<number, PitchResult> = {}
 
     for (const [playerId, det] of detectors) {
       const sample = det.sample()
+      // Per-player delay — fall back to global micDelayMs if not in perPlayerDelays
+      const playerDelay = perPlayerDelays.find(p => p.id === playerId)?.micDelayMs ?? micDelayMs
+      const delayBeats = (playerDelay / 1000) * (songBpm / 60) * 4
+      const evalBeat = currentBeat - delayBeats
 
       // Find which NoteTrack belongs to this player
       const track = tracks.find(t => t.player === det.playerId - 1) ?? tracks[0]

@@ -34,6 +34,8 @@ export interface PlayerConfig {
   inputGain: number
   /** Mic output mix volume 0.0–2.0, default 1.0 */
   mixGain: number
+  /** Mic input latency in ms (0–500). Per-player, measured via latency test. */
+  micDelayMs: number
 }
 
 const PLAYER_COLORS = ['blue', 'red', 'green', 'yellow'] as const
@@ -47,6 +49,7 @@ const DEFAULTS: PlayerConfig[] = [1, 2, 3, 4].map((id, i) => ({
   threshold: 0.1,
   inputGain: 1.0,
   mixGain: 1.0,
+  micDelayMs: 40,
 }))
 
 let players = $state<PlayerConfig[]>(structuredClone(DEFAULTS))
@@ -117,6 +120,11 @@ export const playersStore = {
     players = players.map(p => p.id === id ? { ...p, mixGain: Math.round(mixGain * 100) / 100 } : p)
     playersStore.save()
     setMicMixGain(id, mixGain).catch(() => {})
+  },
+
+  setMicDelayMs(id: number, ms: number) {
+    players = players.map(p => p.id === id ? { ...p, micDelayMs: Math.round(ms) } : p)
+    playersStore.save()
   },
 
   setMonitoring(id: number, on: boolean) {
