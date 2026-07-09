@@ -229,9 +229,8 @@
   })
 
   // ── Canvas: playhead only ──────────────────────────────────────────────────
-  let canvasEl: HTMLCanvasElement | undefined
-  let _ctx: CanvasRenderingContext2D | null = null
-  let _cw = 0, _ch = 0
+  // ── Playhead div: position set directly in _tick(), zero Svelte reactivity ──
+  let playheadEl: HTMLElement | undefined
 
   let _phraseStartSec = 0
   let _phraseDurSec   = 0
@@ -245,38 +244,18 @@
     _phraseDurSec    = (last.startBeat + last.lengthBeats) * secPerBeat + gap / 1000 - _phraseStartSec
   })
 
-  $effect(() => {
-    if (!canvasEl) return
-    const ro = new ResizeObserver((entries) => {
-      if (!canvasEl) return
-      const rect = entries[0]?.contentRect
-      _cw = rect?.width  ?? canvasEl.offsetWidth
-      _ch = rect?.height ?? canvasEl.offsetHeight
-      canvasEl.width  = Math.round(_cw)
-      canvasEl.height = Math.round(_ch)
-      _ctx = canvasEl.getContext('2d')
-    })
-    ro.observe(canvasEl)
-    return () => ro.disconnect()
-  })
-
   function _drawPlayhead() {
-    if (!_ctx || _cw === 0 || _phraseDurSec <= 0) {
-      _ctx?.clearRect(0, 0, _cw, _ch)
+    if (!playheadEl || _phraseDurSec <= 0) {
+      if (playheadEl) playheadEl.style.opacity = '0'
       return
     }
     const frac = (smoothTime - _phraseStartSec) / _phraseDurSec
-    _ctx.clearRect(0, 0, _cw, _ch)
-    if (frac < 0 || frac > 1) return
-    const x = frac * _cw
-    _ctx.save()
-    _ctx.beginPath()
-    _ctx.moveTo(x, 0)
-    _ctx.lineTo(x, _ch)
-    _ctx.strokeStyle = 'rgba(255,255,255,0.5)'
-    _ctx.lineWidth   = 2
-    _ctx.stroke()
-    _ctx.restore()
+    if (frac < 0 || frac > 1) {
+      playheadEl.style.opacity = '0'
+      return
+    }
+    playheadEl.style.opacity = '1'
+    playheadEl.style.transform = `translateX(${frac * 100}%)`
   }
 </script>
 
