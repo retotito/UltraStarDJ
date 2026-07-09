@@ -691,8 +691,3 @@ a {
   from { transform: translateX(0%);   opacity: 1; }
   to   { transform: translateX(100%); opacity: 1; }
 }
-
-/* TEST: keep playhead always visible */
-.playhead-line {
-  opacity: 1 !important;
-}
