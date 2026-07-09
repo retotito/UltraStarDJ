@@ -155,7 +155,7 @@
         _evaluatedForPerfect = true
         const allPerfect = line.notes
           .filter(n => n.type !== 'freestyle')
-          .every(n => (noteStates[n.startBeat]?.correctBeats ?? 0) >= n.lengthBeats)
+          .every(n => (noteStates[n.startBeat]?.correctBeats ?? 0) * 2 >= n.lengthBeats)
         if (allPerfect) {
           perfectFlash = true
           setTimeout(() => { perfectFlash = false }, 1600)
@@ -250,7 +250,7 @@
       {@const isGolden      = cell.note.type === 'golden'}
       {@const isRap         = cell.note.type === 'rap' || cell.note.type === 'rap-golden'}
       {@const isFreestyle   = cell.note.type === 'freestyle'}
-      {@const isFullyCorrect = (state?.correctBeats ?? 0) >= cell.note.lengthBeats && cell.note.lengthBeats > 0}
+      {@const isFullyCorrect = (state?.correctBeats ?? 0) * 2 >= cell.note.lengthBeats && cell.note.lengthBeats > 0}
 
       <div
         class="note-cell"
