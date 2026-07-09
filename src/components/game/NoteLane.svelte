@@ -354,7 +354,7 @@
       </div>
     {/if}
 
-    <canvas bind:this={canvasEl} class="overlay-canvas" aria-hidden="true"></canvas>
+    <div bind:this={playheadEl} class="playhead-line" aria-hidden="true"></div>
 
   </div>
 </div>
@@ -545,13 +545,15 @@
     text-transform: uppercase;
   }
 
-  .overlay-canvas {
+  /* ── Playhead div: transform driven directly by rAF, no Svelte reactivity ── */
+  .playhead-line {
     position: absolute;
-    top: 0; left: 0;
+    top: 0; bottom: 0; left: 0;
     width: 100%;
-    height: 100%;
+    border-left: 2px solid rgba(255, 255, 255, 0.6);
+    opacity: 0;
+    will-change: transform;
     pointer-events: none;
     z-index: 15;
-    display: block;
   }
 </style>
