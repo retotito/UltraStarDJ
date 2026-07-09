@@ -172,6 +172,7 @@
                   {noteBarStyle}
                   playing={screen === 'playing'}
                   pitchTick={pitchTicks.find(t => t.playerId === id) ?? null}
+                  micDelayMs={payload.playerMicDelays?.[id] ?? 0}
                 />
               </div>
             {/each}

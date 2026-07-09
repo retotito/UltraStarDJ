@@ -273,11 +273,15 @@ export const playback = {
 
     for (const display of [displaysStore.display1, displaysStore.display2]) {
       if (display.open) {
+        const playerMicDelays = Object.fromEntries(
+          playersStore.all.map(p => [p.id, p.micDelayMs ?? 0])
+        )
         await sendPlaySong({
           song: $state.snapshot(song) as Song,
           assetBase,
           playerIds: [...display.playerIds].sort((a, b) => a - b),
           windowLabel: display.label,
+          playerMicDelays,
         })
       }
     }

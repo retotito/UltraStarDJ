@@ -71,6 +71,8 @@ export interface PlaySongPayload {
   playerIds: number[]
   /** Tauri window label of the target beamer */
   windowLabel: string
+  /** Per-player mic delay in ms, keyed by playerId */
+  playerMicDelays?: Record<number, number>
 }
 
 /** What the DJ sends to show the preview/get-ready screen before playback */

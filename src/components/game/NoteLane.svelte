@@ -7,7 +7,7 @@
     tracks, trackIndex = 0, playerColor = '#ffffff', currentTime, bpm, gap,
     rowCount = 16, showPianoRollLines = true, showNoteSyllables = true,
     noteBarStyle = 'white', noteBarMinHeight = 28, noteBarRadius = 4,
-    pitchTick = null, playing = true
+    pitchTick = null, playing = true, micDelayMs = 0
   }: {
     tracks: NoteTrack[]
     trackIndex?: number
@@ -23,6 +23,7 @@
     noteBarRadius?: number
     pitchTick?: PitchTickEntry | null
     playing?: boolean
+    micDelayMs?: number
   } = $props()
 
   // ── Beat math — derived from currentTime prop (10fps) ────────────────────
@@ -197,6 +198,31 @@
     playheadEl.style.animationName          = 'playhead-slide'
   })
 
+  // ── Delay indicator: red line at micDelayMs behind playhead ─────────────
+  let delayIndicatorEl = $state<HTMLElement | undefined>(undefined)
+
+  $effect(() => {
+    if (!phraseActive || !delayIndicatorEl) return
+
+    const elapsed   = untrack(() => currentTime) - untrack(() => _phraseStartSec)
+    const phraseDur = untrack(() => _phraseDurSec)
+    // Indicator is micDelayMs behind the playhead
+    const indDelay  = -Math.max(0, elapsed) + micDelayMs / 1000
+
+    delayIndicatorEl.style.animationName          = 'none'
+    delayIndicatorEl.style.animationDuration      = `${phraseDur}s`
+    delayIndicatorEl.style.animationDelay         = `${indDelay}s`
+    delayIndicatorEl.style.animationTimingFunction = 'linear'
+    delayIndicatorEl.style.animationFillMode      = 'none'
+    void delayIndicatorEl.offsetWidth
+    delayIndicatorEl.style.animationName          = 'playhead-slide'
+  })
+
+  $effect(() => {
+    if (!delayIndicatorEl) return
+    delayIndicatorEl.style.animationPlayState = playing ? 'running' : 'paused'
+  })
+
   // Pause/resume the CSS animation when playing prop changes
   $effect(() => {
     if (!playheadEl) return
@@ -279,6 +305,7 @@
     {/if}
 
     <div bind:this={playheadEl} class="playhead-line" aria-hidden="true"></div>
+    <div bind:this={delayIndicatorEl} class="delay-indicator" aria-hidden="true"></div>
 
   </div>
 </div>
@@ -469,7 +496,16 @@
     text-transform: uppercase;
   }
 
-  /* ── CSS playhead: GPU animation, keyframe defined globally in app.css ── */
+  /* ── Delay indicator: red line showing expected fill right edge ── */
+  .delay-indicator {
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: 100%;
+    border-left: 2px solid rgba(255, 80, 80, 0.8);
+    will-change: transform;
+    pointer-events: none;
+    z-index: 14;
+  }
   .playhead-line {
     position: absolute;
     top: 0; bottom: 0; left: 0;
