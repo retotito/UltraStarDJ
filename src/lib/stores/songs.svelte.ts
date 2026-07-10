@@ -1,6 +1,5 @@
 /**
  * Songs store — reactive song library built from enabled sources.
- * Replaces mockSongs once real sources are added.
  */
 
 import type { Song } from '$lib/ultrastar/types'
@@ -8,7 +7,6 @@ import type { SongSource } from '$lib/stores/settings.svelte'
 import { appSettings } from '$lib/stores/settings.svelte'
 import { parseSongHeader } from '$lib/ultrastar/parser'
 import { listTxtFiles, readFile, pathExists } from '$lib/ipc/tauri'
-import { mockSongs } from '$lib/db/mockSongs'
 
 export type ScanStatus = 'idle' | 'scanning' | 'done' | 'error'
 
@@ -23,12 +21,12 @@ interface SongsState {
 }
 
 const state = $state<SongsState>({
-  songs: mockSongs,
+  songs: [],
   scanning: false,
   scanningSourceId: null,
   scanStatus: 'idle',
   scanError: null,
-  countBySource: { mock: mockSongs.length }
+  countBySource: {}
 })
 
 export const songLibrary = {
@@ -43,10 +41,10 @@ export const songLibrary = {
   async scanSources(sources: SongSource[]) {
     const localSources = sources.filter(s => s.type === 'local-folder')
 
-    // If no real sources at all, fall back to mock data
+    // If no real sources at all, clear the library
     if (localSources.length === 0) {
-      state.songs = mockSongs
-      state.countBySource = { mock: mockSongs.length }
+      state.songs = []
+      state.countBySource = {}
       state.scanStatus = 'idle'
       return
     }

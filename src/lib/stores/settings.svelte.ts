@@ -38,7 +38,7 @@ export interface AppSettings {
 }
 
 const DEFAULTS: AppSettings = {
-  theme: 'dark',
+  theme: 'light',
   sources: [],
   beamerMonitorIndex: 1,
   lyricsOffsetMs: 0,

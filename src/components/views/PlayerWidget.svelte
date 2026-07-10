@@ -254,10 +254,10 @@
       </button>
     </div>
   {:else}
-    <div class="empty-state">
-      <img src={placeholderSrc} alt="" class="empty-placeholder" />
-      <p class="text-muted text-sm">Select a song to preview</p>
+    <div class="empty-placeholder">
+      <span class="icon icon_placehoder">music_note</span>
     </div>
+    <p class="text-muted text-sm">Select a song to preview</p>
   {/if}
 </div>
 
@@ -423,10 +423,17 @@
   }
 
   .empty-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
     aspect-ratio: 16 / 9;
     border-radius: var(--radius-md);
     object-fit: cover;
-    opacity: 0.3;
+    background-color: rgb(41, 41, 41);
+  }
+  .icon_placehoder {
+    font-size: 48px;
+    color: rgb(191, 191, 191);
   }
 </style>
