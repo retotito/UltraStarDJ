@@ -34,7 +34,7 @@
   let countdown = $state(0)         // seconds remaining in get-ready countdown
   let trialResults = $state<number[]>([])
   let detectedMs = $state<number | null>(null)
-  let manualMs = $state(player.micDelayMs ?? 40)
+  let manualMs = $state(Math.min(player.micDelayMs ?? 40, 250))
   let errorMsg = $state('')
 
   // ── Audio context (created on demand) ─────────────────────────────────────
@@ -249,7 +249,7 @@
       </p>
       <div class="manual-row">
         <span class="manual-label">Manual: <strong>{manualMs} ms</strong></span>
-        <input type="range" min="0" max="500" step="10" bind:value={manualMs} class="delay-slider" />
+        <input type="range" min="0" max="250" step="10" bind:value={manualMs} class="delay-slider" />
       </div>
       <div class="actions">
         <button class="btn btn-primary" onclick={startTest} disabled={!player.mic}>
@@ -305,7 +305,7 @@
       </div>
       <div class="manual-row">
         <span class="manual-label">Adjust: <strong>{manualMs} ms</strong></span>
-        <input type="range" min="0" max="500" step="10" bind:value={manualMs} class="delay-slider" />
+        <input type="range" min="0" max="250" step="10" bind:value={manualMs} class="delay-slider" />
       </div>
       <div class="actions">
         <button class="btn btn-primary" onclick={apply}>Apply {manualMs} ms to Player {player.id}</button>
@@ -316,7 +316,7 @@
       <p class="error-msg">{errorMsg}</p>
       <div class="manual-row">
         <span class="manual-label">Set manually: <strong>{manualMs} ms</strong></span>
-        <input type="range" min="0" max="500" step="10" bind:value={manualMs} class="delay-slider" />
+        <input type="range" min="0" max="250" step="10" bind:value={manualMs} class="delay-slider" />
       </div>
       <div class="actions">
         <button class="btn btn-primary" onclick={startTest}>Retry</button>
