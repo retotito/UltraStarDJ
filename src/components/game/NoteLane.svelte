@@ -81,6 +81,8 @@
     return last.startBeat + last.lengthBeats - first
   })
 
+  const phraseFirstBeat = $derived(activeLine?.notes[0]?.startBeat ?? 0)
+
   const cells = $derived.by((): NoteCell[] => {
     if (!activeLine) return []
     const firstBeat = activeLine.notes[0].startBeat
@@ -93,15 +95,24 @@
     }))
   })
 
-  // ── Per-note state: updated incrementally from pitch tick ─────────────────
+  // ── Per-note state (glow/perfect tracking) + per-phrase sung segments ─────
   type NoteState = {
-    fillPct:      number
     correct:      boolean
     rapHit:       boolean
     correctBeats: number
   }
 
+  // A contiguous run of beats at the same row (correct or wrong)
+  type BeatSegment = {
+    startBeat: number   // absolute beat where this segment starts
+    beatCount: number   // grows each tick
+    row:       number   // 1-based row
+    isCorrect: boolean
+    isGolden:  boolean
+  }
+
   const noteStates = $state<Record<number, NoteState>>({})
+  const phraseSegments = $state<BeatSegment[]>([])
   let _lastLine:            LyricLine | null = null
   let _lastBeat:            number           = -1
   let _evaluatedForPerfect: boolean          = false
@@ -113,9 +124,10 @@
 
     if (line !== _lastLine) {
       for (const k in noteStates) delete (noteStates as any)[k]
+      phraseSegments.length = 0
       if (line) {
         for (const note of line.notes) {
-          noteStates[note.startBeat] = { fillPct: 0, correct: false, rapHit: false, correctBeats: 0 }
+          noteStates[note.startBeat] = { correct: false, rapHit: false, correctBeats: 0 }
         }
       }
       _lastBeat = -1
@@ -137,7 +149,29 @@
     const state = noteStates[note.startBeat]
     if (!state) return
 
-    state.fillPct = Math.min(100, ((intBeat - note.startBeat + 1) / note.lengthBeats) * 100)
+    // ── Beat segment tracking (tunePerfect-style) ──────────────────────────
+    // Group consecutive beats into contiguous segments. Each beat of silence or
+    // pitch/row change starts a new segment. Correct beats → note's own row.
+    // Wrong beats → singer's actual pitch row (above/below the note).
+    if (tick.midiNote >= 0) {
+      const noteRow  = cells.find(c => c.note === note)?.row ?? 1
+      const avg      = avgPitch(line)
+      const sungRow  = pitchToRow(tick.rowPitch, avg, rowCount)
+      const dispRow  = tick.correct ? noteRow : sungRow
+      const isGolden = note.type === 'golden'
+
+      const last = phraseSegments[phraseSegments.length - 1]
+      if (
+        last &&
+        last.row === dispRow &&
+        last.isCorrect === tick.correct &&
+        last.startBeat + last.beatCount === intBeat
+      ) {
+        last.beatCount++
+      } else {
+        phraseSegments.push({ startBeat: intBeat, beatCount: 1, row: dispRow, isCorrect: tick.correct, isGolden })
+      }
+    }
 
     if (tick.correct) {
       state.correct      = true
@@ -204,27 +238,6 @@
     playheadEl.style.animationPlayState = playing ? 'running' : 'paused'
   })
 
-  // ── CSS fill animation: one-shot per note, GPU-driven ────────────────────
-  const _activeFills = new Set<HTMLElement>()
-
-  function noteFillAnim(node: HTMLElement, params: { noteStartSec: number, noteDurSec: number }) {
-    const elapsed = Math.max(0, currentTime - micDelayMs / 1000 - params.noteStartSec)
-    node.style.animationName          = 'none'
-    node.style.animationDuration      = `${params.noteDurSec}s`
-    node.style.animationDelay         = `${-elapsed}s`
-    node.style.animationTimingFunction = 'linear'
-    node.style.animationFillMode      = 'forwards'
-    node.style.animationPlayState     = playing ? 'running' : 'paused'
-    void node.offsetWidth
-    node.style.animationName          = 'fill-slide'
-    _activeFills.add(node)
-    return { destroy() { _activeFills.delete(node) } }
-  }
-
-  $effect(() => {
-    const s = playing ? 'running' : 'paused'
-    for (const el of _activeFills) el.style.animationPlayState = s
-  })
 </script>
 
 <div
@@ -270,18 +283,6 @@
           class:sung-correct={isFullyCorrect && !isGolden}
           class:golden-correct={isGolden && isFullyCorrect}
         >
-          {#if state && state.fillPct > 0}
-            <div
-              class="note-fill"
-              class:correct={state.correct}
-              class:golden={isGolden}
-              use:noteFillAnim={{
-                noteStartSec: cell.note.startBeat * (60 / bpm / 4) + gap / 1000,
-                noteDurSec:   cell.note.lengthBeats * (60 / bpm / 4),
-              }}
-            ></div>
-          {/if}
-
           {#if showNoteSyllables && cell.note.syllable?.trim()}
             <span class="note-syllable">{cell.note.syllable.trim()}</span>
           {/if}
@@ -296,6 +297,21 @@
           <span class="freestyle-badge">F</span>
         {/if}
       </div>
+    {/each}
+
+    <!-- Sung beat segments: correct ones sit on note row, wrong ones float above/below -->
+    {#each phraseSegments as seg (seg.startBeat)}
+      <div
+        class="sung-segment"
+        class:correct={seg.isCorrect}
+        class:golden={seg.isGolden && seg.isCorrect}
+        style="
+          left:   {(seg.startBeat - phraseFirstBeat) / phraseBeats * 100}%;
+          width:  {seg.beatCount / phraseBeats * 100}%;
+          top:    {(seg.row - 1) / rowCount * 100}%;
+          height: {1 / rowCount * 100}%;
+        "
+      ></div>
     {/each}
 
     {#if perfectFlash}
@@ -417,24 +433,42 @@
     100% { border-color: rgba(255,215,0,0.9);   box-shadow: 0 0 8px rgba(255,215,0,0.4); }
   }
 
-  .note-fill {
+  /* Sung beat segments — stack on top of note bars as a separate layer */
+  .sung-segment {
     position: absolute;
-    inset: 0;
-    background: var(--player-color);
-    opacity: 0.45;
-    clip-path: inset(0 100% 0 0);  /* starts hidden; animation takes over */
+    box-sizing: border-box;
     pointer-events: none;
-    z-index: 1;
+    z-index: 5;
+    transition: width 80ms linear;
   }
 
-  .note-fill.correct { opacity: 0.85; }
+  /* Inner bar: vertically centered in the row, matching note-bar geometry */
+  .sung-segment::after {
+    content: '';
+    position: absolute;
+    left: 1px; right: 1px;
+    height: max(80%, var(--bar-min-h, 28px));
+    top: 50%;
+    transform: translateY(-50%);
+    border-radius: var(--bar-radius, 4px);
+    background: var(--player-color);
+    opacity: 0.5;
+  }
 
-  .note-fill.golden {
+  .sung-segment.correct::after {
+    opacity: 0.85;
+  }
+
+  .sung-segment.golden::after {
     background: #ffd700;
-    box-shadow: inset 0 0 6px rgba(255, 215, 0, 0.4);
+    box-shadow: 0 0 6px rgba(255, 215, 0, 0.5);
   }
 
-  .note-syllable {
+  .note-fill {
+    display: none; /* legacy — replaced by .sung-segment */
+  }
+
+  .perfect-overlay {
     position: relative;
     z-index: 2;
     font-size: clamp(0.55rem, 1.2vw, 0.95rem);
