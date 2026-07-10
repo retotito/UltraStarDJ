@@ -112,7 +112,11 @@
   }
 
   const noteStates = $state<Record<number, NoteState>>({})
-  const phraseSegments = $state<BeatSegment[]>([])
+
+  // Beat history for current phrase — plain Map (fast), _historyVersion triggers $derived recompute
+  const _beatHistory = new Map<number, { rowPitch: number; correct: boolean; midiNote: number; isGolden: boolean }>()
+  let _historyVersion = $state(0)
+
   let _lastLine:            LyricLine | null = null
   let _lastBeat:            number           = -1
   let _evaluatedForPerfect: boolean          = false
@@ -124,7 +128,8 @@
 
     if (line !== _lastLine) {
       for (const k in noteStates) delete (noteStates as any)[k]
-      phraseSegments.length = 0
+      _beatHistory.clear()
+      _historyVersion++
       if (line) {
         for (const note of line.notes) {
           noteStates[note.startBeat] = { correct: false, rapHit: false, correctBeats: 0 }
@@ -149,28 +154,15 @@
     const state = noteStates[note.startBeat]
     if (!state) return
 
-    // ── Beat segment tracking (tunePerfect-style) ──────────────────────────
-    // Group consecutive beats into contiguous segments. Each beat of silence or
-    // pitch/row change starts a new segment. Correct beats → note's own row.
-    // Wrong beats → singer's actual pitch row (above/below the note).
+    // ── Accumulate beat history (recomputed as $derived segments) ─────────
     if (tick.midiNote >= 0) {
-      const noteRow  = cells.find(c => c.note === note)?.row ?? 1
-      const avg      = avgPitch(line)
-      const sungRow  = pitchToRow(tick.rowPitch, avg, rowCount)
-      const dispRow  = tick.correct ? noteRow : sungRow
-      const isGolden = note.type === 'golden'
-
-      const last = phraseSegments[phraseSegments.length - 1]
-      if (
-        last &&
-        last.row === dispRow &&
-        last.isCorrect === tick.correct &&
-        last.startBeat + last.beatCount === intBeat
-      ) {
-        last.beatCount++
-      } else {
-        phraseSegments.push({ startBeat: intBeat, beatCount: 1, row: dispRow, isCorrect: tick.correct, isGolden })
-      }
+      _beatHistory.set(intBeat, {
+        rowPitch:  tick.rowPitch,
+        correct:   tick.correct,
+        midiNote:  tick.midiNote,
+        isGolden:  note.type === 'golden',
+      })
+      _historyVersion++
     }
 
     if (tick.correct) {
@@ -196,6 +188,49 @@
         }
       }
     }
+  })
+
+  // ── Segment computation: derived from full beat history ───────────────────
+  // Recomputes on every new beat (_historyVersion++) or phrase/cells change.
+  // Correct segments: grouped per note, rendered inside note-bar (clipped, z < syllable).
+  // Wrong segments:   rendered in lane-content at singer's actual pitch row.
+  const derivedSegments = $derived.by(() => {
+    const _ver = _historyVersion  // reactive dep
+    if (!activeLine) return { correctByNote: new Map<number, BeatSegment[]>(), wrong: [] as BeatSegment[] }
+
+    const avg         = avgPitch(activeLine)
+    const sortedBeats = Array.from(_beatHistory.keys()).sort((a, b) => a - b)
+    const correctByNote = new Map<number, BeatSegment[]>()
+    const wrong: BeatSegment[] = []
+
+    for (const beat of sortedBeats) {
+      const data = _beatHistory.get(beat)!
+      if (data.midiNote < 0) continue
+
+      const cell = cells.find(c => beat >= c.note.startBeat && beat < c.note.startBeat + c.note.lengthBeats)
+      if (!cell) continue
+
+      if (data.correct) {
+        if (!correctByNote.has(cell.note.startBeat)) correctByNote.set(cell.note.startBeat, [])
+        const noteSegs = correctByNote.get(cell.note.startBeat)!
+        const last     = noteSegs[noteSegs.length - 1]
+        if (last && last.startBeat + last.beatCount >= beat - 2) {
+          last.beatCount = beat - last.startBeat + 1  // extend + bridge gaps ≤2 beats
+        } else {
+          noteSegs.push({ startBeat: beat, beatCount: 1, row: cell.row, isCorrect: true, isGolden: data.isGolden })
+        }
+      } else {
+        const sungRow = pitchToRow(data.rowPitch, avg, rowCount)
+        const last    = wrong[wrong.length - 1]
+        if (last && last.startBeat + last.beatCount >= beat - 2) {
+          last.beatCount = beat - last.startBeat + 1  // extend + bridge; row stays fixed (no jitter)
+        } else {
+          wrong.push({ startBeat: beat, beatCount: 1, row: sungRow, isCorrect: false, isGolden: false })
+        }
+      }
+    }
+
+    return { correctByNote, wrong }
   })
 
   // ── CSS playhead: GPU animation, triggered by audio clock ────────────────
@@ -283,6 +318,18 @@
           class:sung-correct={isFullyCorrect && !isGolden}
           class:golden-correct={isGolden && isFullyCorrect}
         >
+          <!-- Correct fill segments: inside note-bar, clipped by overflow:hidden, below syllable -->
+          {#each (derivedSegments.correctByNote.get(cell.note.startBeat) ?? []) as seg (seg.startBeat)}
+            <div
+              class="note-fill-segment"
+              class:golden={seg.isGolden}
+              style="
+                left:  {(seg.startBeat - cell.note.startBeat) / cell.note.lengthBeats * 100}%;
+                width: {seg.beatCount / cell.note.lengthBeats * 100}%;
+              "
+            ></div>
+          {/each}
+
           {#if showNoteSyllables && cell.note.syllable?.trim()}
             <span class="note-syllable">{cell.note.syllable.trim()}</span>
           {/if}
@@ -299,12 +346,10 @@
       </div>
     {/each}
 
-    <!-- Sung beat segments: correct ones sit on note row, wrong ones float above/below -->
-    {#each phraseSegments as seg (seg.startBeat)}
+    <!-- Wrong pitch segments: float in lane-content at singer's actual pitch row -->
+    {#each derivedSegments.wrong as seg (seg.startBeat)}
       <div
-        class="sung-segment"
-        class:correct={seg.isCorrect}
-        class:golden={seg.isGolden && seg.isCorrect}
+        class="wrong-segment"
         style="
           left:   {(seg.startBeat - phraseFirstBeat) / phraseBeats * 100}%;
           width:  {seg.beatCount / phraseBeats * 100}%;
@@ -433,8 +478,24 @@
     100% { border-color: rgba(255,215,0,0.9);   box-shadow: 0 0 8px rgba(255,215,0,0.4); }
   }
 
-  /* Sung beat segments — stack on top of note bars as a separate layer */
-  .sung-segment {
+  /* Correct fill segments — inside note-bar, clipped by overflow:hidden */
+  .note-fill-segment {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: var(--player-color);
+    opacity: 0.85;
+    z-index: 1;          /* below .note-syllable (z-index: 2) */
+    pointer-events: none;
+    transition: width 80ms linear;
+  }
+
+  .note-fill-segment.golden {
+    background: #ffd700;
+    box-shadow: inset 0 0 6px rgba(255, 215, 0, 0.4);
+  }
+
+  /* Wrong pitch segments — in lane-content at singer's actual pitch row */
+  .wrong-segment {
     position: absolute;
     box-sizing: border-box;
     pointer-events: none;
@@ -442,8 +503,7 @@
     transition: width 80ms linear;
   }
 
-  /* Inner bar: vertically centered in the row, matching note-bar geometry */
-  .sung-segment::after {
+  .wrong-segment::after {
     content: '';
     position: absolute;
     left: 1px; right: 1px;
@@ -453,35 +513,6 @@
     border-radius: var(--bar-radius, 4px);
     background: var(--player-color);
     opacity: 0.5;
-  }
-
-  .sung-segment.correct::after {
-    opacity: 0.85;
-  }
-
-  .sung-segment.golden::after {
-    background: #ffd700;
-    box-shadow: 0 0 6px rgba(255, 215, 0, 0.5);
-  }
-
-  .note-fill {
-    display: none; /* legacy — replaced by .sung-segment */
-  }
-
-  .perfect-overlay {
-    position: relative;
-    z-index: 2;
-    font-size: clamp(0.55rem, 1.2vw, 0.95rem);
-    font-weight: 600;
-    color: #fff;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    pointer-events: none;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
-    max-width: 100%;
-    padding: 0 2px;
-    line-height: 1;
   }
 
   .note-bar.golden .note-syllable { color: #ffe680; }
