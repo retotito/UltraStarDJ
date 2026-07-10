@@ -194,20 +194,26 @@ export const pitchSession = {
       // Snap display pitch to target when correct (so segments sit ON the note bar)
       const displayMidi = correct ? targetPitch : correctedMidi
 
-      // Log pitch info for debugging (throttled: only on new integer beats)
-      if (sample.midiNote >= 0) {
+      // Log pitch info per new integer beat
+      if (sample.midiNote >= 0 && activeNoteStart >= 0) {
         const intBeat = Math.floor(evalBeat)
         const lastLogged = (_lastLoggedBeat.get(playerId) ?? -1)
         if (intBeat !== lastLogged) {
+          // Detect skipped beats
+          if (lastLogged >= 0 && intBeat > lastLogged + 1) {
+            for (let s = lastLogged + 1; s < intBeat; s++) {
+              console.log(`[pitch P${playerId}] beat=${s} → SKIPPED (tick missed)`)
+            }
+          }
           _lastLoggedBeat.set(playerId, intBeat)
-          console.log(
-            `[pitch P${playerId}] beat=${intBeat}` +
-            ` raw=${sample.midiNote}` +
-            (targetPitch >= 0
-              ? ` corrected=${correctedMidi} target=${targetPitch} correct=${correct}${jokerUsed ? ' (joker)' : ''} (difficulty=${difficulty} tol=±${tolerance}st)`
-              : ' (no active note)')
-          )
+          const syllable = (() => { for (const line of (track?.lines ?? [])) { const n = line.notes.find(n => intBeat >= n.startBeat && intBeat < n.startBeat + n.lengthBeats); if (n) return n.syllable?.trim() ?? '' } return '' })()
+          const dist = targetPitch >= 0 ? Math.min(Math.abs(correctedMidi - targetPitch) % 12, 12 - Math.abs(correctedMidi - targetPitch) % 12) : -1
+          const status = correct ? '✓ CORRECT' : `✗ WRONG (dist=${dist}st > tol=±${tolerance}st)`
+          console.log(`[pitch P${playerId}] beat=${intBeat} "${syllable}" sung=${correctedMidi} target=${targetPitch} dist=${dist}st ${status}${jokerUsed ? ' (joker)' : ''}`)
         }
+      } else if (sample.midiNote < 0) {
+        // silence — reset last logged so next note starts fresh
+        _lastLoggedBeat.set(playerId, -1)
       }
 
       // Record one ProcessedBeat per integer beat when we're inside a note
