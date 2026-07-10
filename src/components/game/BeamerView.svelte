@@ -58,6 +58,31 @@
   function getScore(id: number) { return pitchTicks.find(t => t.playerId === id)?.score ?? 0 }
   function getMaxScore(id: number) { return pitchTicks.find(t => t.playerId === id)?.maxScore ?? 0 }
 
+  // ── Score screen animation ────────────────────────────────────────────────
+  const displayScores = $state<Record<number, number>>({})
+
+  const winnerId = $derived.by(() => {
+    if (assignedPlayerIds.length < 2) return assignedPlayerIds[0] ?? -1
+    return assignedPlayerIds.reduce((best, id) => getScore(id) >= getScore(best) ? id : best, assignedPlayerIds[0])
+  })
+
+  $effect(() => {
+    if (screen !== 'score') return
+    for (const id of assignedPlayerIds) displayScores[id] = 0
+
+    const finals = Object.fromEntries(assignedPlayerIds.map(id => [id, getScore(id)]))
+    const duration = 1800
+    const startTs = performance.now()
+
+    function step(now: number) {
+      const t = Math.min(1, (now - startTs) / duration)
+      const eased = 1 - Math.pow(1 - t, 3)  // ease-out cubic
+      for (const id of assignedPlayerIds) displayScores[id] = Math.round(finals[id] * eased)
+      if (t < 1) requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+  })
+
   // Song duration derived from last note beat
   const songDuration = $derived.by(() => {
     const song = payload?.song
@@ -204,14 +229,16 @@
       <span class="score-song">{payload.song.artist} — {payload.song.title}</span>
       <div class="score-rows">
         {#each assignedPlayerIds as id (id)}
-          <div class="score-row">
+          {@const isWinner = id === winnerId && assignedPlayerIds.length > 1}
+          {@const barPct = getMaxScore(id) > 0 ? Math.round((displayScores[id] ?? 0) / getMaxScore(id) * 100) : 0}
+          <div class="score-row" class:winner={isWinner}>
             <div class="player-badge" style="border-color: {PLAYER_COLORS[id] ?? '#888'}; color: {PLAYER_COLORS[id] ?? '#888'}">
-              P{id}
+              {#if isWinner}🏆{:else}P{id}{/if}
             </div>
             <div class="score-bar-wrap">
-              <div class="score-bar" style="width: {getMaxScore(id) > 0 ? Math.round(getScore(id) / getMaxScore(id) * 100) : 0}%; background: {PLAYER_COLORS[id] ?? '#888'}"></div>
+              <div class="score-bar" class:winner={isWinner} style="width: {barPct}%; background: {PLAYER_COLORS[id] ?? '#888'}"></div>
             </div>
-            <span class="score-value">{getScore(id).toLocaleString()}</span>
+            <span class="score-value" class:winner={isWinner}>{(displayScores[id] ?? 0).toLocaleString()}</span>
           </div>
         {/each}
       </div>
@@ -503,7 +530,41 @@
   .score-bar {
     height: 100%;
     border-radius: var(--radius-full);
-    transition: width 1s ease-out;
+  }
+
+  .score-bar.winner {
+    animation: winner-bar-pulse 1.2s ease-in-out 1.8s infinite alternate;
+  }
+
+  @keyframes winner-bar-pulse {
+    from { filter: brightness(1)   drop-shadow(0 0 0px   currentColor); }
+    to   { filter: brightness(1.3) drop-shadow(0 0 12px  currentColor); }
+  }
+
+  .score-row.winner {
+    position: relative;
+  }
+
+  .score-row.winner::after {
+    content: '★ ★ ★';
+    position: absolute;
+    left: 50%; top: -1.4em;
+    transform: translateX(-50%);
+    font-size: 1.1rem;
+    color: #ffd700;
+    letter-spacing: 0.4em;
+    opacity: 0;
+    animation: stars-appear 0.6s ease-out 1.6s forwards;
+  }
+
+  @keyframes stars-appear {
+    from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.7); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
+  }
+
+  .score-value.winner {
+    font-size: 1.5rem;
+    color: #ffd700;
   }
 
   .score-value {

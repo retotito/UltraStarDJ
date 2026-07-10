@@ -156,12 +156,15 @@
       n => intBeat >= n.startBeat && intBeat < n.startBeat + n.lengthBeats
     )
     if (!note) return
+    if (note.type === 'freestyle') return  // freestyle notes: no state tracking
 
     const state = noteStates[note.startBeat]
     if (!state) return
 
     // ── Accumulate beat history (recomputed as $derived segments) ─────────
-    if (tick.midiNote >= 0) {
+    // Rap notes skip fill history — they use border glow instead
+    const isRapNote = note.type === 'rap' || note.type === 'rap-golden'
+    if (!isRapNote && tick.midiNote >= 0) {
       const beatData = {
         rowPitch:  tick.rowPitch,
         correct:   tick.correct,
@@ -322,6 +325,7 @@
       {@const isRap         = cell.note.type === 'rap' || cell.note.type === 'rap-golden'}
       {@const isFreestyle   = cell.note.type === 'freestyle'}
       {@const isFullyCorrect = (state?.correctBeats ?? 0) * 2 >= cell.note.lengthBeats && cell.note.lengthBeats > 0}
+      {@const isActive      = isFreestyle && currentBeat >= cell.note.startBeat}
 
       <div
         class="note-cell"
@@ -340,6 +344,7 @@
           class:freestyle={isFreestyle}
           class:sung-correct={isFullyCorrect && !isGolden}
           class:golden-correct={isGolden && isFullyCorrect}
+          class:active={isActive}
         >
           <!-- Correct fill segments: inside note-bar, clipped by overflow:hidden, below syllable -->
           {#each (derivedSegments.correctByNote.get(cell.note.startBeat) ?? []) as seg (seg.startBeat)}
@@ -433,13 +438,22 @@
     top: 50%;
     transform: translateY(calc(-50% - 1px));
     background: var(--bar-bg);
-    border: 2px solid var(--bar-border);
+    border: 2px solid color-mix(in srgb, var(--player-color) 55%, var(--bar-border));
+    box-shadow: 0 0 7px color-mix(in srgb, var(--player-color) 30%, transparent);
     border-radius: var(--bar-radius, 4px);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     min-width: 0;
+    transition: border-color 0.12s ease-out, box-shadow 0.35s ease-out;
+  }
+
+  .note-bar.active {
+    border-color: color-mix(in srgb, var(--player-color) 90%, white) !important;
+    box-shadow:
+      0 0 0px  2px color-mix(in srgb, var(--player-color) 35%, transparent),
+      0 0 16px 2px color-mix(in srgb, var(--player-color) 50%, transparent) !important;
   }
 
   .note-bar.golden {
@@ -463,16 +477,15 @@
   }
 
   .note-bar.rap.rap-hit {
-    background: rgba(255, 140, 0, 0.35);
-    border-color: rgba(255, 165, 50, 0.8);
+    border-color: rgba(255, 165, 50, 0.9);
     border-style: solid;
-    animation: rap-hit-pop 0.25s ease-out 1 forwards;
+    animation: rap-border-glow 0.5s ease-out 1 forwards;
   }
 
-  @keyframes rap-hit-pop {
-    0%   { background: rgba(255, 140, 0, 0.75); box-shadow: 0 0 10px rgba(255, 140, 0, 0.6); }
-    60%  { background: rgba(255, 140, 0, 0.45); box-shadow: 0 0 6px rgba(255, 140, 0, 0.3); }
-    100% { background: rgba(255, 140, 0, 0.35); box-shadow: none; }
+  @keyframes rap-border-glow {
+    0%   { box-shadow: 0 0 18px rgba(255, 140, 0, 0.85); border-color: rgba(255, 175, 60, 1); }
+    60%  { box-shadow: 0 0 10px rgba(255, 140, 0, 0.5);  border-color: rgba(255, 165, 50, 0.9); }
+    100% { box-shadow: 0 0 6px  rgba(255, 140, 0, 0.35); border-color: rgba(255, 165, 50, 0.8); }
   }
 
   .note-bar.freestyle {
@@ -538,7 +551,22 @@
     opacity: 0.5;
   }
 
-  .note-bar.golden .note-syllable { color: #ffe680; }
+  .note-syllable {
+    position: relative;
+    z-index: 2;
+    color: #fff !important;
+    font-size: clamp(0.55rem, 1.2vw, 0.95rem);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    max-width: 100%;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .note-bar.golden .note-syllable { color: #fff; }
 
   .rap-badge,
   .freestyle-badge {
