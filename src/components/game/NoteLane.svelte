@@ -36,13 +36,19 @@
   // ── Active phrase ──────────────────────────────────────────────────────────
   const activeLine = $derived.by(() => {
     if (!track) return null
+    const micDelayBeats = micDelayMs / 1000 * (bpm / 60) * 4
+    const lines = track.lines.filter(l => l.notes.length > 0)
     let upcoming: LyricLine | null = null
-    for (const line of track.lines) {
-      if (!line.notes.length) continue
+    for (let i = 0; i < lines.length; i++) {
+      const line  = lines[i]
       const first = line.notes[0].startBeat
       const last  = line.notes[line.notes.length - 1]
       const end   = last.startBeat + last.lengthBeats
-      if (currentBeat >= first - 4 && currentBeat <= end + 4) return line
+      // Right extension: cover mic delay, but never more than half the gap to the next phrase
+      const nextFirst = lines[i + 1]?.notes[0]?.startBeat ?? Infinity
+      const gapBeats  = nextFirst - end
+      const rightExt  = Math.min(micDelayBeats, gapBeats / 2)
+      if (currentBeat >= first - 4 && currentBeat <= end + 4 + rightExt) return line
       if (currentBeat < first && !upcoming) upcoming = line
     }
     return upcoming
