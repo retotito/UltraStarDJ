@@ -5,6 +5,7 @@
   import { layout } from '$lib/stores/layout.svelte'
   import { playersStore } from '$lib/stores/players.svelte'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
+  import SongFader from '$components/ui/SongFader.svelte'
   import MicMixRow from '$components/ui/MicMixRow.svelte'
   import { gameChannel } from '$lib/audio/channels.svelte'
   import SongProgress from '$components/game/SongProgress.svelte'
@@ -173,7 +174,7 @@
 
     <!-- Transport controls — always shown -->
     <div class="mixer">
-      <HorizontalFader label="Song" level={gameChannel.level} gain={gameChannel.gain} ongainchange={(v) => gameChannel.setGain(v)} dimmed={!!playback.song?.youtubeId && !playback.song?.audioPath && !playback.song?.videoPath} />
+      <SongFader label="Song" level={gameChannel.level} gain={gameChannel.gain} ongainchange={(v) => gameChannel.setGain(v)} dimmed={!!playback.song?.youtubeId && !playback.song?.audioPath && !playback.song?.videoPath} />
     </div>
 
     <!-- Mic mix section — only players on an OPEN display AND with a mic assigned -->
