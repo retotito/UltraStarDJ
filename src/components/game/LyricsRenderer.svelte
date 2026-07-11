@@ -130,12 +130,22 @@
   const nextLine   = $derived(track ? getNextLine(track.lines, activeLine) : null)
   const visible    = $derived(activeLine !== null)
 
-  /** Whether to insert a space after note at index i (auto word-boundary detection) */
+  $effect(() => {
+    if (!activeLine) return
+    console.log('[LyricsRenderer] syllables:', activeLine.notes.map(n => JSON.stringify(n.syllable)).join(', '))
+  })
+
+  /** Whether to insert a space after note at index i.
+   * New style: trailing space on current → space after it
+   * Old style: leading space on next → space after current
+   * Legacy (no spaces): space after every syllable */
   function needsTrailingSpace(notes: Note[], i: number): boolean {
-    const curr = notes[i]
-    const next = notes[i + 1]
-    if (!next) return false
-    return !curr.syllable.endsWith(' ') && !next.syllable.startsWith(' ')
+    if (!notes[i + 1]) return false
+    const curr = notes[i].syllable
+    const next = notes[i + 1].syllable
+    const encoded = notes.some(n => n.syllable.endsWith(' ') || n.syllable.startsWith(' '))
+    if (encoded) return curr.endsWith(' ') || next.startsWith(' ')
+    return true
   }
 </script>
 
