@@ -8,11 +8,12 @@
   import SongProgress from '$components/game/SongProgress.svelte'
   import type { PitchTickEntry } from '$lib/ipc/tauri'
 
-  let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, onCountdownDone, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', pitchTicks = [] }: {
+  let { screen = 'idle', payload, assignedPlayerIds = [], currentTime = 0, smoothTime = 0, onCountdownDone, showPianoRollLines = true, showNoteSyllables = true, noteBarStyle = 'white', pitchTicks = [] }: {
     screen?: BeamerScreen
     payload: PlaySongPayload | PreviewSongPayload | null
     assignedPlayerIds?: number[]
     currentTime?: number
+    smoothTime?: number
     onCountdownDone?: () => void
     showPianoRollLines?: boolean
     showNoteSyllables?: boolean
@@ -218,7 +219,7 @@
           {/if}
         </div>
         <div class="progress-overlay">
-          <SongProgress {currentTime} duration={songDuration} playerColor={p1Color} />
+          <SongProgress currentTime={smoothTime} duration={songDuration} playerColor={p1Color} />
         </div>
       </div>
     </div>

@@ -13,6 +13,20 @@
   let currentPayload = $state<PlaySongPayload | PreviewSongPayload | null>(null)
   let assignedPlayerIds = $state<number[]>([])
   let currentTime = $state(0)
+  let smoothTime  = $state(0)
+  let _lastKnownTime = 0
+  let _lastKnownAt   = 0
+  let _rafId = 0
+
+  function rafLoop() {
+    if (screen === 'playing') {
+      const elapsed = (performance.now() - _lastKnownAt) / 1000
+      smoothTime = _lastKnownTime + elapsed
+    } else {
+      smoothTime = currentTime  // paused/stopped: use exact value
+    }
+    _rafId = requestAnimationFrame(rafLoop)
+  }
   let unlisteners: UnlistenFn[] = []
 
   // Beamer display settings — initialised from localStorage, then kept in sync via IPC
@@ -24,6 +38,7 @@
   const windowLabel = getWindowLabel()
 
   onMount(async () => {
+    _rafId = requestAnimationFrame(rafLoop)
     unlisteners = await Promise.all([
       onPreviewSong(payload => {
         if (payload.windowLabel !== windowLabel) return
@@ -52,7 +67,11 @@
           assignedPlayerIds = cfg.playerIds
         }
       }),
-      onTimeTick(t => { currentTime = t }),
+      onTimeTick(t => {
+        currentTime = t
+        _lastKnownTime = t
+        _lastKnownAt   = performance.now()
+      }),
       onBeamerSettings(s => {
         showPianoRollLines = s.showPianoRollLines
         showNoteSyllables  = s.showNoteSyllables
@@ -62,7 +81,10 @@
     ])
   })
 
-  onDestroy(() => unlisteners.forEach(fn => fn()))
+  onDestroy(() => {
+    cancelAnimationFrame(_rafId)
+    unlisteners.forEach(fn => fn())
+  })
 
   function onCountdownDone() {
     screen = 'playing'
@@ -70,5 +92,5 @@
   }
 </script>
 
-<BeamerView {screen} payload={currentPayload} {assignedPlayerIds} {currentTime} onCountdownDone={onCountdownDone} {showPianoRollLines} {showNoteSyllables} {noteBarStyle} {pitchTicks} />
+<BeamerView {screen} payload={currentPayload} {assignedPlayerIds} {currentTime} {smoothTime} onCountdownDone={onCountdownDone} {showPianoRollLines} {showNoteSyllables} {noteBarStyle} {pitchTicks} />
 
