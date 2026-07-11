@@ -12,6 +12,7 @@
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
   import HorizontalFader from '$components/ui/HorizontalFader.svelte'
+  import SongFader from '$components/ui/SongFader.svelte'
   import { previewChannel } from '$lib/audio/channels.svelte'
 
   type MediaType = 'video' | 'youtube' | 'audio' | 'none'
@@ -240,7 +241,7 @@
     </div>
 
     <div class="preview-fader">
-      <HorizontalFader label="Preview" level={previewChannel.level} gain={previewChannel.gain} ongainchange={(v) => previewChannel.setGain(v)} />
+      <SongFader label="Preview" level={previewChannel.level} gain={previewChannel.gain} ongainchange={(v) => previewChannel.setGain(v)} />
     </div>
 
     <div class="actions">
