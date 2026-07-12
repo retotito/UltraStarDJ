@@ -34,6 +34,18 @@
       console.log('[AppShell] USDB auto-login:', ok ? 'OK' : 'FAILED')
     }
 
+    // Validate mic assignments — mark any mic that's no longer plugged in as disconnected
+    const availableInputs = await listAudioInputDevices()
+    const availableDeviceIds = new Set(availableInputs.map(d => d.id))
+    console.log('[AppShell] available input devices:', availableInputs.map(d => `${d.id} (${d.name})`))
+    for (const p of playersStore.all) {
+      console.log(`[AppShell] player ${p.id} mic:`, p.mic ? `${p.mic.deviceId} — available: ${availableDeviceIds.has(p.mic.deviceId)}` : 'none')
+      if (p.mic && !availableDeviceIds.has(p.mic.deviceId)) {
+        console.log(`[AppShell] → clearing player ${p.id} mic (not available at startup)`)
+        playersStore.setMic(p.id, null)
+      }
+    }
+
     // Global mic level listener — always active, independent of popup state
     unlistenMicLevel = await onMicLevel(e => {
       if (playersStore.monitoringIds.has(e.player_id)) {
