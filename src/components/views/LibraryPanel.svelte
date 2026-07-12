@@ -9,6 +9,7 @@
   let selectedLanguage = $state('')
   let selectedGenre = $state('')
   let selectedSource = $state('')
+  let selectedQuality = $state('')
 
   const songs = $derived(songLibrary.songs)
 
@@ -42,7 +43,15 @@
       const matchesLang = !selectedLanguage || s.language === selectedLanguage
       const matchesGenre = !selectedGenre || s.genre === selectedGenre
       const matchesSource = !selectedSource || s.sourceId === selectedSource
-      return matchesSearch && matchesLang && matchesGenre && matchesSource
+      const matchesQuality = !selectedQuality || s.sourceId !== 'usdb' || (() => {
+        const v = s.usdbViews ?? 0
+        if (selectedQuality === '100')  return v >= 100 && v < 500
+        if (selectedQuality === '500')  return v >= 500 && v < 1000
+        if (selectedQuality === '1000') return v >= 1000 && v < 2000
+        if (selectedQuality === '2000') return v >= 2000
+        return true
+      })()
+      return matchesSearch && matchesLang && matchesGenre && matchesSource && matchesQuality
     })
   )
 </script>
@@ -53,6 +62,7 @@
     bind:selectedLanguage
     bind:selectedGenre
     bind:selectedSource
+    bind:selectedQuality
     {languages}
     {genres}
     {sources}

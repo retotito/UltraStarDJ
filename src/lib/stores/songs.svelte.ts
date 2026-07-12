@@ -150,6 +150,7 @@ export const songLibrary = {
       language:  entry.language || undefined,
       coverPath: entry.coverUrl || undefined,
       usdbId:    entry.songId,
+      usdbViews: entry.views > 0 ? entry.views : undefined,
     } as Song & { usdbId: number }))
     state.songs = [...local, ...usdbSongs]
     state.countBySource = { ...state.countBySource, usdb: usdbSongs.length }

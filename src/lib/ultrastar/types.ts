@@ -41,6 +41,8 @@ export interface Song {
 
   /* --- USDB source (optional, only for USDB songs) --- */
   usdbId?: number
+  /** USDB download count (only present for USDB songs) */
+  usdbViews?: number
 }
 
 export interface NoteTrack {

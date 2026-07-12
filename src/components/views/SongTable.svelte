@@ -13,7 +13,7 @@
 
   let { songs }: { songs: Song[] } = $props()
 
-  type SortKey = 'title' | 'artist' | 'year' | 'language' | 'bpm' | 'genre'
+  type SortKey = 'title' | 'artist' | 'year' | 'language' | 'bpm' | 'genre' | 'rating'
   let sortKey = $state<SortKey>('title')
   let sortAsc = $state(true)
   let hoveredId = $state<string | null>(null)
@@ -200,6 +200,14 @@
               <td class="col-narrow text-muted">{song.bpm}</td>
             {:else if col.key === 'genre'}
               <td class="text-muted">{song.genre ?? '—'}</td>
+            {:else if col.key === 'rating'}
+              <td class="col-narrow text-muted">
+                {#if song.usdbViews != null}
+                  {song.usdbViews >= 2000 ? '★★★★' : song.usdbViews >= 1000 ? '★★★' : song.usdbViews >= 500 ? '★★' : '★'}
+                {:else}
+                  —
+                {/if}
+              </td>
             {:else if col.key === 'source'}
               <td>
                 {#if song.sourceId === 'usdb'}

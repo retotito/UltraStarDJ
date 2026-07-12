@@ -10,7 +10,8 @@
     sourceOptions = [] as { value: string; label: string }[],
     selectedLanguage = $bindable(''),
     selectedGenre = $bindable(''),
-    selectedSource = $bindable('')
+    selectedSource = $bindable(''),
+    selectedQuality = $bindable(''),
   }: {
     query?: string
     languages?: string[]
@@ -20,7 +21,16 @@
     selectedLanguage?: string
     selectedGenre?: string
     selectedSource?: string
+    selectedQuality?: string
   } = $props()
+
+  const qualityOptions = [
+    { value: '',    label: 'Rating' },
+    { value: '100', label: '★ Popular (100+)' },
+    { value: '500', label: '★★ Good (500+)' },
+    { value: '1000', label: '★★★ Very good (1000+)' },
+    { value: '2000', label: '★★★★ Top (2000+)' },
+  ]
 </script>
 
 <div class="search-bar">
@@ -54,6 +64,13 @@
       onchange={(v) => selectedGenre = v}
     />
 
+    <Select
+      class="filter-select"
+      value={selectedQuality}
+      options={qualityOptions}
+      onchange={(v) => selectedQuality = v}
+    />
+
     {#if sources.length >= 2}
       <Select
         class="filter-select"
@@ -63,8 +80,8 @@
       />
     {/if}
 
-    {#if selectedLanguage || selectedGenre}
-      <button class="btn btn-text" onclick={() => { selectedLanguage = ''; selectedGenre = '' }}>
+    {#if selectedLanguage || selectedGenre || selectedQuality}
+      <button class="btn btn-text" onclick={() => { selectedLanguage = ''; selectedGenre = ''; selectedQuality = '' }}>
         <span class="icon icon-sm">filter_list_off</span>
         Clear
       </button>
