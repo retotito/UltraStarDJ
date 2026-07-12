@@ -58,10 +58,12 @@ const _catalog = $state<UsdbCatalogEntry[]>(loadCatalog())
 
 type SyncStatus = 'idle' | 'syncing' | 'error'
 
-let _loggedIn    = $state(false)
-let _syncStatus  = $state<SyncStatus>('idle')
-let _syncError   = $state<string | null>(null)
-let _syncFetched = $state(0)
+let _loggedIn      = $state(false)
+let _syncStatus    = $state<SyncStatus>('idle')
+let _syncError     = $state<string | null>(null)
+let _syncFetched   = $state(0)
+let _syncIsFullSync = $state(false)
+const ESTIMATED_TOTAL = 27_000
 
 export const usdbStore = {
   // ── Credentials ──────────────────────────────────────────────────────────
@@ -100,20 +102,28 @@ export const usdbStore = {
   },
 
   // ── Catalog ───────────────────────────────────────────────────────────────
-  get catalog()      { return _catalog },
-  get catalogCount() { return _catalog.length },
-  get syncStatus()   { return _syncStatus },
-  get syncError()    { return _syncError },
-  get syncFetched()  { return _syncFetched },
+  get catalog()        { return _catalog },
+  get catalogCount()   { return _catalog.length },
+  get syncStatus()     { return _syncStatus },
+  get syncError()      { return _syncError },
+  get syncFetched()    { return _syncFetched },
+  get syncIsFullSync() { return _syncIsFullSync },
+  /** 0–100 progress estimate for full sync; -1 for incremental (indeterminate) */
+  get syncProgressPct(): number {
+    if (_syncStatus !== 'syncing') return 0
+    if (!_syncIsFullSync) return -1
+    return Math.min(99, Math.round((_syncFetched / ESTIMATED_TOTAL) * 100))
+  },
 
   /** Full sync (force=true) or incremental (force=false). Requires logged-in session. */
   async syncCatalog(force = false): Promise<void> {
     if (_syncStatus === 'syncing') return
     if (!_loggedIn) { _syncError = 'Not logged in'; return }
 
-    _syncStatus  = 'syncing'
-    _syncError   = null
-    _syncFetched = 0
+    _syncStatus     = 'syncing'
+    _syncError      = null
+    _syncFetched    = 0
+    _syncIsFullSync = (force || loadWatermark().lastMtime === 0)
 
     try {
       const { lastMtime, lastSongIds } = force ? { lastMtime: 0, lastSongIds: [] } : loadWatermark()

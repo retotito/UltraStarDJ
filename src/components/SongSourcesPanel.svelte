@@ -68,8 +68,8 @@
       usdbLoginError = result.error ?? 'Login failed'
       return
     }
-    // After login, start a background sync
-    usdbStore.syncCatalog(false)
+    // After login, sync in background then update library
+    await usdbStore.syncCatalog(false)
     syncUsdbToLibrary()
   }
 
@@ -211,10 +211,18 @@
       <div class="usdb-connected">
         <span class="text-xs text-muted">{usdbStore.catalogCount.toLocaleString()} songs</span>
         {#if usdbStore.syncStatus === 'syncing'}
-          <span class="text-xs text-muted">
-            <span class="icon icon-sm spinning">sync</span>
-            Syncing… {usdbStore.syncFetched > 0 ? `${usdbStore.syncFetched.toLocaleString()} fetched` : ''}
-          </span>
+          <div class="usdb-sync-progress">
+            <div class="sync-bar-track">
+              {#if usdbStore.syncProgressPct >= 0}
+                <div class="sync-bar-fill" style="width: {usdbStore.syncProgressPct}%"></div>
+              {:else}
+                <div class="sync-bar-fill sync-bar-indeterminate"></div>
+              {/if}
+            </div>
+            <span class="text-xs text-muted">
+              {usdbStore.syncIsFullSync ? `Syncing… ${usdbStore.syncFetched > 0 ? `${usdbStore.syncFetched.toLocaleString()} / ~27,000` : ''}` : 'Syncing new songs…'}
+            </span>
+          </div>
         {:else if usdbStore.syncError}
           <span class="text-xs usdb-error">{usdbStore.syncError}</span>
         {/if}
@@ -413,5 +421,36 @@
 
   .usdb-error {
     color: var(--md-sys-color-error);
+  }
+
+  .usdb-sync-progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .sync-bar-track {
+    height: 6px;
+    background: var(--md-sys-color-surface-variant);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .sync-bar-fill {
+    height: 100%;
+    background: #22c55e;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  @keyframes indeterminate {
+    0%   { transform: translateX(-100%) scaleX(0.5); }
+    50%  { transform: translateX(0%)    scaleX(0.5); }
+    100% { transform: translateX(200%)  scaleX(0.5); }
+  }
+
+  .sync-bar-indeterminate {
+    width: 50%;
+    animation: indeterminate 1.5s ease-in-out infinite;
   }
 </style>
