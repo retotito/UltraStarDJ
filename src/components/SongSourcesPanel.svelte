@@ -255,14 +255,23 @@
           <span class="text-xs usdb-error">{usdbStore.syncError}</span>
         {/if}
         <div class="usdb-actions">
-          <button class="btn btn-sm btn-tonal" onclick={() => resyncUsdb(false)} disabled={usdbStore.syncStatus === 'syncing'}>
-            <span class="icon icon-sm">sync</span>
-            Sync new
-          </button>
-          <button class="btn btn-sm btn-outlined" onclick={() => resyncUsdb(true)} disabled={usdbStore.syncStatus === 'syncing'}>
-            <span class="icon icon-sm">refresh</span>
-            Full resync
-          </button>
+          {#if usdbStore.catalogCount === 0}
+            <!-- No local catalog — only show full sync -->
+            <button class="btn btn-sm btn-tonal" onclick={() => resyncUsdb(true)} disabled={usdbStore.syncStatus === 'syncing'}>
+              <span class="icon icon-sm">download</span>
+              Sync catalog
+            </button>
+          {:else}
+            <!-- Catalog exists — offer incremental or full -->
+            <button class="btn btn-sm btn-tonal" onclick={() => resyncUsdb(false)} disabled={usdbStore.syncStatus === 'syncing'}>
+              <span class="icon icon-sm">sync</span>
+              Sync new
+            </button>
+            <button class="btn btn-sm btn-outlined" onclick={() => resyncUsdb(true)} disabled={usdbStore.syncStatus === 'syncing'}>
+              <span class="icon icon-sm">refresh</span>
+              Full resync
+            </button>
+          {/if}
           {#if usdbStore.syncStatus === 'syncing'}
             <button class="btn btn-sm btn-outlined" onclick={abortSync}>
               <span class="icon icon-sm">stop</span>
