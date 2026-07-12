@@ -335,6 +335,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   .source-row {
@@ -408,6 +410,8 @@
     display: flex;
     gap: var(--space-2);
     flex-wrap: wrap;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   /* ── USDB section ── */
@@ -417,6 +421,8 @@
     gap: var(--space-3);
     border-top: 1px solid var(--md-sys-color-outline-variant);
     padding-top: var(--space-3);
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   .usdb-header {
