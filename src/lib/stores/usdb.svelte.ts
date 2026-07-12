@@ -27,19 +27,34 @@ function loadCredentials(): UsdbCredentials {
 function loadCatalog(): UsdbCatalogEntry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch { /* ignore */ }
+    if (raw) {
+      const parsed = JSON.parse(raw) as UsdbCatalogEntry[]
+      console.log('[usdb] loadCatalog: found', parsed.length, 'entries in localStorage')
+      return parsed
+    }
+    console.log('[usdb] loadCatalog: nothing in localStorage')
+  } catch (e) {
+    console.warn('[usdb] loadCatalog: parse error', e)
+  }
   return []
 }
 
 function saveCatalog(entries: UsdbCatalogEntry[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)) } catch { /* ignore */ }
+  try {
+    const json = JSON.stringify(entries)
+    console.log('[usdb] saveCatalog: attempting to save', entries.length, 'entries (', Math.round(json.length / 1024), 'KB)')
+    localStorage.setItem(STORAGE_KEY, json)
+    console.log('[usdb] saveCatalog: saved OK')
+  } catch (e) {
+    console.warn('[usdb] saveCatalog: FAILED (quota?)', e)
+  }
 }
 
 function loadWatermark(): { lastMtime: number; lastSongIds: number[] } {
   try {
     const mtime = parseInt(localStorage.getItem(MTIME_KEY) ?? '0', 10) || 0
     const ids   = JSON.parse(localStorage.getItem(IDS_KEY) ?? '[]') as number[]
+    console.log('[usdb] loadWatermark: lastMtime=', mtime, 'lastSongIds.length=', ids.length)
     return { lastMtime: mtime, lastSongIds: ids }
   } catch {
     return { lastMtime: 0, lastSongIds: [] }
@@ -47,6 +62,7 @@ function loadWatermark(): { lastMtime: number; lastSongIds: number[] } {
 }
 
 function saveWatermark(lastMtime: number, lastSongIds: number[]) {
+  console.log('[usdb] saveWatermark: lastMtime=', lastMtime, 'ids.length=', lastSongIds.length)
   localStorage.setItem(MTIME_KEY, String(lastMtime))
   localStorage.setItem(IDS_KEY,   JSON.stringify(lastSongIds))
 }
