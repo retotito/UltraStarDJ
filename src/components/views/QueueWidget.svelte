@@ -4,6 +4,7 @@
   import { validateSong } from '$lib/ultrastar/validate_song'
   import { enrichUsdbSong } from '$lib/ultrastar/usdb-load'
   import { errorStore } from '$lib/stores/error.svelte'
+  import { tooltip } from '$lib/tooltip'
 
   async function loadSong(songId: string) {
     const song = songQueue.items.find(s => s.id === songId)
@@ -46,7 +47,7 @@
             <button
               class="btn btn-icon-sm"
               disabled={!playback.canLoad}
-              title={playback.isActive ? 'Stop current song first' : 'Load into player'}
+              use:tooltip={!playback.canLoad ? (playback.status === 'playing' ? 'Song is playing — stop it first' : 'Song is paused — stop it first') : undefined}
               onclick={() => loadSong(song.id)}
               aria-label="Load"
             >

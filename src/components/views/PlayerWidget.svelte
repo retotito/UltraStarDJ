@@ -9,6 +9,7 @@
   import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, usdbGetSongTxt } from '$lib/ipc/tauri'
   import { validateSong } from '$lib/ultrastar/validate_song'
   import { enrichUsdbSong, requiresInternet } from '$lib/ultrastar/usdb-load'
+  import { tooltip } from '$lib/tooltip'
   import { errorStore } from '$lib/stores/error.svelte'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
@@ -262,7 +263,8 @@
         <span class="icon">queue_music</span>
         Add to Queue
       </button>
-      <button class="btn btn-tonal" onclick={loadIntoPlayer} disabled={!playback.canLoad}>
+      <button class="btn btn-tonal" onclick={loadIntoPlayer} disabled={!playback.canLoad}
+        use:tooltip={!playback.canLoad ? (playback.status === 'playing' ? 'Song is playing — stop it first' : 'Song is paused — stop it first') : undefined}>
         <span class="icon">play_circle</span>
         Load
       </button>

@@ -9,6 +9,7 @@
   import { enrichUsdbSong, requiresInternet } from '$lib/ultrastar/usdb-load'
   import { network } from '$lib/stores/network.svelte'
   import { errorStore } from '$lib/stores/error.svelte'
+  import { tooltip } from '$lib/tooltip'
 
   let { songs }: { songs: Song[] } = $props()
 
@@ -243,7 +244,8 @@
     <button class="menu-item" role="menuitem" onclick={() => { previewSong(menuSong); closeMenu() }} class:disabled={menuOffline} title={menuOffline ? 'You\'re offline' : undefined}>
       <span class="icon icon-sm">play_arrow</span> Preview
     </button>
-    <button class="menu-item" role="menuitem" onclick={() => { if (playback.canLoad && !menuOffline) loadSong(menuSong) }} class:disabled={!playback.canLoad || menuOffline} title={menuOffline ? 'You\'re offline' : undefined}>
+    <button class="menu-item" role="menuitem" onclick={() => { if (playback.canLoad && !menuOffline) loadSong(menuSong) }} class:disabled={!playback.canLoad || menuOffline}
+      use:tooltip={menuOffline ? 'You\'re offline' : playback.status === 'playing' ? 'Song is playing — stop it first' : playback.status === 'paused' ? 'Song is paused — stop it first' : undefined}>
       <span class="icon icon-sm">play_circle</span> Load into player
     </button>
     <button class="menu-item" role="menuitem" onclick={() => addToQueue(menuSong)} class:disabled={menuOffline} title={menuOffline ? 'You\'re offline' : undefined}>
