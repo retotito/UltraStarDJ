@@ -7,9 +7,7 @@
   import { playback } from '$lib/stores/playback.svelte'
   import { network } from '$lib/stores/network.svelte'
   import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, usdbGetSongTxt } from '$lib/ipc/tauri'
-  import { validateSong } from '$lib/ultrastar/validate_song'
-  import { parseSongNotes } from '$lib/ultrastar/parser'
-  import { enrichUsdbSong } from '$lib/ultrastar/usdb-load'
+  import { validateSong } from '$lib/ultrastar/validate_song'\n  import { enrichUsdbSong } from '$lib/ultrastar/usdb-load'
   import { errorStore } from '$lib/stores/error.svelte'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
@@ -157,7 +155,7 @@
     const song = player.song
     if (!song) return
     try {
-      const enriched = song.usdbId ? await _enrichUsdbSong(song) : song
+      const enriched = song.usdbId ? await enrichUsdbSong(song) : song
       const result = await validateSong(enriched)
       if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
       songQueue.add(result.song)
@@ -165,29 +163,6 @@
       console.error('[PlayerWidget] addToQueue error:', e)
       errorStore.show('Failed to add USDB song', [String(e)])
     }
-  }
-
-  /** For USDB songs: fetch .txt, parse notes + extract YouTube ID, return enriched Song. */
-  async function enrichUsdbSong(song: Song): Promise<Song> {
-    if (!song.usdbId) return song
-    console.log('[PlayerWidget] fetching USDB txt for songId=', song.usdbId)
-    const txt = await usdbGetSongTxt(song.usdbId)
-    const notes = parseSongNotes(txt)
-    // Extract BPM and GAP from header lines
-    let bpm = 0, gap = 0, youtubeId: string | undefined
-    for (const line of txt.split('\n')) {
-      const t = line.trim()
-      if (t.startsWith('#BPM:'))     bpm = parseFloat(t.slice(5).replace(',', '.'))
-      if (t.startsWith('#GAP:'))     gap = parseFloat(t.slice(5).replace(',', '.'))
-      if (t.startsWith('#YOUTUBE:')) youtubeId = t.slice(9).trim() || undefined
-      if (t.startsWith('#VIDEO:') && !youtubeId) {
-        const val = t.slice(7).trim()
-        const m = val.match(/[?&v=]+([A-Za-z0-9_-]{11})/) ?? val.match(/^([A-Za-z0-9_-]{11})$/)
-        if (m) youtubeId = m[1]
-      }
-    }
-    console.log('[PlayerWidget] USDB txt parsed: bpm=', bpm, 'gap=', gap, 'youtubeId=', youtubeId)
-    return { ...song, bpm, gap, youtubeId, notes }
   }
 
   async function loadIntoPlayer() {
@@ -200,7 +175,7 @@
     const t = performance.now().toFixed(0)
     console.log(`[PlayerWidget ${t}ms] loadIntoPlayer() — song:${song.title}`)
     try {
-      if (song.usdbId) song = await _enrichUsdbSong(song)
+      if (song.usdbId) song = await enrichUsdbSong(song)
       const result = await validateSong(song)
       if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
       await playback.load(result.song)
