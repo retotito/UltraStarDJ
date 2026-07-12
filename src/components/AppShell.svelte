@@ -27,9 +27,10 @@
     // Load USDB catalog from IndexedDB and populate library
     await usdbStore.initialize()
     songLibrary.setUsdbSongs(usdbStore.catalog)
-    // Restore login session with saved credentials (no auto-sync — user syncs manually)
+    // Restore USDB session on app start (awaited so session is ready before user interaction)
     if (usdbStore.username) {
-      usdbStore.autoLogin()  // fire-and-forget, updates _loggedIn state
+      const ok = await usdbStore.autoLogin()
+      console.log('[AppShell] USDB auto-login:', ok ? 'OK' : 'FAILED')
     }
 
     // Global mic level listener — always active, independent of popup state
