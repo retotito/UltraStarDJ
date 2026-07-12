@@ -1,16 +1,15 @@
 /**
  * USDB store — credentials, catalog cache, sync state.
- * Catalog is persisted to localStorage as a JSON blob.
+ * Catalog is persisted via Tauri store plugin (writes to disk).
  */
 
 import { usdbLogin, usdbFetchCatalog, type UsdbCatalogEntry } from '$lib/ipc/tauri'
-import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
 import { listen } from '@tauri-apps/api/event'
+import { load as storeLoad } from '@tauri-apps/plugin-store'
 
-const STORAGE_KEY = 'usdb_catalog_v1'
-const MTIME_KEY   = 'usdb_last_mtime'
-const IDS_KEY     = 'usdb_last_song_ids'
-const CREDS_KEY   = 'usdb_credentials'
+const MTIME_KEY  = 'usdb_last_mtime'
+const IDS_KEY    = 'usdb_last_song_ids'
+const CREDS_KEY  = 'usdb_credentials'
 
 // ── Credentials (persisted) ───────────────────────────────────────────────────
 
@@ -24,45 +23,44 @@ function loadCredentials(): UsdbCredentials {
   return { username: '', password: '' }
 }
 
-// ── Catalog cache (persisted) ─────────────────────────────────────────────────
+// ── Catalog — Tauri Store (persists to disk, survives app restarts) ───────────
+const STORE_FILE      = 'usdb-catalog.json'
+const CATALOG_VERSION = 1
 
-// ── Catalog — IndexedDB (no size limit, handles 15MB+ easily) ────────────────
-const IDB_CATALOG_KEY = 'usdb_catalog_v1'
-const IDB_VERSION_KEY = 'usdb_catalog_version'
-const CATALOG_VERSION = 1  // bump to force full resync on schema change
+async function getStore() {
+  return await storeLoad(STORE_FILE, { autoSave: false, defaults: {} })
+}
 
 async function loadCatalogFromIdb(): Promise<UsdbCatalogEntry[]> {
   try {
-    const version = await idbGet<number>(IDB_VERSION_KEY)
+    const store = await getStore()
+    const version = await store.get<number>('version')
     if (version !== CATALOG_VERSION) {
-      console.log('[usdb] loadCatalog: version mismatch (stored=', version, 'expected=', CATALOG_VERSION, ') — clearing')
-      await idbDel(IDB_CATALOG_KEY)
-      await idbSet(IDB_VERSION_KEY, CATALOG_VERSION)
+      console.log('[usdb] loadCatalog: version mismatch — clearing')
+      await store.clear(); await store.save()
       return []
     }
-    const entries = await idbGet<UsdbCatalogEntry[]>(IDB_CATALOG_KEY)
+    const entries = await store.get<UsdbCatalogEntry[]>('catalog')
     if (entries && entries.length > 0) {
-      // Validate: filter out corrupt entries missing required fields
       const valid = entries.filter(e => e.songId && e.title && e.artist)
-      if (valid.length !== entries.length) {
-        console.warn('[usdb] loadCatalog: filtered', entries.length - valid.length, 'corrupt entries')
-      }
-      console.log('[usdb] loadCatalog: found', valid.length, 'valid entries in IndexedDB')
+      console.log('[usdb] loadCatalog: found', valid.length, 'entries in Tauri store')
       return valid
     }
-    console.log('[usdb] loadCatalog: IndexedDB empty')
+    console.log('[usdb] loadCatalog: Tauri store empty')
     return []
   } catch (e) {
-    console.warn('[usdb] loadCatalog: IndexedDB error', e)
+    console.warn('[usdb] loadCatalog: error', e)
     return []
   }
 }
 
 async function saveCatalogToIdb(entries: UsdbCatalogEntry[]): Promise<void> {
   try {
-    console.log('[usdb] saveCatalog: saving', entries.length, 'entries to IndexedDB')
-    await idbSet(IDB_CATALOG_KEY, entries)
-    await idbSet(IDB_VERSION_KEY, CATALOG_VERSION)
+    console.log('[usdb] saveCatalog: saving', entries.length, 'entries')
+    const store = await getStore()
+    await store.set('catalog', entries)
+    await store.set('version', CATALOG_VERSION)
+    await store.save()
     console.log('[usdb] saveCatalog: saved OK')
   } catch (e) {
     console.error('[usdb] saveCatalog: FAILED', e)
@@ -70,8 +68,13 @@ async function saveCatalogToIdb(entries: UsdbCatalogEntry[]): Promise<void> {
 }
 
 async function clearCatalogFromIdb(): Promise<void> {
-  await idbDel(IDB_CATALOG_KEY)
-  console.log('[usdb] clearCatalog: IndexedDB cleared')
+  try {
+    const store = await getStore()
+    await store.clear(); await store.save()
+    console.log('[usdb] clearCatalog: store cleared')
+  } catch (e) {
+    console.warn('[usdb] clearCatalog error', e)
+  }
 }
 
 function loadWatermark(): { lastMtime: number; lastSongIds: number[] } {
