@@ -41,10 +41,11 @@ export const songLibrary = {
   async scanSources(sources: SongSource[]) {
     const localSources = sources.filter(s => s.type === 'local-folder')
 
-    // If no real sources at all, clear the library
+    // If no real sources at all, clear only local songs (keep USDB)
     if (localSources.length === 0) {
-      state.songs = []
-      state.countBySource = {}
+      const usdbSongs = state.songs.filter(s => s.sourceId === 'usdb')
+      state.songs = usdbSongs
+      state.countBySource = usdbSongs.length > 0 ? { usdb: usdbSongs.length } : {}
       state.scanStatus = 'idle'
       return
     }
@@ -111,8 +112,10 @@ export const songLibrary = {
       }
 
       appSettings.save()
-      state.songs = librarySongs
-      state.countBySource = counts
+      // Preserve USDB songs when replacing local songs
+      const usdbSongs = state.songs.filter(s => s.sourceId === 'usdb')
+      state.songs = [...librarySongs, ...usdbSongs]
+      state.countBySource = { ...counts, ...(usdbSongs.length > 0 ? { usdb: usdbSongs.length } : {}) }
       state.scanStatus = 'done'
       state.scanningSourceId = null
     } catch (err) {
