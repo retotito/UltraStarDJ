@@ -9,6 +9,7 @@
   import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, usdbGetSongTxt } from '$lib/ipc/tauri'
   import { validateSong } from '$lib/ultrastar/validate_song'
   import { parseSongNotes } from '$lib/ultrastar/parser'
+  import { enrichUsdbSong } from '$lib/ultrastar/usdb-load'
   import { errorStore } from '$lib/stores/error.svelte'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
@@ -156,7 +157,7 @@
     const song = player.song
     if (!song) return
     try {
-      const enriched = song.usdbId ? await enrichUsdbSong(song) : song
+      const enriched = song.usdbId ? await _enrichUsdbSong(song) : song
       const result = await validateSong(enriched)
       if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
       songQueue.add(result.song)
@@ -199,7 +200,7 @@
     const t = performance.now().toFixed(0)
     console.log(`[PlayerWidget ${t}ms] loadIntoPlayer() — song:${song.title}`)
     try {
-      if (song.usdbId) song = await enrichUsdbSong(song)
+      if (song.usdbId) song = await _enrichUsdbSong(song)
       const result = await validateSong(song)
       if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
       await playback.load(result.song)

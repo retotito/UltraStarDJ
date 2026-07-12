@@ -6,6 +6,7 @@
   import { playback } from '$lib/stores/playback.svelte'
   import { appSettings } from '$lib/stores/settings.svelte'
   import { validateSong } from '$lib/ultrastar/validate_song'
+  import { enrichUsdbSong } from '$lib/ultrastar/usdb-load'
   import { errorStore } from '$lib/stores/error.svelte'
 
   let { songs }: { songs: Song[] } = $props()
@@ -61,7 +62,8 @@
   function closeMenu() { menuSongId = null }
 
   async function previewSong(song: Song) {
-    const result = await validateSong(song)
+    const s = song.usdbId ? await enrichUsdbSong(song) : song
+    const result = await validateSong(s)
     if (!result.valid) { errorStore.show('Song cannot be previewed', result.errors.map(e => e.message)); return }
     player.clear()
     player.load(result.song)
@@ -69,7 +71,8 @@
 
   async function addToQueue(song: Song) {
     closeMenu()
-    const result = await validateSong(song)
+    const s = song.usdbId ? await enrichUsdbSong(song) : song
+    const result = await validateSong(s)
     if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
     songQueue.add(result.song)
   }
@@ -77,7 +80,8 @@
   async function loadSong(song: Song) {
     if (!playback.canLoad) return
     closeMenu()
-    const result = await validateSong(song)
+    const s = song.usdbId ? await enrichUsdbSong(song) : song
+    const result = await validateSong(s)
     if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
     await playback.load(result.song)
   }
@@ -251,6 +255,8 @@
   .song-row {
     cursor: pointer;
     transition: background var(--transition-fast);
+    content-visibility: auto;
+    contain-intrinsic-size: 0 36px;  /* skip rendering off-screen rows */
   }
   .song-row:nth-child(even) {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent);
