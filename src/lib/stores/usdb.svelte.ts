@@ -182,10 +182,11 @@ export const usdbStore = {
   get syncError()      { return _syncError },
   get syncFetched()    { return _syncFetched },
   get syncIsFullSync() { return _syncIsFullSync },
-  /** 0–100 progress estimate for full sync; -1 for incremental (indeterminate) */
+  /** -1 = indeterminate (show animated bar), 0-99 = percent complete */
   get syncProgressPct(): number {
     if (_syncStatus !== 'syncing') return 0
-    if (!_syncIsFullSync) return -1
+    if (_syncFetched === 0) return -1  // waiting for Rust — show indeterminate
+    if (!_syncIsFullSync) return -1    // incremental — count unknown, show indeterminate
     return Math.min(99, Math.round((_syncFetched / ESTIMATED_TOTAL) * 100))
   },
 
