@@ -6,7 +6,8 @@
   import { playback } from '$lib/stores/playback.svelte'
   import { appSettings } from '$lib/stores/settings.svelte'
   import { validateSong } from '$lib/ultrastar/validate_song'
-  import { enrichUsdbSong } from '$lib/ultrastar/usdb-load'
+  import { enrichUsdbSong, requiresInternet } from '$lib/ultrastar/usdb-load'
+  import { network } from '$lib/stores/network.svelte'
   import { errorStore } from '$lib/stores/error.svelte'
 
   let { songs }: { songs: Song[] } = $props()
@@ -62,28 +63,48 @@
   function closeMenu() { menuSongId = null }
 
   async function previewSong(song: Song) {
-    const s = song.usdbId ? await enrichUsdbSong(song) : song
-    const result = await validateSong(s)
-    if (!result.valid) { errorStore.show('Song cannot be previewed', result.errors.map(e => e.message)); return }
-    player.clear()
-    player.load(result.song)
+    if (requiresInternet(song) && !network.isOnline) {
+      errorStore.show('You\'re offline', ['This song requires a YouTube connection and cannot be played without internet.'])
+      return
+    }
+    try {
+      const s = song.usdbId ? await enrichUsdbSong(song) : song
+      const result = await validateSong(s)
+      if (!result.valid) { errorStore.show('Song cannot be previewed', result.errors.map(e => e.message)); return }
+      player.clear()
+      player.load(result.song)
+    } catch (e) {
+      errorStore.show('Cannot preview song', [String(e)])
+    }
   }
 
   async function addToQueue(song: Song) {
+    if (requiresInternet(song) && !network.isOnline) {
+      errorStore.show('You\'re offline', ['This song requires a YouTube connection and cannot be queued without internet.'])
+      return
+    }
     closeMenu()
-    const s = song.usdbId ? await enrichUsdbSong(song) : song
-    const result = await validateSong(s)
-    if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
-    songQueue.add(result.song)
+    try {
+      const s = song.usdbId ? await enrichUsdbSong(song) : song
+      const result = await validateSong(s)
+      if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
+      songQueue.add(result.song)
+    } catch (e) {
+      errorStore.show('Cannot add song to queue', [String(e)])
+    }
   }
 
   async function loadSong(song: Song) {
     if (!playback.canLoad) return
     closeMenu()
-    const s = song.usdbId ? await enrichUsdbSong(song) : song
-    const result = await validateSong(s)
-    if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
-    await playback.load(result.song)
+    try {
+      const s = song.usdbId ? await enrichUsdbSong(song) : song
+      const result = await validateSong(s)
+      if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
+      await playback.load(result.song)
+    } catch (e) {
+      errorStore.show('Cannot load song', [String(e)])
+    }
   }
 
   $effect(() => {
@@ -154,6 +175,8 @@
           class="song-row"
           class:selected={player.song?.id === song.id}
           class:hovered={hoveredId === song.id}
+          class:offline-song={requiresInternet(song) && !network.isOnline}
+          title={requiresInternet(song) && !network.isOnline ? 'You\'re offline — this song requires a YouTube connection' : undefined}
           ondblclick={() => previewSong(song)}
           onmouseenter={() => hoveredId = song.id}
           onmouseleave={() => hoveredId = null}
@@ -209,6 +232,7 @@
 <!-- Row context menu -->
 {#if menuSongId}
   {@const menuSong = sorted.find(s => s.id === menuSongId)!}
+  {@const menuOffline = requiresInternet(menuSong) && !network.isOnline}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="row-menu"
@@ -216,13 +240,13 @@
     role="menu"
     bind:this={menuEl}
   >
-    <button class="menu-item" role="menuitem" onclick={() => { previewSong(menuSong); closeMenu() }}>
+    <button class="menu-item" role="menuitem" onclick={() => { previewSong(menuSong); closeMenu() }} class:disabled={menuOffline} title={menuOffline ? 'You\'re offline' : undefined}>
       <span class="icon icon-sm">play_arrow</span> Preview
     </button>
-    <button class="menu-item" role="menuitem" onclick={() => { if (playback.canLoad) loadSong(menuSong) }} class:disabled={!playback.canLoad}>
+    <button class="menu-item" role="menuitem" onclick={() => { if (playback.canLoad && !menuOffline) loadSong(menuSong) }} class:disabled={!playback.canLoad || menuOffline} title={menuOffline ? 'You\'re offline' : undefined}>
       <span class="icon icon-sm">play_circle</span> Load into player
     </button>
-    <button class="menu-item" role="menuitem" onclick={() => addToQueue(menuSong)}>
+    <button class="menu-item" role="menuitem" onclick={() => addToQueue(menuSong)} class:disabled={menuOffline} title={menuOffline ? 'You\'re offline' : undefined}>
       <span class="icon icon-sm">queue_music</span> Add to queue
     </button>
     <div class="menu-divider"></div>
@@ -291,6 +315,14 @@
   }
   .song-row.selected {
     background: var(--color-table-row-selected);
+  }
+
+  .song-row.offline-song {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .song-row.offline-song:hover {
+    background: transparent;
   }
 
   .col-index {

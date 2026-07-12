@@ -4,6 +4,7 @@
   import { playback } from '$lib/stores/playback.svelte'
   import { usdbStore } from '$lib/stores/usdb.svelte'
   import { songLibrary } from '$lib/stores/songs.svelte'
+  import { network } from '$lib/stores/network.svelte'
   import { onMount, onDestroy } from 'svelte'
   import { onOutputDevicesChanged, onMicLevel, onMicDisconnected, onMicReconnected, onDevicesChanged, listAudioInputDevices, stopMicMonitor } from '$lib/ipc/tauri'
   import { loadAudioOutputDevices, audioOutputDevices } from '$lib/audio/devices.svelte'
@@ -130,6 +131,13 @@
 <MicDisconnectedToast />
 <NowPlayingBar />
 
+{#if !network.isOnline}
+  <div class="offline-badge" role="status" aria-label="No internet connection">
+    <span class="icon" style="font-size:16px">wifi_off</span>
+    Offline
+  </div>
+{/if}
+
 {#if outputToast}
   <div class="output-toast-container" role="status" aria-live="polite">
     <div class="output-toast" class:toast-ok={outputToast.type === 'connected'} class:toast-warn={outputToast.type === 'disconnected'}>
@@ -185,6 +193,24 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+
+  .offline-badge {
+    position: fixed;
+    top: 4px;
+    right: var(--space-3);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-3);
+    border-radius: 999px;
+    background: var(--md-sys-color-error);
+    color: var(--md-sys-color-on-error);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+    pointer-events: none;
+    user-select: none;
   }
 
   .output-toast-container {

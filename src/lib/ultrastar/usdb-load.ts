@@ -7,6 +7,15 @@ import type { Song } from '$lib/ultrastar/types'
 import { usdbGetSongTxt } from '$lib/ipc/tauri'
 import { parseSongNotes } from '$lib/ultrastar/parser'
 import { usdbStore } from '$lib/stores/usdb.svelte'
+import { network } from '$lib/stores/network.svelte'
+
+/** True when a song requires an internet connection to play (YouTube only, no local fallback). */
+export function requiresInternet(song: Song): boolean {
+  // USDB songs always need YouTube (no local files until enriched)
+  if (song.sourceId === 'usdb') return true
+  // Local songs: need YouTube and have no local audio/video fallback
+  return !!song.youtubeId && !song.audioPath && !song.videoPath
+}
 
 function looksLikeHtml(txt: string): boolean {
   const t = txt.trimStart().toLowerCase()
@@ -15,6 +24,7 @@ function looksLikeHtml(txt: string): boolean {
 
 export async function enrichUsdbSong(song: Song): Promise<Song> {
   if (!song.usdbId) return song
+  if (!network.isOnline) throw new Error('You\'re offline — this song requires a YouTube connection')
   console.log('[usdb-load] fetching txt for songId=', song.usdbId, song.title)
 
   let txt = await usdbGetSongTxt(song.usdbId)

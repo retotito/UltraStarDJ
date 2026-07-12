@@ -8,7 +8,7 @@
   import { network } from '$lib/stores/network.svelte'
   import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, usdbGetSongTxt } from '$lib/ipc/tauri'
   import { validateSong } from '$lib/ultrastar/validate_song'
-  import { enrichUsdbSong } from '$lib/ultrastar/usdb-load'
+  import { enrichUsdbSong, requiresInternet } from '$lib/ultrastar/usdb-load'
   import { errorStore } from '$lib/stores/error.svelte'
   import placeholderSrc from '$lib/assets/song-placeholder.svg'
   import type { Song } from '$lib/ultrastar/types'
@@ -32,7 +32,7 @@
   )
 
   const isOfflineYoutube = $derived(
-    !!player.song?.youtubeId && !player.song?.videoPath && !player.song?.audioPath && !network.isOnline
+    !!player.song && requiresInternet(player.song) && !network.isOnline
   )
 
   // Transcoded temp file state
@@ -155,6 +155,10 @@
     console.log('[PlayerWidget] addToQueue clicked, song:', player.song?.title)
     const song = player.song
     if (!song) return
+    if (isOfflineYoutube) {
+      errorStore.show('You\'re offline', ['This song requires a YouTube connection and cannot be queued without internet.'])
+      return
+    }
     try {
       const enriched = song.usdbId ? await enrichUsdbSong(song) : song
       const result = await validateSong(enriched)
@@ -171,6 +175,10 @@
     let song = player.song
     if (!song || !playback.canLoad) {
       console.warn('[PlayerWidget] loadIntoPlayer blocked — song:', !!song, 'canLoad:', playback.canLoad)
+      return
+    }
+    if (isOfflineYoutube) {
+      errorStore.show('You\'re offline', ['This song requires a YouTube connection and cannot be played without internet.'])
       return
     }
     const t = performance.now().toFixed(0)
