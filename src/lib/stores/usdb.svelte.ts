@@ -35,18 +35,20 @@ async function loadCatalogFromIdb(): Promise<UsdbCatalogEntry[]> {
   try {
     const store = await getStore()
     const version = await store.get<number>('version')
+    console.log('[usdb] loadCatalog: store version=', version, 'expected=', CATALOG_VERSION)
     if (version !== CATALOG_VERSION) {
       console.log('[usdb] loadCatalog: version mismatch — clearing')
       await store.clear(); await store.save()
       return []
     }
     const entries = await store.get<UsdbCatalogEntry[]>('catalog')
+    console.log('[usdb] loadCatalog: entries=', entries?.length ?? 'null')
     if (entries && entries.length > 0) {
       const valid = entries.filter(e => e.songId && e.title && e.artist)
-      console.log('[usdb] loadCatalog: found', valid.length, 'entries in Tauri store')
+      console.log('[usdb] loadCatalog: found', valid.length, 'valid entries')
       return valid
     }
-    console.log('[usdb] loadCatalog: Tauri store empty')
+    console.log('[usdb] loadCatalog: store empty')
     return []
   } catch (e) {
     console.warn('[usdb] loadCatalog: error', e)
@@ -61,7 +63,10 @@ async function saveCatalogToIdb(entries: UsdbCatalogEntry[]): Promise<void> {
     await store.set('catalog', entries)
     await store.set('version', CATALOG_VERSION)
     await store.save()
-    console.log('[usdb] saveCatalog: saved OK')
+    console.log('[usdb] saveCatalog: save() called')
+    // Verify: immediately read back
+    const verify = await store.get<UsdbCatalogEntry[]>('catalog')
+    console.log('[usdb] saveCatalog: verify read-back =', verify?.length ?? 'null', 'entries')
   } catch (e) {
     console.error('[usdb] saveCatalog: FAILED', e)
   }
