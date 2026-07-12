@@ -172,14 +172,12 @@ impl UsdbClient {
             .await
             .map_err(|e| format!("Failed to fetch song txt: {}", e))?;
 
-        if response.status() == 404 {
-            return Err(format!("Song {} not found on USDB", song_id));
-        }
-
         let body = response.text().await
-            .map_err(|e| format!("Failed to read song txt: {}", e))?;
+            .map_err(|e| format!("Failed to read song txt response: {}", e))?;
 
-        Ok(body)
+        // USDB returns the txt wrapped in an HTML page — extract from <textarea>
+        extract_song_txt_from_html(&body)
+            .ok_or_else(|| format!("Could not find song txt in USDB response (songId={})", song_id))
     }
 }
 
@@ -240,6 +238,13 @@ pub fn parse_song_list(html: &str) -> Vec<UsdbCatalogEntry> {
 }
 
 // ── Extract YouTube ID from USDB song page ────────────────────────────────────
+
+/// Extract the raw UltraStar txt from USDB's HTML response (it's in a <textarea>)
+fn extract_song_txt_from_html(html: &str) -> Option<String> {
+    let document = scraper::Html::parse_document(html);
+    let sel = scraper::Selector::parse("textarea").unwrap();
+    document.select(&sel).next().map(|el| el.text().collect::<String>())
+}
 
 pub fn extract_youtube_id_from_txt(txt: &str) -> Option<String> {
     for line in txt.lines() {
