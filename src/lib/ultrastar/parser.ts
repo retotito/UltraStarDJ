@@ -125,9 +125,11 @@ export function parseSongNotes(text: string): import('./types').NoteTrack[] {
 
     const noteType = NOTE_TYPES[line[0]]
     if (noteType) {
-      // Split on single space (no trim) — preserves leading/trailing spaces in syllable,
-      // which UltraStar uses to encode word boundaries. Same approach as allkaraoke.party.
-      const split = line.split(' ')
+      // Use raw (untrimmed) line to preserve leading/trailing spaces in syllable text.
+      // UltraStar uses these spaces to encode word boundaries.
+      // Strip only the line-ending \r (Windows CRLF), but keep syllable spaces.
+      const rawLine = raw.replace(/\r$/, '')
+      const split = rawLine.split(' ')
       const startBeat   = parseInt(split[1], 10)
       const lengthBeats = parseInt(split[2], 10)
       const pitch       = parseInt(split[3], 10)

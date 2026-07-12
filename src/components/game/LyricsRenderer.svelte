@@ -130,11 +130,6 @@
   const nextLine   = $derived(track ? getNextLine(track.lines, activeLine) : null)
   const visible    = $derived(activeLine !== null)
 
-  $effect(() => {
-    if (!activeLine) return
-    console.log('[LyricsRenderer] syllables:', activeLine.notes.map(n => JSON.stringify(n.syllable)).join(', '))
-  })
-
   /** Whether to insert a space after note at index i.
    * New style: trailing space on current → space after it
    * Old style: leading space on next → space after current

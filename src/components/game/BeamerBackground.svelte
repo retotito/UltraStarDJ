@@ -124,10 +124,7 @@
     const targetTime = currentTime + videoGapSecs
     const ytTime: number = ytPlayer?.getCurrentTime() ?? targetTime
     const drift = Math.abs(ytTime - targetTime)
-    const t = performance.now().toFixed(0)
-    console.log(`[BeamerBackground ${t}ms] yt-sync currentTime:${currentTime.toFixed(2)} ytTime:${ytTime.toFixed(2)} target:${targetTime.toFixed(2)} drift:${drift.toFixed(2)}`)
     if (drift > 0.5) {
-      console.log(`[BeamerBackground ${t}ms] yt-sync SEEK → ${targetTime.toFixed(2)}`)
       ytPlayer?.seekTo(targetTime, true)
     }
   })
