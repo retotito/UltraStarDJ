@@ -32,8 +32,9 @@
   })
   const sorted = $derived(
     [...songs].sort((a, b) => {
-      const av = (a[sortKey] ?? '') as string | number
-      const bv = (b[sortKey] ?? '') as string | number
+      const val = (s: Song) => sortKey === 'rating' ? (s.usdbViews ?? -1) : (s[sortKey as keyof Song] ?? '')
+      const av = val(a) as string | number
+      const bv = val(b) as string | number
       const cmp = av < bv ? -1 : av > bv ? 1 : 0
       return sortAsc ? cmp : -cmp
     })
