@@ -164,7 +164,12 @@ impl UsdbClient {
     /// Fetch the raw .txt content for a song ID.
     pub async fn get_song_txt(&self, song_id: u32) -> Result<String, String> {
         let url = format!("{}/index.php?link=gettxt&id={}", BASE_URL, song_id);
-        let response = self.client.get(&url).send().await
+        let response = self.client
+            .post(&url)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body("wd=1")
+            .send()
+            .await
             .map_err(|e| format!("Failed to fetch song txt: {}", e))?;
 
         if response.status() == 404 {
