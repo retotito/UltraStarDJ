@@ -62,7 +62,7 @@ function loadState(): LayoutState {
     })
     return {
       rightPanelWidth: saved.rightPanelWidth ?? DEFAULTS.rightPanelWidth,
-      showNowPlaying: saved.showNowPlaying ?? DEFAULTS.showNowPlaying,
+      showNowPlaying: false,  // always closed on app start, regardless of last session
       showPianoRollLines: saved.showPianoRollLines ?? DEFAULTS.showPianoRollLines,
       showNoteSyllables: saved.showNoteSyllables ?? DEFAULTS.showNoteSyllables,
       noteBarStyle: saved.noteBarStyle ?? DEFAULTS.noteBarStyle,
