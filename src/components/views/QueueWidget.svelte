@@ -2,15 +2,21 @@
   import { songQueue } from '$lib/stores/queue.svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { validateSong } from '$lib/ultrastar/validate_song'
+  import { enrichUsdbSong } from '$lib/ultrastar/usdb-load'
   import { errorStore } from '$lib/stores/error.svelte'
 
   async function loadSong(songId: string) {
     const song = songQueue.items.find(s => s.id === songId)
     if (!song || !playback.canLoad) return
-    const result = await validateSong(song)
-    if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
-    songQueue.remove(songId)
-    await playback.load(result.song)
+    try {
+      const enriched = song.usdbId ? await enrichUsdbSong(song) : song
+      const result = await validateSong(enriched)
+      if (!result.valid) { errorStore.show('Song cannot be loaded', result.errors.map(e => e.message)); return }
+      songQueue.remove(songId)
+      await playback.load(result.song)
+    } catch (e) {
+      errorStore.show('Failed to load USDB song', [String(e)])
+    }
   }
 </script>
 

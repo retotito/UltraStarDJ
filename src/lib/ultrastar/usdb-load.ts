@@ -1,18 +1,36 @@
 /**
  * Utility for loading USDB songs on-demand.
  * Fetches the .txt file, parses notes + BPM/GAP/YouTube ID.
+ * Auto re-logins if session expired.
  */
 import type { Song } from '$lib/ultrastar/types'
 import { usdbGetSongTxt } from '$lib/ipc/tauri'
 import { parseSongNotes } from '$lib/ultrastar/parser'
+import { usdbStore } from '$lib/stores/usdb.svelte'
 
-/** For USDB songs: fetch .txt, parse notes + extract YouTube ID, return enriched Song. */
+function looksLikeHtml(txt: string): boolean {
+  const t = txt.trimStart().toLowerCase()
+  return t.startsWith('<!doctype') || t.startsWith('<html') || t.startsWith('<!')
+}
+
 export async function enrichUsdbSong(song: Song): Promise<Song> {
   if (!song.usdbId) return song
   console.log('[usdb-load] fetching txt for songId=', song.usdbId, song.title)
-  const txt = await usdbGetSongTxt(song.usdbId)
+
+  let txt = await usdbGetSongTxt(song.usdbId)
+  console.log('[usdb-load] txt first 80 chars:', txt.slice(0, 80).replace(/\n/g, '↵'))
+
+  if (looksLikeHtml(txt)) {
+    console.warn('[usdb-load] got HTML — session expired, re-logging in')
+    const ok = await usdbStore.login()
+    if (!ok.ok) throw new Error('USDB session expired and re-login failed: ' + ok.error)
+    txt = await usdbGetSongTxt(song.usdbId)
+    if (looksLikeHtml(txt)) throw new Error('USDB song txt unavailable after re-login')
+  }
+
   const notes = parseSongNotes(txt)
   let bpm = 0, gap = 0, youtubeId: string | undefined
+
   for (const line of txt.split('\n')) {
     const t = line.trim()
     if (t.startsWith('#BPM:'))     bpm = parseFloat(t.slice(5).replace(',', '.'))
@@ -24,6 +42,10 @@ export async function enrichUsdbSong(song: Song): Promise<Song> {
       if (m) youtubeId = m[1]
     }
   }
-  console.log('[usdb-load] parsed: bpm=', bpm, 'gap=', gap, 'youtubeId=', youtubeId)
+
+  console.log('[usdb-load] bpm=', bpm, 'gap=', gap, 'youtubeId=', youtubeId, 'tracks=', notes.length)
+  if (bpm === 0) throw new Error('Missing or invalid #BPM in USDB song txt')
+  if (!youtubeId) throw new Error('No YouTube ID found in USDB song txt')
+
   return { ...song, bpm, gap, youtubeId, notes }
 }
