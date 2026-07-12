@@ -87,10 +87,8 @@
     songLibrary.setUsdbSongs(usdbStore.catalog)
   }
 
-  // Keep library in sync when catalog changes
-  $effect(() => {
-    songLibrary.setUsdbSongs(usdbStore.catalog)
-  })
+  // Sync catalog to library on component mount (in case catalog was loaded from localStorage)
+  syncUsdbToLibrary()
 </script>
 
 <div class="sources-panel">
