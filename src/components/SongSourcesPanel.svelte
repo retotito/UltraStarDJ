@@ -59,6 +59,8 @@
   let usdbUsername = $state(usdbStore.username)
   let usdbPassword = $state(usdbStore.password)
   let usdbLoginError = $state<string | null>(null)
+  let showPassword = $state(false)
+  let _aborted = false
 
   async function connectUsdb() {
     console.log('[usdb-ui] connectUsdb clicked, username=', usdbUsername)
@@ -86,9 +88,18 @@
 
   async function resyncUsdb(force = false) {
     console.log('[usdb-ui] resyncUsdb clicked, force=', force)
+    _aborted = false
     await usdbStore.syncCatalog(force)
-    console.log('[usdb-ui] resync done, catalog=', usdbStore.catalogCount)
-    syncUsdbToLibrary()
+    if (!_aborted) {
+      console.log('[usdb-ui] resync done, catalog=', usdbStore.catalogCount)
+      syncUsdbToLibrary()
+    }
+  }
+
+  function abortSync() {
+    console.log('[usdb-ui] abort clicked')
+    _aborted = true
+    usdbStore.abortSync()
   }
 
   function syncUsdbToLibrary() {
@@ -215,12 +226,17 @@
           placeholder="Username"
           bind:value={usdbUsername}
         />
-        <input
-          class="input input-sm"
-          type="password"
-          placeholder="Password"
-          bind:value={usdbPassword}
-        />
+        <div class="password-row">
+          <input
+            class="input input-sm"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Password"
+            bind:value={usdbPassword}
+          />
+          <button class="btn btn-icon-sm" onclick={() => showPassword = !showPassword} title={showPassword ? 'Hide' : 'Show'}>
+            <span class="icon icon-sm">{showPassword ? 'visibility_off' : 'visibility'}</span>
+          </button>
+        </div>
         {#if usdbLoginError}
           <span class="usdb-error text-xs">{usdbLoginError}</span>
         {/if}
@@ -257,10 +273,17 @@
             <span class="icon icon-sm">refresh</span>
             Full resync
           </button>
-          <button class="btn btn-sm btn-outlined" onclick={disconnectUsdb}>
-            <span class="icon icon-sm">logout</span>
-            Disconnect
-          </button>
+          {#if usdbStore.syncStatus === 'syncing'}
+            <button class="btn btn-sm btn-outlined" onclick={abortSync}>
+              <span class="icon icon-sm">stop</span>
+              Abort
+            </button>
+          {:else}
+            <button class="btn btn-sm btn-outlined" onclick={disconnectUsdb}>
+              <span class="icon icon-sm">logout</span>
+              Disconnect
+            </button>
+          {/if}
         </div>
       </div>
     {/if}
@@ -428,6 +451,14 @@
     flex-direction: column;
     gap: var(--space-2);
   }
+
+  .password-row {
+    display: flex;
+    gap: var(--space-1);
+    align-items: center;
+  }
+
+  .password-row .input { flex: 1; }
 
   .usdb-connected {
     display: flex;

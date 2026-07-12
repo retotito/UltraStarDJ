@@ -7,6 +7,7 @@
   import DisplaysView from '$components/views/DisplaysView.svelte'
   import AudioOutputView from '$components/views/AudioOutputView.svelte'
   import SongSourcesPanel from '$components/SongSourcesPanel.svelte'
+  import { usdbStore } from '$lib/stores/usdb.svelte'
 
   let showSettings = $state(false)
   let showLayoutMenu = $state(false)
@@ -142,11 +143,11 @@
 
 {#if showSources}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="popover-backdrop" onclick={() => showSources = false}></div>
+  <div class="popover-backdrop" onclick={() => { if (usdbStore.syncStatus !== 'syncing') showSources = false }}></div>
   <div class="sources-popover">
     <div class="popover-header">
       <span class="popover-title">Song Sources</span>
-      <button class="btn btn-icon" onclick={() => showSources = false} aria-label="Close">
+      <button class="btn btn-icon" onclick={() => { if (usdbStore.syncStatus !== 'syncing') showSources = false }} aria-label="Close" disabled={usdbStore.syncStatus === 'syncing'}>
         <span class="icon">close</span>
       </button>
     </div>

@@ -188,4 +188,11 @@ export const usdbStore = {
     saveCatalog([])
     saveWatermark(0, [])
   },
+
+  /** Stop showing sync progress (Rust continues in background but results are discarded). */
+  abortSync() {
+    console.log('[usdb] abortSync called')
+    _syncStatus = 'idle'
+    _syncError  = null
+  },
 }
