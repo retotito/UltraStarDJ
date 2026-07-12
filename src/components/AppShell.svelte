@@ -27,14 +27,9 @@
     // Load USDB catalog from IndexedDB and populate library
     await usdbStore.initialize()
     songLibrary.setUsdbSongs(usdbStore.catalog)
-    // Auto-login with saved credentials and run incremental sync
+    // Restore login session with saved credentials (no auto-sync — user syncs manually)
     if (usdbStore.username) {
-      const ok = await usdbStore.autoLogin()
-      if (ok) {
-        usdbStore.syncCatalog(false).then(() => {
-          songLibrary.setUsdbSongs(usdbStore.catalog)
-        })
-      }
+      usdbStore.autoLogin()  // fire-and-forget, updates _loggedIn state
     }
 
     // Global mic level listener — always active, independent of popup state

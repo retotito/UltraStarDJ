@@ -206,6 +206,7 @@ export const usdbStore = {
     _syncIsFullSync = (force || catalogEmpty || lastMtime === 0)
 
     try {
+      console.log('[usdb] syncCatalog: calling usdbFetchCatalog, lastMtime=', lastMtime, 'fullSync=', _syncIsFullSync)
       const entries = await usdbFetchCatalog(lastMtime, lastSongIds)
       console.log('[usdb] syncCatalog got', entries.length, 'entries, force=', force, 'lastMtime=', lastMtime)
 
