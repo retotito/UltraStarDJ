@@ -107,18 +107,8 @@
   }
 
   // Initialize: load catalog from IndexedDB, then sync library
-  ;(async () => {
-    await usdbStore.initialize()
-    syncUsdbToLibrary()
-    // Auto-login with saved credentials on mount
-    if (!usdbStore.loggedIn && usdbStore.username) {
-      const ok = await usdbStore.autoLogin()
-      if (ok) {
-        await usdbStore.syncCatalog(false)
-        syncUsdbToLibrary()
-      }
-    }
-  })()
+  // (full init is handled by AppShell on startup; this is a fallback if panel opened first)
+  syncUsdbToLibrary()
 </script>
 
 <div class="sources-panel">

@@ -2,6 +2,8 @@
   import { layout } from '$lib/stores/layout.svelte'
   import { playersStore } from '$lib/stores/players.svelte'
   import { playback } from '$lib/stores/playback.svelte'
+  import { usdbStore } from '$lib/stores/usdb.svelte'
+  import { songLibrary } from '$lib/stores/songs.svelte'
   import { onMount, onDestroy } from 'svelte'
   import { onOutputDevicesChanged, onMicLevel, onMicDisconnected, onMicReconnected, onDevicesChanged, listAudioInputDevices, stopMicMonitor } from '$lib/ipc/tauri'
   import { loadAudioOutputDevices, audioOutputDevices } from '$lib/audio/devices.svelte'
@@ -22,6 +24,19 @@
   let unlistenDevicesChanged: (() => void) | null = null
 
   onMount(async () => {
+    // Load USDB catalog from IndexedDB and populate library
+    await usdbStore.initialize()
+    songLibrary.setUsdbSongs(usdbStore.catalog)
+    // Auto-login with saved credentials and run incremental sync
+    if (usdbStore.username) {
+      const ok = await usdbStore.autoLogin()
+      if (ok) {
+        usdbStore.syncCatalog(false).then(() => {
+          songLibrary.setUsdbSongs(usdbStore.catalog)
+        })
+      }
+    }
+
     // Global mic level listener — always active, independent of popup state
     unlistenMicLevel = await onMicLevel(e => {
       if (playersStore.monitoringIds.has(e.player_id)) {
