@@ -61,25 +61,33 @@
   let usdbLoginError = $state<string | null>(null)
 
   async function connectUsdb() {
+    console.log('[usdb-ui] connectUsdb clicked, username=', usdbUsername)
     usdbLoginError = null
     usdbStore.setCredentials(usdbUsername, usdbPassword)
     const result = await usdbStore.login()
+    console.log('[usdb-ui] login result=', result)
     if (!result.ok) {
       usdbLoginError = result.error ?? 'Login failed'
       return
     }
     // After login, sync in background then update library
+    console.log('[usdb-ui] starting syncCatalog, catalog size=', usdbStore.catalogCount)
     await usdbStore.syncCatalog(false)
+    console.log('[usdb-ui] syncCatalog done, catalog size=', usdbStore.catalogCount)
     syncUsdbToLibrary()
   }
 
   function disconnectUsdb() {
+    console.log('[usdb-ui] disconnectUsdb clicked')
     usdbStore.clearCredentials()
+    console.log('[usdb-ui] credentials cleared, catalog count=', usdbStore.catalogCount)
     syncUsdbToLibrary()
   }
 
   async function resyncUsdb(force = false) {
+    console.log('[usdb-ui] resyncUsdb clicked, force=', force)
     await usdbStore.syncCatalog(force)
+    console.log('[usdb-ui] resync done, catalog=', usdbStore.catalogCount)
     syncUsdbToLibrary()
   }
 
@@ -193,6 +201,9 @@
           <span class="icon icon-sm">check_circle</span>
           Connected
         </span>
+      {/if}
+      {#if usdbStore.syncStatus === 'syncing'}
+        <span class="usdb-syncing-badge">syncing…</span>
       {/if}
     </div>
 
@@ -428,6 +439,23 @@
     display: flex;
     gap: var(--space-2);
     flex-wrap: wrap;
+  }
+
+  .usdb-syncing-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid #22c55e55;
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-left: auto;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
   }
 
   .usdb-error {
