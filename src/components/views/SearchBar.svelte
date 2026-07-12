@@ -26,10 +26,10 @@
 
   const qualityOptions = [
     { value: '',    label: 'Rating' },
-    { value: '100', label: '★ Popular (100+)' },
-    { value: '500', label: '★★ Good (500+)' },
-    { value: '1000', label: '★★★ Very good (1000+)' },
-    { value: '2000', label: '★★★★ Top (2000+)' },
+    { value: '100', label: '★' },
+    { value: '500', label: '★★' },
+    { value: '1000', label: '★★★' },
+    { value: '2000', label: '★★★★' },
   ]
 </script>
 
