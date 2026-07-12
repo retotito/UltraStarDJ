@@ -8,6 +8,7 @@
   import AudioOutputView from '$components/views/AudioOutputView.svelte'
   import SongSourcesPanel from '$components/SongSourcesPanel.svelte'
   import { usdbStore } from '$lib/stores/usdb.svelte'
+  import { tooltip } from '$lib/tooltip'
 
   let showSettings = $state(false)
   let showLayoutMenu = $state(false)
@@ -39,7 +40,7 @@
     <button
       class="btn btn-icon"
       class:is-active={showLayoutMenu}
-      data-tooltip="Layout"
+      use:tooltip={'Layout'}
       aria-label="Toggle layout options"
       onclick={() => { const v = !showLayoutMenu; closeAll(); showLayoutMenu = v }}
     >
@@ -49,7 +50,7 @@
     <button
       class="btn btn-icon"
       class:is-active={showSources}
-      data-tooltip="Song Sources"
+      use:tooltip={'Song Sources'}
       aria-label="Song Sources"
       onclick={() => { const v = !showSources; closeAll(); showSources = v }}
     >
@@ -59,7 +60,7 @@
     <button
       class="btn btn-icon"
       class:is-active={showPlayers}
-      data-tooltip={audioLocked ? 'Audio Input (song active)' : 'Audio Input'}
+      use:tooltip={audioLocked ? 'Audio Input (song active)' : 'Audio Input'}
       aria-label="Audio Input"
       disabled={audioLocked}
       onclick={() => { const v = !showPlayers; closeAll(); showPlayers = v }}
@@ -70,7 +71,7 @@
     <button
       class="btn btn-icon"
       class:is-active={showAudioOutput}
-      data-tooltip={audioLocked ? 'Audio Output (song active)' : 'Audio Output'}
+      use:tooltip={audioLocked ? 'Audio Output (song active)' : 'Audio Output'}
       aria-label="Audio output routing"
       disabled={audioLocked}
       onclick={() => { const v = !showAudioOutput; closeAll(); showAudioOutput = v }}
@@ -81,7 +82,7 @@
     <button
       class="btn btn-icon"
       class:is-active={showDisplays}
-      data-tooltip={audioLocked ? 'Displays (song active)' : 'Displays'}
+      use:tooltip={audioLocked ? 'Displays (song active)' : 'Displays'}
       aria-label="Open Displays"
       disabled={audioLocked}
       onclick={() => { const v = !showDisplays; closeAll(); showDisplays = v }}
@@ -92,7 +93,7 @@
     <button
       class="btn btn-icon now-playing-btn"
       class:is-active={layout.showNowPlaying && playback.isLoaded}
-      data-tooltip="Now Playing"
+      use:tooltip={'Now Playing'}
       aria-label="Toggle now playing"
       onclick={() => { closeAll(); layout.toggleNowPlaying() }}
     >
@@ -106,7 +107,7 @@
   <div class="sidebar-bottom">
     <button
       class="btn btn-icon"
-      data-tooltip="Settings"
+      use:tooltip={'Settings'}
       aria-label="Settings"
       onclick={() => { closeAll(); showSettings = true }}
     >
@@ -230,27 +231,7 @@
     50% { opacity: 0.4; }
   }
 
-  /* CSS tooltip */
-  .btn-icon[data-tooltip] { position: relative; }
-  .btn-icon[data-tooltip]::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    left: calc(100% + 10px);
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--md-sys-color-surface-container-highest);
-    color: var(--md-sys-color-on-surface);
-    font-size: var(--text-xs);
-    white-space: nowrap;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-    z-index: var(--z-toast);
-    box-shadow: var(--elevation-1);
-  }
-  .btn-icon[data-tooltip]:hover::after { opacity: 1; }
+
 
   .layout-popover {
     position: fixed;

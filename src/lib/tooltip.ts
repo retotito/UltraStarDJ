@@ -19,10 +19,24 @@ function show(anchor: HTMLElement, text: string) {
   const tip = getEl()
   tip.textContent = text
   tip.style.display = 'block'
+
   const r = anchor.getBoundingClientRect()
-  tip.style.left = `${r.left + r.width / 2}px`
-  tip.style.top = `${r.top - 8}px`
-  tip.style.transform = 'translateX(-50%) translateY(-100%)'
+  const tipW = tip.offsetWidth
+  const tipH = tip.offsetHeight
+
+  // Check if centering above would overflow left edge
+  const centeredLeft = r.left + r.width / 2 - tipW / 2
+  if (centeredLeft < 8) {
+    // Position to the right of the anchor instead
+    tip.style.left = `${r.right + 10}px`
+    tip.style.top = `${r.top + r.height / 2}px`
+    tip.style.transform = 'translateY(-50%)'
+  } else {
+    tip.style.left = `${r.left + r.width / 2}px`
+    tip.style.top = `${r.top - 8}px`
+    tip.style.transform = 'translateX(-50%) translateY(-100%)'
+  }
+
   tip.style.opacity = '1'
 }
 
