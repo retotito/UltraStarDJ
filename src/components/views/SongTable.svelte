@@ -96,13 +96,29 @@
     }
   })
 
-  function sortLabel(key: SortKey) {
-    if (sortKey !== key) return ''
-    return sortAsc ? ' ▲' : ' ▼'
-  }
+  // ── Virtual scroll ────────────────────────────────────────────────────────
+  const ROW_H   = 36   // px per row — must match CSS
+  const BUFFER  = 20   // extra rows above/below viewport
+
+  let wrapEl    = $state<HTMLElement | undefined>(undefined)
+  let wrapH     = $state(600)
+  let scrollTop = $state(0)
+
+  $effect(() => {
+    if (!wrapEl) return
+    const ro = new ResizeObserver(entries => { wrapH = entries[0].contentRect.height })
+    ro.observe(wrapEl)
+    return () => ro.disconnect()
+  })
+
+  const startIdx = $derived(Math.max(0, Math.floor(scrollTop / ROW_H) - BUFFER))
+  const endIdx   = $derived(Math.min(sorted.length, Math.ceil((scrollTop + wrapH) / ROW_H) + BUFFER))
+  const topPad   = $derived(startIdx * ROW_H)
+  const botPad   = $derived(Math.max(0, (sorted.length - endIdx) * ROW_H))
+  const visible  = $derived(sorted.slice(startIdx, endIdx))
 </script>
 
-<div class="table-wrap">
+<div class="table-wrap" bind:this={wrapEl} onscroll={(e) => scrollTop = (e.currentTarget as HTMLElement).scrollTop}>
   <table class="song-table">
     <thead>
       <tr>
@@ -124,7 +140,10 @@
       </tr>
     </thead>
     <tbody>
-      {#each sorted as song, i (song.id)}
+      <!-- top spacer -->
+      {#if topPad > 0}<tr style="height: {topPad}px"><td colspan="99"></td></tr>{/if}
+      {#each visible as song, vi (song.id)}
+        {@const i = startIdx + vi}
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <tr
           class="song-row"
@@ -175,6 +194,8 @@
           </td>
         </tr>
       {/each}
+      <!-- bottom spacer -->
+      {#if botPad > 0}<tr style="height: {botPad}px"><td colspan="99"></td></tr>{/if}
     </tbody>
   </table>
 </div>
@@ -255,8 +276,7 @@
   .song-row {
     cursor: pointer;
     transition: background var(--transition-fast);
-    content-visibility: auto;
-    contain-intrinsic-size: 0 36px;  /* skip rendering off-screen rows */
+    height: 36px;  /* must match ROW_H constant */
   }
   .song-row:nth-child(even) {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent);
