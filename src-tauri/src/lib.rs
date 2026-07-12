@@ -3,6 +3,45 @@ use std::sync::Arc;
 use tauri::Manager;
 
 mod audio;
+mod usdb;
+
+// ── USDB managed state ────────────────────────────────────────────────────────
+struct UsdbState(tokio::sync::Mutex<usdb::UsdbClient>);
+
+#[tauri::command]
+async fn usdb_login(
+    state: tauri::State<'_, UsdbState>,
+    username: String,
+    password: String,
+) -> Result<bool, String> {
+    let client = state.0.lock().await;
+    client.login(&username, &password).await
+}
+
+#[tauri::command]
+async fn usdb_fetch_catalog(
+    state: tauri::State<'_, UsdbState>,
+    last_mtime: i64,
+    last_song_ids: Vec<u32>,
+) -> Result<Vec<usdb::UsdbCatalogEntry>, String> {
+    let client = state.0.lock().await;
+    if last_mtime == 0 {
+        // Full sync
+        client.fetch_all_songs(|_fetched, _total| {}).await
+    } else {
+        // Incremental sync
+        client.fetch_updated_songs(last_mtime, &last_song_ids).await
+    }
+}
+
+#[tauri::command]
+async fn usdb_get_song_txt(
+    state: tauri::State<'_, UsdbState>,
+    song_id: u32,
+) -> Result<String, String> {
+    let client = state.0.lock().await;
+    client.get_song_txt(song_id).await
+}
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -107,9 +146,11 @@ fn delete_temp_file(path: String) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let audio_state = Arc::new(audio::AudioState::new());
+    let usdb_state = UsdbState(tokio::sync::Mutex::new(usdb::UsdbClient::new()));
 
     tauri::Builder::default()
         .manage(audio_state.clone())
+        .manage(usdb_state)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -163,6 +204,9 @@ pub fn run() {
             audio::open_output_channel,
             audio::push_audio_pcm,
             audio::close_output_channel,
+            usdb_login,
+            usdb_fetch_catalog,
+            usdb_get_song_txt,
         ])
         .setup(move |app| {
             audio::start_hotplug_watcher(app.handle().clone(), audio_state);

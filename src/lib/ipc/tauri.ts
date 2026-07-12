@@ -432,3 +432,40 @@ export function onDevicesChanged(cb: (devices: AudioInputDevice[]) => void): Pro
 export function onOutputDevicesChanged(cb: () => void): Promise<UnlistenFn> {
   return listen('audio:output-devices-changed', () => cb())
 }
+
+// ── USDB ──────────────────────────────────────────────────────────────────────
+
+export interface UsdbCatalogEntry {
+  songId:      number
+  artist:      string
+  title:       string
+  genre:       string
+  year:        number | null
+  language:    string
+  creator:     string
+  edition:     string
+  goldenNotes: boolean
+  rating:      number
+  views:       number
+  coverUrl:    string | null
+  usdbMtime:   number
+}
+
+/** Login to USDB. Returns true on success, false on wrong credentials. */
+export async function usdbLogin(username: string, password: string): Promise<boolean> {
+  return await invoke<boolean>('usdb_login', { username, password })
+}
+
+/** Fetch catalog entries. Pass lastMtime=0 for full sync, >0 for incremental. */
+export async function usdbFetchCatalog(
+  lastMtime: number,
+  lastSongIds: number[]
+): Promise<UsdbCatalogEntry[]> {
+  return await invoke<UsdbCatalogEntry[]>('usdb_fetch_catalog', { lastMtime, lastSongIds })
+}
+
+/** Fetch the raw .txt content for a USDB song. Throws if song not found. */
+export async function usdbGetSongTxt(songId: number): Promise<string> {
+  return await invoke<string>('usdb_get_song_txt', { songId })
+}
+
