@@ -17,6 +17,11 @@
     "fs:allow-read-file",
     "fs:allow-read-dir",
     "fs:allow-exists",
+    "store:allow-load",
+    "store:allow-set",
+    "store:allow-get",
+    "store:allow-save",
+    "store:allow-clear",
     {
       "identifier": "fs:scope",
       "allow": [
