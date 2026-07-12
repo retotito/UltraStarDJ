@@ -112,6 +112,7 @@ let _syncStatus    = $state<SyncStatus>('idle')
 let _syncError     = $state<string | null>(null)
 let _syncFetched   = $state(0)
 let _syncIsFullSync = $state(false)
+let _catalogLoading = $state(false)
 const ESTIMATED_TOTAL = 27_000
 
 export const usdbStore = {
@@ -135,10 +136,13 @@ export const usdbStore = {
     this.clearCatalog()
   },
 
+  get catalogLoading() { return _catalogLoading },
+
   /** Load catalog from IndexedDB. Call once on app start. */
   async initialize(): Promise<void> {
     if (_catalogLoaded) return
     _catalogLoaded = true
+    _catalogLoading = true
     const entries = await loadCatalogFromIdb()
     if (entries.length > 0) {
       _catalog.length = 0
@@ -155,6 +159,7 @@ export const usdbStore = {
         console.log('[usdb] initialize: repaired missing watermark, lastMtime=', max)
       }
     }
+    _catalogLoading = false
   },
 
   // ── Login ─────────────────────────────────────────────────────────────────

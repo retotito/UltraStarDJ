@@ -1,6 +1,7 @@
 <script lang="ts">
   import { songLibrary } from '$lib/stores/songs.svelte'
   import { appSettings } from '$lib/stores/settings.svelte'
+  import { usdbStore } from '$lib/stores/usdb.svelte'
   import SearchBar from '$components/views/SearchBar.svelte'
   import SongTable from '$components/views/SongTable.svelte'
 
@@ -58,7 +59,14 @@
     {sourceOptions}
   />
   <div class="table-container">
-    <SongTable songs={filtered} />
+    {#if usdbStore.catalogLoading}
+      <div class="catalog-loading">
+        <span class="icon spinning">sync</span>
+        <span class="text-sm text-muted">Loading catalog…</span>
+      </div>
+    {:else}
+      <SongTable songs={filtered} />
+    {/if}
   </div>
   <footer class="status-bar">
     <span class="text-muted text-xs">{filtered.length} of {songs.length} songs</span>
@@ -79,6 +87,19 @@
     display: flex;
     flex-direction: column;
   }
+
+  .catalog-loading {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinning { animation: spin 1s linear infinite; display: inline-block; font-size: 2rem; }
 
   .status-bar {
     padding: var(--space-1) var(--space-4);
