@@ -22,7 +22,7 @@ export interface Song {
   comment?: string
 
   /* --- File paths (absolute, local) --- */
-  txtPath: string
+  txtPath?: string
   audioPath?: string
   videoPath?: string
   coverPath?: string
@@ -38,6 +38,9 @@ export interface Song {
 
   /* --- Parsed notes (loaded on demand, not at library scan) --- */
   notes?: NoteTrack[]
+
+  /* --- USDB source (optional, only for USDB songs) --- */
+  usdbId?: number
 }
 
 export interface NoteTrack {

@@ -131,6 +131,30 @@ export const songLibrary = {
     state.countBySource = counts
   },
 
+  /** Replace USDB songs in the library with a fresh catalog. */
+  setUsdbSongs(catalog: import('$lib/ipc/tauri').UsdbCatalogEntry[]) {
+    // Remove old USDB songs, keep local songs
+    const local = state.songs.filter(s => s.sourceId !== 'usdb')
+    const usdbSongs: Song[] = catalog.map(entry => ({
+      id:         String(entry.songId),
+      sourceId:   'usdb',
+      title:      entry.title,
+      artist:     entry.artist,
+      bpm:        0,
+      gap:        0,
+      genre:      entry.genre || undefined,
+      year:       entry.year ? String(entry.year) : undefined,
+      language:   entry.language || undefined,
+      coverPath:  entry.coverUrl || undefined,
+      txtPath:    undefined,
+      audioPath:  undefined,
+      // Mark as USDB so the UI knows to fetch on load
+      usdbId:     entry.songId,
+    } as Song & { usdbId: number }))
+    state.songs = [...local, ...usdbSongs]
+    state.countBySource = { ...state.countBySource, usdb: usdbSongs.length }
+  },
+
   /**
    * Start a background poll that checks source availability every N seconds.
    * If a source goes unavailable its songs are removed from the library.

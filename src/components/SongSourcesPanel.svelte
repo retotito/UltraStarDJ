@@ -1,6 +1,7 @@
 <script lang="ts">
   import { appSettings, type SongSource } from '$lib/stores/settings.svelte'
   import { songLibrary } from '$lib/stores/songs.svelte'
+  import { usdbStore } from '$lib/stores/usdb.svelte'
   import { pickFolder } from '$lib/ipc/tauri'
 
   async function addFolder() {
@@ -53,6 +54,43 @@
     if (e.key === 'Enter') commitRename(id)
     if (e.key === 'Escape') editingId = null
   }
+
+  // ── USDB section ──────────────────────────────────────────────────────────
+  let usdbUsername = $state(usdbStore.username)
+  let usdbPassword = $state(usdbStore.password)
+  let usdbLoginError = $state<string | null>(null)
+
+  async function connectUsdb() {
+    usdbLoginError = null
+    usdbStore.setCredentials(usdbUsername, usdbPassword)
+    const result = await usdbStore.login()
+    if (!result.ok) {
+      usdbLoginError = result.error ?? 'Login failed'
+      return
+    }
+    // After login, start a background sync
+    usdbStore.syncCatalog(false)
+    syncUsdbToLibrary()
+  }
+
+  function disconnectUsdb() {
+    usdbStore.clearCredentials()
+    syncUsdbToLibrary()
+  }
+
+  async function resyncUsdb(force = false) {
+    await usdbStore.syncCatalog(force)
+    syncUsdbToLibrary()
+  }
+
+  function syncUsdbToLibrary() {
+    songLibrary.setUsdbSongs(usdbStore.catalog)
+  }
+
+  // Keep library in sync when catalog changes
+  $effect(() => {
+    songLibrary.setUsdbSongs(usdbStore.catalog)
+  })
 </script>
 
 <div class="sources-panel">
@@ -134,6 +172,70 @@
       <span class="icon icon-sm">refresh</span>
       Rescan
     </button>
+  </div>
+
+  <!-- USDB section -->
+  <div class="usdb-section">
+    <div class="usdb-header">
+      <span class="usdb-badge">USDB</span>
+      <span class="section-title">usdb.animux.de</span>
+      {#if usdbStore.loggedIn}
+        <span class="usdb-status connected">
+          <span class="icon icon-sm">check_circle</span>
+          Connected
+        </span>
+      {/if}
+    </div>
+
+    {#if !usdbStore.loggedIn}
+      <div class="usdb-login-form">
+        <input
+          class="input input-sm"
+          type="text"
+          placeholder="Username"
+          bind:value={usdbUsername}
+        />
+        <input
+          class="input input-sm"
+          type="password"
+          placeholder="Password"
+          bind:value={usdbPassword}
+        />
+        {#if usdbLoginError}
+          <span class="usdb-error text-xs">{usdbLoginError}</span>
+        {/if}
+        <button class="btn btn-primary btn-sm" onclick={connectUsdb}>
+          <span class="icon icon-sm">login</span>
+          Connect
+        </button>
+      </div>
+    {:else}
+      <div class="usdb-connected">
+        <span class="text-xs text-muted">{usdbStore.catalogCount.toLocaleString()} songs</span>
+        {#if usdbStore.syncStatus === 'syncing'}
+          <span class="text-xs text-muted">
+            <span class="icon icon-sm spinning">sync</span>
+            Syncing… {usdbStore.syncFetched > 0 ? `${usdbStore.syncFetched.toLocaleString()} fetched` : ''}
+          </span>
+        {:else if usdbStore.syncError}
+          <span class="text-xs usdb-error">{usdbStore.syncError}</span>
+        {/if}
+        <div class="usdb-actions">
+          <button class="btn btn-sm btn-tonal" onclick={() => resyncUsdb(false)} disabled={usdbStore.syncStatus === 'syncing'}>
+            <span class="icon icon-sm">sync</span>
+            Sync new
+          </button>
+          <button class="btn btn-sm btn-outlined" onclick={() => resyncUsdb(true)} disabled={usdbStore.syncStatus === 'syncing'}>
+            <span class="icon icon-sm">refresh</span>
+            Full resync
+          </button>
+          <button class="btn btn-sm btn-outlined" onclick={disconnectUsdb}>
+            <span class="icon icon-sm">logout</span>
+            Disconnect
+          </button>
+        </div>
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -256,5 +358,62 @@
     display: flex;
     gap: var(--space-2);
     flex-wrap: wrap;
+  }
+
+  /* ── USDB section ── */
+  .usdb-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    padding-top: var(--space-3);
+  }
+
+  .usdb-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .usdb-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    background: #22c55e;
+    color: #fff;
+    border-radius: 4px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+  }
+
+  .usdb-status.connected {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--text-xs);
+    color: #22c55e;
+    margin-left: auto;
+  }
+
+  .usdb-login-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .usdb-connected {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .usdb-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .usdb-error {
+    color: var(--md-sys-color-error);
   }
 </style>

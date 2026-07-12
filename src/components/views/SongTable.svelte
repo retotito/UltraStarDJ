@@ -149,7 +149,13 @@
             {:else if col.key === 'genre'}
               <td class="text-muted">{song.genre ?? '—'}</td>
             {:else if col.key === 'source'}
-              <td class="text-muted">{appSettings.sources.find(s => s.id === song.sourceId)?.label ?? song.sourceId}</td>
+              <td>
+                {#if song.sourceId === 'usdb'}
+                  <span class="usdb-source-badge">USDB</span>
+                {:else}
+                  <span class="text-muted">{appSettings.sources.find(s => s.id === song.sourceId)?.label ?? song.sourceId}</span>
+                {/if}
+              </td>
             {/if}
           {/each}
           <td class="col-actions">
@@ -327,5 +333,15 @@
     height: 1px;
     background: var(--md-sys-color-outline-variant);
     margin: var(--space-1) 0;
+  }
+
+  .usdb-source-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    background: #22c55e;
+    color: #fff;
+    border-radius: 4px;
+    padding: 1px 5px;
   }
 </style>
