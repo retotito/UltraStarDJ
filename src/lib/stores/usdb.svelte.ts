@@ -4,6 +4,7 @@
  */
 
 import { usdbLogin, usdbFetchCatalog, type UsdbCatalogEntry } from '$lib/ipc/tauri'
+import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
 
 const STORAGE_KEY = 'usdb_catalog_v1'
 const MTIME_KEY   = 'usdb_last_mtime'
@@ -24,30 +25,52 @@ function loadCredentials(): UsdbCredentials {
 
 // ── Catalog cache (persisted) ─────────────────────────────────────────────────
 
-function loadCatalog(): UsdbCatalogEntry[] {
+// ── Catalog — IndexedDB (no size limit, handles 15MB+ easily) ────────────────
+const IDB_CATALOG_KEY = 'usdb_catalog_v1'
+const IDB_VERSION_KEY = 'usdb_catalog_version'
+const CATALOG_VERSION = 1  // bump to force full resync on schema change
+
+async function loadCatalogFromIdb(): Promise<UsdbCatalogEntry[]> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as UsdbCatalogEntry[]
-      console.log('[usdb] loadCatalog: found', parsed.length, 'entries in localStorage')
-      return parsed
+    const version = await idbGet<number>(IDB_VERSION_KEY)
+    if (version !== CATALOG_VERSION) {
+      console.log('[usdb] loadCatalog: version mismatch (stored=', version, 'expected=', CATALOG_VERSION, ') — clearing')
+      await idbDel(IDB_CATALOG_KEY)
+      await idbSet(IDB_VERSION_KEY, CATALOG_VERSION)
+      return []
     }
-    console.log('[usdb] loadCatalog: nothing in localStorage')
+    const entries = await idbGet<UsdbCatalogEntry[]>(IDB_CATALOG_KEY)
+    if (entries && entries.length > 0) {
+      // Validate: filter out corrupt entries missing required fields
+      const valid = entries.filter(e => e.songId && e.title && e.artist)
+      if (valid.length !== entries.length) {
+        console.warn('[usdb] loadCatalog: filtered', entries.length - valid.length, 'corrupt entries')
+      }
+      console.log('[usdb] loadCatalog: found', valid.length, 'valid entries in IndexedDB')
+      return valid
+    }
+    console.log('[usdb] loadCatalog: IndexedDB empty')
+    return []
   } catch (e) {
-    console.warn('[usdb] loadCatalog: parse error', e)
+    console.warn('[usdb] loadCatalog: IndexedDB error', e)
+    return []
   }
-  return []
 }
 
-function saveCatalog(entries: UsdbCatalogEntry[]) {
+async function saveCatalogToIdb(entries: UsdbCatalogEntry[]): Promise<void> {
   try {
-    const json = JSON.stringify(entries)
-    console.log('[usdb] saveCatalog: attempting to save', entries.length, 'entries (', Math.round(json.length / 1024), 'KB)')
-    localStorage.setItem(STORAGE_KEY, json)
+    console.log('[usdb] saveCatalog: saving', entries.length, 'entries to IndexedDB')
+    await idbSet(IDB_CATALOG_KEY, entries)
+    await idbSet(IDB_VERSION_KEY, CATALOG_VERSION)
     console.log('[usdb] saveCatalog: saved OK')
   } catch (e) {
-    console.warn('[usdb] saveCatalog: FAILED (quota?)', e)
+    console.error('[usdb] saveCatalog: FAILED', e)
   }
+}
+
+async function clearCatalogFromIdb(): Promise<void> {
+  await idbDel(IDB_CATALOG_KEY)
+  console.log('[usdb] clearCatalog: IndexedDB cleared')
 }
 
 function loadWatermark(): { lastMtime: number; lastSongIds: number[] } {
@@ -70,7 +93,8 @@ function saveWatermark(lastMtime: number, lastSongIds: number[]) {
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 const _creds   = $state<UsdbCredentials>(loadCredentials())
-const _catalog = $state<UsdbCatalogEntry[]>(loadCatalog())
+const _catalog = $state<UsdbCatalogEntry[]>([])  // starts empty; loaded async via initialize()
+let _catalogLoaded = false
 
 type SyncStatus = 'idle' | 'syncing' | 'error'
 
@@ -100,6 +124,28 @@ export const usdbStore = {
     _loggedIn = false
     localStorage.removeItem(CREDS_KEY)
     this.clearCatalog()
+  },
+
+  /** Load catalog from IndexedDB. Call once on app start. */
+  async initialize(): Promise<void> {
+    if (_catalogLoaded) return
+    _catalogLoaded = true
+    const entries = await loadCatalogFromIdb()
+    if (entries.length > 0) {
+      _catalog.length = 0
+      const CHUNK = 1000
+      for (let i = 0; i < entries.length; i += CHUNK) {
+        _catalog.push(...entries.slice(i, i + CHUNK))
+      }
+      // Repair watermark if missing
+      const { lastMtime } = loadWatermark()
+      if (lastMtime === 0 && _catalog.length > 0) {
+        const max = Math.max(..._catalog.map(e => e.usdbMtime))
+        const ids = _catalog.filter(e => e.usdbMtime === max).map(e => e.songId)
+        saveWatermark(max, ids)
+        console.log('[usdb] initialize: repaired missing watermark, lastMtime=', max)
+      }
+    }
   },
 
   // ── Login ─────────────────────────────────────────────────────────────────
@@ -190,7 +236,7 @@ export const usdbStore = {
         saveWatermark(maxMtime, atMax)
       }
 
-      saveCatalog([..._catalog])
+      await saveCatalogToIdb([..._catalog])
       _syncStatus = 'idle'
     } catch (e) {
       _syncError  = String(e)
@@ -199,9 +245,9 @@ export const usdbStore = {
     }
   },
 
-  clearCatalog() {
+  async clearCatalog() {
     _catalog.length = 0
-    saveCatalog([])
+    await clearCatalogFromIdb()
     saveWatermark(0, [])
   },
 

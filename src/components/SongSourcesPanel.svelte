@@ -106,11 +106,11 @@
     songLibrary.setUsdbSongs(usdbStore.catalog)
   }
 
-  // Sync catalog to library on component mount (in case catalog was loaded from localStorage)
-  syncUsdbToLibrary()
-
-  // Auto-login with saved credentials on mount
+  // Initialize: load catalog from IndexedDB, then sync library
   ;(async () => {
+    await usdbStore.initialize()
+    syncUsdbToLibrary()
+    // Auto-login with saved credentials on mount
     if (!usdbStore.loggedIn && usdbStore.username) {
       const ok = await usdbStore.autoLogin()
       if (ok) {
