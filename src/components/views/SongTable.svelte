@@ -116,6 +116,11 @@
   const topPad   = $derived(startIdx * ROW_H)
   const botPad   = $derived(Math.max(0, (sorted.length - endIdx) * ROW_H))
   const visible  = $derived(sorted.slice(startIdx, endIdx))
+
+  function sortLabel(key: SortKey) {
+    if (sortKey !== key) return ''
+    return sortAsc ? ' ▲' : ' ▼'
+  }
 </script>
 
 <div class="table-wrap" bind:this={wrapEl} onscroll={(e) => scrollTop = (e.currentTarget as HTMLElement).scrollTop}>
