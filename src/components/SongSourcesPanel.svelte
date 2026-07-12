@@ -89,6 +89,17 @@
 
   // Sync catalog to library on component mount (in case catalog was loaded from localStorage)
   syncUsdbToLibrary()
+
+  // Auto-login with saved credentials on mount
+  ;(async () => {
+    if (!usdbStore.loggedIn && usdbStore.username) {
+      const ok = await usdbStore.autoLogin()
+      if (ok) {
+        await usdbStore.syncCatalog(false)
+        syncUsdbToLibrary()
+      }
+    }
+  })()
 </script>
 
 <div class="sources-panel">

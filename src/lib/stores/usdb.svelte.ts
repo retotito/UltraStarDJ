@@ -101,6 +101,18 @@ export const usdbStore = {
     }
   },
 
+  /** Attempt silent login with saved credentials (on app start). */
+  async autoLogin(): Promise<boolean> {
+    if (!_creds.username || !_creds.password) return false
+    try {
+      const ok = await usdbLogin(_creds.username, _creds.password)
+      _loggedIn = ok
+      return ok
+    } catch {
+      return false
+    }
+  },
+
   // ── Catalog ───────────────────────────────────────────────────────────────
   get catalog()        { return _catalog },
   get catalogCount()   { return _catalog.length },
@@ -123,16 +135,25 @@ export const usdbStore = {
     _syncStatus     = 'syncing'
     _syncError      = null
     _syncFetched    = 0
-    _syncIsFullSync = (force || loadWatermark().lastMtime === 0)
+
+    // If catalog is empty (failed to load from localStorage) treat as full sync
+    const catalogEmpty = _catalog.length === 0
+    const { lastMtime, lastSongIds } = (force || catalogEmpty)
+      ? { lastMtime: 0, lastSongIds: [] }
+      : loadWatermark()
+    _syncIsFullSync = (force || catalogEmpty || lastMtime === 0)
 
     try {
-      const { lastMtime, lastSongIds } = force ? { lastMtime: 0, lastSongIds: [] } : loadWatermark()
       const entries = await usdbFetchCatalog(lastMtime, lastSongIds)
+      console.log('[usdb] syncCatalog got', entries.length, 'entries, force=', force, 'lastMtime=', lastMtime)
 
-      if (force || lastMtime === 0) {
-        // Full sync: replace catalog
+      if (force || lastMtime === 0 || catalogEmpty) {
+        // Full sync: replace catalog in chunks (avoid stack overflow with 27k entries)
         _catalog.length = 0
-        _catalog.push(...entries)
+        const CHUNK = 1000
+        for (let i = 0; i < entries.length; i += CHUNK) {
+          _catalog.push(...entries.slice(i, i + CHUNK))
+        }
       } else {
         // Incremental: merge
         const updatedMap = new Map(entries.map(e => [e.songId, e]))
@@ -158,6 +179,7 @@ export const usdbStore = {
     } catch (e) {
       _syncError  = String(e)
       _syncStatus = 'error'
+      console.error('[usdb] syncCatalog error:', e)
     }
   },
 
