@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
+use tauri::Emitter;
 
 mod audio;
 mod usdb;
@@ -20,14 +21,17 @@ async fn usdb_login(
 
 #[tauri::command]
 async fn usdb_fetch_catalog(
+    app: tauri::AppHandle,
     state: tauri::State<'_, UsdbState>,
     last_mtime: i64,
     last_song_ids: Vec<u32>,
 ) -> Result<Vec<usdb::UsdbCatalogEntry>, String> {
     let client = state.0.lock().await;
     if last_mtime == 0 {
-        // Full sync
-        client.fetch_all_songs(|_fetched, _total| {}).await
+        // Full sync — emit progress events per page
+        client.fetch_all_songs(|fetched, total| {
+            let _ = app.emit("usdb:progress", serde_json::json!({ "fetched": fetched, "total": total }));
+        }).await
     } else {
         // Incremental sync
         client.fetch_updated_songs(last_mtime, &last_song_ids).await

@@ -5,6 +5,7 @@
 
 import { usdbLogin, usdbFetchCatalog, type UsdbCatalogEntry } from '$lib/ipc/tauri'
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
+import { listen } from '@tauri-apps/api/event'
 
 const STORAGE_KEY = 'usdb_catalog_v1'
 const MTIME_KEY   = 'usdb_last_mtime'
@@ -208,7 +209,17 @@ export const usdbStore = {
 
     try {
       console.log('[usdb] syncCatalog: calling usdbFetchCatalog, lastMtime=', lastMtime, 'fullSync=', _syncIsFullSync)
+
+      // Subscribe to per-page progress events from Rust
+      const unlisten = _syncIsFullSync
+        ? await listen<{ fetched: number; total: number }>('usdb:progress', e => {
+            _syncFetched = e.payload.fetched
+            console.log('[usdb] progress:', e.payload.fetched, '/', e.payload.total)
+          })
+        : null
+
       const entries = await usdbFetchCatalog(lastMtime, lastSongIds)
+      unlisten?.()
       console.log('[usdb] syncCatalog got', entries.length, 'entries, force=', force, 'lastMtime=', lastMtime)
 
       if (force || lastMtime === 0 || catalogEmpty) {
