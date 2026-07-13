@@ -469,3 +469,36 @@ export async function usdbGetSongTxt(songId: number): Promise<string> {
   return await invoke<string>('usdb_get_song_txt', { songId })
 }
 
+// ── Songbook (local network sharing) ─────────────────────────────────────────
+
+export interface SongbookEntry {
+  id: string
+  title: string
+  artist: string
+  year?: number
+  language?: string
+  genre?: string
+  usdbViews?: number
+  sourceId: string
+}
+
+/** Start the songbook HTTP server. Returns the URL guests should open. */
+export async function songbookStart(songs: SongbookEntry[]): Promise<string> {
+  return await invoke<string>('songbook_start', { songs })
+}
+
+/** Stop the songbook HTTP server. */
+export async function songbookStop(): Promise<void> {
+  await invoke('songbook_stop')
+}
+
+/** Update the song list served by the running songbook server. */
+export async function songbookUpdateSongs(songs: SongbookEntry[]): Promise<void> {
+  await invoke('songbook_update_songs', { songs })
+}
+
+/** Get the local network URL without starting the server. */
+export async function songbookGetUrl(): Promise<string | null> {
+  return await invoke<string | null>('songbook_get_url')
+}
+

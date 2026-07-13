@@ -5,9 +5,42 @@ use tauri::Emitter;
 
 mod audio;
 mod usdb;
+mod songbook;
 
 // ── USDB managed state ────────────────────────────────────────────────────────
 struct UsdbState(tokio::sync::Mutex<usdb::UsdbClient>);
+
+// ── Songbook state ────────────────────────────────────────────────────────────
+struct SongbookServerState(songbook::SongbookState);
+
+#[tauri::command]
+async fn songbook_start(state: tauri::State<'_, SongbookServerState>, songs: Vec<songbook::SongEntry>) -> Result<String, String> {
+    let sb = &state.0;
+    *sb.songs.lock().unwrap() = songs;
+    songbook::start_server(sb.clone());
+    let ip = local_ip_address::local_ip()
+        .map(|ip| ip.to_string())
+        .unwrap_or_else(|_| "localhost".to_string());
+    Ok(format!("http://{}:{}", ip, songbook::SONGBOOK_PORT))
+}
+
+#[tauri::command]
+async fn songbook_stop(state: tauri::State<'_, SongbookServerState>) -> Result<(), String> {
+    songbook::stop_server(&state.0);
+    Ok(())
+}
+
+#[tauri::command]
+fn songbook_update_songs(state: tauri::State<'_, SongbookServerState>, songs: Vec<songbook::SongEntry>) {
+    *state.0.songs.lock().unwrap() = songs;
+}
+
+#[tauri::command]
+fn songbook_get_url() -> Option<String> {
+    local_ip_address::local_ip()
+        .map(|ip| format!("http://{}:{}", ip, songbook::SONGBOOK_PORT))
+        .ok()
+}
 
 #[tauri::command]
 async fn usdb_login(
@@ -151,10 +184,12 @@ fn delete_temp_file(path: String) {
 pub fn run() {
     let audio_state = Arc::new(audio::AudioState::new());
     let usdb_state = UsdbState(tokio::sync::Mutex::new(usdb::UsdbClient::new()));
+    let songbook_state = SongbookServerState(songbook::SongbookState::new());
 
     tauri::Builder::default()
         .manage(audio_state.clone())
         .manage(usdb_state)
+        .manage(songbook_state)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -212,6 +247,10 @@ pub fn run() {
             usdb_login,
             usdb_fetch_catalog,
             usdb_get_song_txt,
+            songbook_start,
+            songbook_stop,
+            songbook_update_songs,
+            songbook_get_url,
         ])
         .setup(move |app| {
             audio::start_hotplug_watcher(app.handle().clone(), audio_state);

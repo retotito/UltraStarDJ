@@ -9,6 +9,8 @@
   import SongSourcesPanel from '$components/SongSourcesPanel.svelte'
   import { usdbStore } from '$lib/stores/usdb.svelte'
   import { tooltip } from '$lib/tooltip'
+  import SongbookView from '$components/views/SongbookView.svelte'
+  import { songbookStore } from '$lib/stores/songbook.svelte'
 
   let showSettings = $state(false)
   let showLayoutMenu = $state(false)
@@ -16,6 +18,7 @@
   let showPlayers = $state(false)
   let showDisplays = $state(false)
   let showAudioOutput = $state(false)
+  let showSongbook = $state(false)
 
   // Lock audio config popups while a song is playing or paused
   const audioLocked = $derived(playback.status === 'playing' || playback.status === 'paused')
@@ -31,6 +34,7 @@
     showPlayers = false
     showDisplays = false
     showAudioOutput = false
+    showSongbook = false
   }
 </script>
 
@@ -107,6 +111,16 @@
   <div class="sidebar-bottom">
     <button
       class="btn btn-icon"
+      class:is-active={showSongbook}
+      class:songbook-live={songbookStore.active}
+      use:tooltip={'Songbook'}
+      aria-label="Songbook"
+      onclick={() => { const v = !showSongbook; closeAll(); showSongbook = v }}
+    >
+      <span class="icon">share</span>
+    </button>
+    <button
+      class="btn btn-icon"
       use:tooltip={'Settings'}
       aria-label="Settings"
       onclick={() => { closeAll(); showSettings = true }}
@@ -180,6 +194,14 @@
   <div class="popover-backdrop" onclick={() => showAudioOutput = false}></div>
   <div class="audio-output-popover">
     <AudioOutputView onclose={() => showAudioOutput = false} />
+  </div>
+{/if}
+
+{#if showSongbook}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="popover-backdrop" onclick={() => showSongbook = false}></div>
+  <div class="songbook-popover">
+    <SongbookView onclose={() => showSongbook = false} />
   </div>
 {/if}
 
@@ -310,6 +332,18 @@
     z-index: var(--z-overlay);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     overflow: hidden;
+  }
+
+  .songbook-popover {
+    position: fixed;
+    left: 74px;
+    bottom: 60px;
+    z-index: var(--z-overlay);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  }
+
+  .songbook-live {
+    color: var(--md-sys-color-primary) !important;
   }
 
   .popover-backdrop {
