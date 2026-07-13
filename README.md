@@ -1,7 +1,97 @@
-# Tauri + SvelteKit + TypeScript
+# UltrastarDJ
 
-This template should help get you started developing with Tauri, SvelteKit and TypeScript in Vite.
+> A desktop karaoke DJ app — manage your song library, assign microphones, run a singer display, and score live performances.
 
-## Recommended IDE Setup
+<!-- Hero mockup — replace with actual screenshot -->
+<p align="center">
+  <img src="docs/screenshots/UltrastarDJ%20mockup.png" alt="UltrastarDJ — game view" width="100%">
+</p>
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+---
+
+## Workflow
+
+<table>
+  <tr>
+    <td align="center">
+      <strong>1. Select song sources</strong><br><br>
+      <a href="docs/screenshots/01-load%20song%20sources.png">
+        <img src="docs/screenshots/01-load%20song%20sources.png" alt="Select song sources" width="100%">
+      </a>
+    </td>
+    <td align="center">
+      <strong>2. Assign microphones to players</strong><br><br>
+      <a href="docs/screenshots/02-assigne%20microphones%20to%20players.png">
+        <img src="docs/screenshots/02-assigne%20microphones%20to%20players.png" alt="Assign microphones to players" width="100%">
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <strong>3. Select preview / player audio output</strong><br><br>
+      <a href="docs/screenshots/03-select%20preview%20audio%20output.png">
+        <img src="docs/screenshots/03-select%20preview%20audio%20output.png" alt="Select audio output" width="100%">
+      </a>
+    </td>
+    <td align="center">
+      <strong>4. Assign players to displays</strong><br><br>
+      <a href="docs/screenshots/04-assigne%20players%20to%20screens.png">
+        <img src="docs/screenshots/04-assigne%20players%20to%20screens.png" alt="Assign players to displays" width="100%">
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <strong>5. Load song into player</strong><br><br>
+      <a href="docs/screenshots/05-load%20song%20into%20player.png">
+        <img src="docs/screenshots/05-load%20song%20into%20player.png" alt="Load song into player" width="100%">
+      </a>
+    </td>
+    <td align="center">
+      <strong>6. Play — 1 or 2 displays</strong><br><br>
+      <a href="docs/screenshots/06-play%20game.png">
+        <img src="docs/screenshots/06-play%20game.png" alt="Game view with beamer" width="100%">
+      </a>
+    </td>
+  </tr>
+</table>
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Desktop shell | [Tauri 2](https://tauri.app) (Rust) |
+| Frontend | [Svelte 5](https://svelte.dev) + TypeScript |
+| Routing | SvelteKit with `adapter-static` |
+| UI components | [@material/web](https://github.com/material-components/material-web) |
+| Song format | [UltraStar](https://ultrastar.eu) `.txt` |
+
+## Architecture
+
+Two windows, one codebase:
+
+- **DJ window** (`/`) — library, queue, player controls, mic mixer
+- **Beamer window** (`/beamer`) — singer display with synced lyrics and scoring
+
+All IPC between windows goes through `src/lib/ipc/tauri.ts`. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
+
+## Development setup
+
+```bash
+# Install dependencies
+npm install
+
+# Run in dev mode (Tauri + Vite)
+npm run tauri dev
+
+# Build for production
+npm run tauri build
+```
+
+Requires: [Rust](https://rustup.rs) · [Node.js ≥ 20](https://nodejs.org) · [Tauri CLI prerequisites](https://tauri.app/start/prerequisites/)
+
+## Recommended IDE
+
+[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
