@@ -111,7 +111,7 @@
             alt="QR code" width="180" height="180"
           />
         </div>
-        <p class="qr-note">Tunnel via localtunnel.me · QR code requires internet</p>
+        <p class="qr-note">Tunnel via bore.pub · QR code requires internet</p>
       {/if}
     </section>
 
@@ -244,90 +244,6 @@
     color: var(--md-sys-color-on-surface-variant);
     opacity: 0.6;
     text-align: center;
-  }
-
-  .spinning {
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-</style>
-  }
-
-  .description {
-    font-size: var(--text-sm);
-    color: var(--md-sys-color-on-surface-variant);
-    line-height: 1.5;
-  }
-
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-
-  .toggle-label {
-    font-size: var(--text-sm);
-    color: var(--md-sys-color-on-surface);
-  }
-
-  .url-block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .url-label {
-    font-size: var(--text-xs);
-    color: var(--md-sys-color-on-surface-variant);
-  }
-
-  .url-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    background: var(--md-sys-color-surface-container);
-    border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-3);
-  }
-
-  .url-text {
-    flex: 1;
-    font-size: var(--text-xs);
-    color: var(--md-sys-color-primary);
-    word-break: break-all;
-  }
-
-  .qr-block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    align-items: center;
-  }
-
-  .qr-label {
-    font-size: var(--text-xs);
-    color: var(--md-sys-color-on-surface-variant);
-    align-self: flex-start;
-  }
-
-  .qr-wrap {
-    background: white;
-    border-radius: var(--radius-sm);
-    padding: var(--space-2);
-    display: inline-block;
-  }
-
-  .qr-img { display: block; }
-
-  .qr-note {
-    font-size: 11px;
-    color: var(--md-sys-color-on-surface-variant);
-    opacity: 0.6;
   }
 
   .spinning {
