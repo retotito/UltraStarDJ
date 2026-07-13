@@ -502,3 +502,21 @@ export async function songbookGetUrl(): Promise<string | null> {
   return await invoke<string | null>('songbook_get_url')
 }
 
+// ── Tunnel (public access via localtunnel.me) ─────────────────────────────────
+
+export interface TunnelInfo {
+  url: string
+  pin: string
+}
+
+/** Start a public tunnel. Also starts the songbook server if not running.
+ *  Returns the public URL and a 4-digit party PIN. */
+export async function tunnelStart(songs: SongbookEntry[]): Promise<TunnelInfo> {
+  return await invoke<TunnelInfo>('tunnel_start', { songs })
+}
+
+/** Stop the public tunnel and clear the PIN. */
+export async function tunnelStop(): Promise<void> {
+  await invoke('tunnel_stop')
+}
+

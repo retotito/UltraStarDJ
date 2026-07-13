@@ -6,12 +6,18 @@ use tauri::Emitter;
 mod audio;
 mod usdb;
 mod songbook;
+mod tunnel;
 
 // ── USDB managed state ────────────────────────────────────────────────────────
 struct UsdbState(tokio::sync::Mutex<usdb::UsdbClient>);
 
 // ── Songbook state ────────────────────────────────────────────────────────────
 struct SongbookServerState(songbook::SongbookState);
+
+// ── Tunnel state ─────────────────────────────────────────────────────────────
+struct TunnelServerState {
+    handle: std::sync::Arc<std::sync::Mutex<Option<tunnel::TunnelHandle>>>,
+}
 
 #[tauri::command]
 async fn songbook_start(state: tauri::State<'_, SongbookServerState>, songs: Vec<songbook::SongEntry>) -> Result<String, String> {
@@ -33,6 +39,47 @@ async fn songbook_stop(state: tauri::State<'_, SongbookServerState>) -> Result<(
 #[tauri::command]
 fn songbook_update_songs(state: tauri::State<'_, SongbookServerState>, songs: Vec<songbook::SongEntry>) {
     *state.0.songs.lock().unwrap() = songs;
+}
+
+#[tauri::command]
+async fn tunnel_start(
+    tunnel_state: tauri::State<'_, TunnelServerState>,
+    sb_state: tauri::State<'_, SongbookServerState>,
+    songs: Vec<songbook::SongEntry>,
+) -> Result<serde_json::Value, String> {
+    // Stop any existing tunnel
+    {
+        let mut handle = tunnel_state.handle.lock().unwrap();
+        if let Some(h) = handle.take() {
+            h.stop();
+        }
+    }
+    // Ensure songbook server is running
+    let sb = &sb_state.0;
+    *sb.songs.lock().unwrap() = songs;
+    if sb.shutdown_tx.lock().unwrap().is_none() {
+        songbook::start_server(sb.clone());
+    }
+    // Start the public tunnel
+    let handle = tunnel::start_tunnel(songbook::SONGBOOK_PORT).await?;
+    let url = handle.url.clone();
+    let pin = handle.pin.clone();
+    *sb.pin.lock().unwrap() = Some(pin.clone());
+    *tunnel_state.handle.lock().unwrap() = Some(handle);
+    Ok(serde_json::json!({ "url": url, "pin": pin }))
+}
+
+#[tauri::command]
+async fn tunnel_stop(
+    tunnel_state: tauri::State<'_, TunnelServerState>,
+    sb_state: tauri::State<'_, SongbookServerState>,
+) -> Result<(), String> {
+    let mut handle = tunnel_state.handle.lock().unwrap();
+    if let Some(h) = handle.take() {
+        h.stop();
+    }
+    *sb_state.0.pin.lock().unwrap() = None;
+    Ok(())
 }
 
 #[tauri::command]
@@ -185,11 +232,15 @@ pub fn run() {
     let audio_state = Arc::new(audio::AudioState::new());
     let usdb_state = UsdbState(tokio::sync::Mutex::new(usdb::UsdbClient::new()));
     let songbook_state = SongbookServerState(songbook::SongbookState::new());
+    let tunnel_state = TunnelServerState {
+        handle: std::sync::Arc::new(std::sync::Mutex::new(None)),
+    };
 
     tauri::Builder::default()
         .manage(audio_state.clone())
         .manage(usdb_state)
         .manage(songbook_state)
+        .manage(tunnel_state)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -251,6 +302,8 @@ pub fn run() {
             songbook_stop,
             songbook_update_songs,
             songbook_get_url,
+            tunnel_start,
+            tunnel_stop,
         ])
         .setup(move |app| {
             audio::start_hotplug_watcher(app.handle().clone(), audio_state);

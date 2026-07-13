@@ -1,9 +1,14 @@
-import { songbookStart, songbookStop, songbookUpdateSongs, type SongbookEntry } from '$lib/ipc/tauri'
+import { songbookStart, songbookStop, songbookUpdateSongs, tunnelStart, tunnelStop, type SongbookEntry } from '$lib/ipc/tauri'
 import { songLibrary } from '$lib/stores/songs.svelte'
 
 let _active = $state(false)
 let _url = $state<string | null>(null)
 let _loading = $state(false)
+
+let _tunnelActive = $state(false)
+let _tunnelUrl = $state<string | null>(null)
+let _tunnelPin = $state<string | null>(null)
+let _tunnelLoading = $state(false)
 
 function toEntries(): SongbookEntry[] {
   return songLibrary.songs.map(s => ({
@@ -22,6 +27,11 @@ export const songbookStore = {
   get active() { return _active },
   get url() { return _url },
   get loading() { return _loading },
+
+  get tunnelActive() { return _tunnelActive },
+  get tunnelUrl() { return _tunnelUrl },
+  get tunnelPin() { return _tunnelPin },
+  get tunnelLoading() { return _tunnelLoading },
 
   async start() {
     if (_active) return
@@ -61,5 +71,39 @@ export const songbookStore = {
     } catch (e) {
       console.error('[songbook] syncSongs failed:', e)
     }
+  },
+
+  async startTunnel() {
+    if (_tunnelActive) return
+    _tunnelLoading = true
+    try {
+      const info = await tunnelStart(toEntries())
+      _tunnelUrl = info.url
+      _tunnelPin = info.pin
+      _tunnelActive = true
+      // Songbook server is auto-started by the Rust command
+      _active = true
+    } catch (e) {
+      console.error('[tunnel] start failed:', e)
+    } finally {
+      _tunnelLoading = false
+    }
+  },
+
+  async stopTunnel() {
+    if (!_tunnelActive) return
+    try {
+      await tunnelStop()
+    } catch (e) {
+      console.error('[tunnel] stop failed:', e)
+    }
+    _tunnelActive = false
+    _tunnelUrl = null
+    _tunnelPin = null
+  },
+
+  async toggleTunnel() {
+    if (_tunnelActive) await this.stopTunnel()
+    else await this.startTunnel()
   },
 }
