@@ -83,10 +83,18 @@ All IPC between windows goes through `src/lib/ipc/tauri.ts`. See [docs/ARCHITECT
 # Install dependencies
 npm install
 
+# Download a static FFmpeg binary into src-tauri/resources/ (required once)
+zsh scripts/download-ffmpeg.sh        # macOS
+# scripts/download-ffmpeg.ps1         # Windows
+
 # Run in dev mode (Tauri + Vite)
+# In dev, FFmpeg falls back to any system `ffmpeg` on your PATH if the
+# bundled binary is not present. Install via Homebrew: brew install ffmpeg
 npm run tauri dev
 
 # Build for production
+# The static FFmpeg binary from src-tauri/resources/ is bundled automatically
+# by Tauri as a resource. Run the download script before building.
 npm run tauri build
 ```
 
