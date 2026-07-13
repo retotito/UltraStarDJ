@@ -28,7 +28,7 @@
   </tr>
   <tr>
     <td align="center">
-      <strong>3. Select preview / player audio output</strong><br><br>
+      <strong>3. Select preview player audio output</strong><br><br>
       <a href="docs/screenshots/03-select%20preview%20audio%20output.png">
         <img src="docs/screenshots/03-select%20preview%20audio%20output.png" alt="Select audio output" width="100%">
       </a>
