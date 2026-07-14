@@ -74,24 +74,24 @@
 
   // Plyr action — YouTube embed (preview only)
   function plyrYoutubeAction(node: HTMLDivElement, youtubeId: string) {
+    console.log('[PreviewPlayer] YouTube init — origin:', window.location.origin, 'videoId:', youtubeId)
     const instance = new Plyr(node, {
       controls: ['play', 'progress', 'current-time', 'duration'],
       autoplay: false,
     })
-    // Set lowest quality once the IFrame player is ready (preview — no need for HD)
     instance.once('ready', () => {
-      try {
-        const yt = (instance as any).getInternalPlayer()
-        yt?.setPlaybackQuality?.('tiny')
-      } catch {}
+      console.log('[PreviewPlayer] YouTube Plyr ready')
+      try { (instance as any).getInternalPlayer()?.setPlaybackQuality?.('tiny') } catch {}
     })
-    return {
-      destroy() { try { instance.destroy() } catch {} },
-    }
+    instance.on('playing', () => console.log('[PreviewPlayer] YouTube playing'))
+    instance.on('pause',   () => console.log('[PreviewPlayer] YouTube paused'))
+    instance.on('ended',   () => console.log('[PreviewPlayer] YouTube ended'))
+    instance.on('error',   (e: any) => console.error('[PreviewPlayer] YouTube error', e))
+    return { destroy() { try { instance.destroy() } catch {} } }
   }
 
+  // Plyr action — audio/video files
   function plyrAction(
-    node: HTMLAudioElement | HTMLVideoElement,
     params: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }
   ) {
     const instance = new Plyr(node, {

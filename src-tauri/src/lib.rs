@@ -157,10 +157,12 @@ fn mime_for_ext(ext: &str) -> &'static str {
 fn ffmpeg_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
 
+    // Tauri 2 bundles "resources/ffmpeg" preserving the subdirectory,
+    // so the file lands at {resource_dir}/resources/ffmpeg inside the .app.
     #[cfg(target_os = "windows")]
-    let candidate = resource_dir.join("ffmpeg.exe");
+    let candidate = resource_dir.join("resources").join("ffmpeg.exe");
     #[cfg(not(target_os = "windows"))]
-    let candidate = resource_dir.join("ffmpeg");
+    let candidate = resource_dir.join("resources").join("ffmpeg");
 
     if candidate.exists() {
         return Ok(candidate);
@@ -236,7 +238,19 @@ pub fn run() {
         handle: std::sync::Arc::new(std::sync::Mutex::new(None)),
     };
 
-    tauri::Builder::default()
+    // In production, pick a free port so the app serves from http://localhost:PORT
+    // instead of tauri://localhost — this makes YouTube embeds work.
+    // The localhost-ipc capability file grants IPC access to http://localhost:**.
+    #[cfg(not(dev))]
+    let port: u16 = portpicker::pick_unused_port().expect("failed to find unused port");
+
+    // Build the plugin chain. tauri-plugin-localhost is only registered in
+    // production — in dev the Vite dev server handles asset serving.
+    let mut builder = tauri::Builder::default();
+    #[cfg(not(dev))]
+    { builder = builder.plugin(tauri_plugin_localhost::Builder::new(port).build()); }
+
+    builder
         .manage(audio_state.clone())
         .manage(usdb_state)
         .manage(songbook_state)
@@ -257,27 +271,72 @@ pub fn run() {
             } else {
                 format!("/{}", decoded)
             };
-            match std::fs::read(&path) {
-                Ok(data) => {
-                    let ext = std::path::Path::new(&path)
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("");
-                    let mime = mime_for_ext(ext);
-                    tauri::http::Response::builder()
-                        .header("Content-Type", mime)
-                        .header("Access-Control-Allow-Origin", "*")
-                        .body(data)
-                        .unwrap()
+
+            let ext = std::path::Path::new(&path)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
+            let mime = mime_for_ext(ext);
+
+            let file_len = match std::fs::metadata(&path) {
+                Ok(m) => m.len(),
+                Err(e) => return tauri::http::Response::builder()
+                    .status(404)
+                    .header("Content-Type", "text/plain")
+                    .body(format!("Not found: {}", e).into_bytes())
+                    .unwrap(),
+            };
+
+            // Parse optional Range header for seeking support
+            let range_header = request.headers()
+                .get("Range")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.strip_prefix("bytes="))
+                .map(|s| s.to_string());
+
+            let (start, end, is_range) = if let Some(range) = range_header {
+                let parts: Vec<&str> = range.splitn(2, '-').collect();
+                let s: u64 = parts.get(0).and_then(|v| v.parse().ok()).unwrap_or(0);
+                let e: u64 = parts.get(1).and_then(|v| v.parse().ok()).unwrap_or(file_len - 1);
+                (s, e.min(file_len - 1), true)
+            } else {
+                (0, file_len - 1, false)
+            };
+
+            let chunk_len = end - start + 1;
+
+            use std::io::{Read, Seek, SeekFrom};
+            let data = match std::fs::File::open(&path) {
+                Ok(mut f) => {
+                    let mut buf = vec![0u8; chunk_len as usize];
+                    if f.seek(SeekFrom::Start(start)).is_err() || f.read_exact(&mut buf).is_err() {
+                        return tauri::http::Response::builder()
+                            .status(416)
+                            .body(b"Range not satisfiable".to_vec())
+                            .unwrap();
+                    }
+                    buf
                 }
-                Err(e) => {
-                    tauri::http::Response::builder()
-                        .status(404)
-                        .header("Content-Type", "text/plain")
-                        .body(format!("Not found: {}", e).into_bytes())
-                        .unwrap()
-                }
+                Err(e) => return tauri::http::Response::builder()
+                    .status(404)
+                    .header("Content-Type", "text/plain")
+                    .body(format!("Not found: {}", e).into_bytes())
+                    .unwrap(),
+            };
+
+            let mut builder = tauri::http::Response::builder()
+                .header("Content-Type", mime)
+                .header("Accept-Ranges", "bytes")
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Content-Length", chunk_len.to_string());
+
+            if is_range {
+                builder = builder
+                    .status(206)
+                    .header("Content-Range", format!("bytes {}-{}/{}", start, end, file_len));
             }
+
+            builder.body(data).unwrap()
         })
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -307,6 +366,36 @@ pub fn run() {
         ])
         .setup(move |app| {
             audio::start_hotplug_watcher(app.handle().clone(), audio_state);
+            // Auto-start the songbook server (YouTube proxy at /youtube).
+            // Must be spawned on Tauri's async runtime since setup() is synchronous.
+            let sb = app.state::<SongbookServerState>().inner().0.clone();
+            tauri::async_runtime::spawn(async move {
+                songbook::start_server(sb);
+            });
+
+            // Create the main window dynamically.
+            //   dev:  WebviewUrl::App  → Vite dev server (http://localhost:1420)
+            //   prod: WebviewUrl::External → tauri-plugin-localhost (http://localhost:PORT)
+            //   IPC permissions for the localhost origin are granted via
+            //   capabilities/localhost-ipc.json (http://localhost:**).
+            #[cfg(not(dev))]
+            let webview_url = {
+                use tauri::{Url, WebviewUrl};
+                let url: Url = format!("http://localhost:{}", port).parse().unwrap();
+                WebviewUrl::External(url)
+            };
+            #[cfg(dev)]
+            let webview_url = tauri::WebviewUrl::App(std::path::PathBuf::from("/"));
+
+            tauri::WebviewWindowBuilder::new(app, "main", webview_url)
+                .title("UltrastarDJ")
+                .inner_size(1280.0, 800.0)
+                .maximized(true)
+                .min_inner_size(900.0, 600.0)
+                .accept_first_mouse(true)
+                .devtools(true)
+                .build()?;
+
             Ok(())
         })
         .run(tauri::generate_context!())

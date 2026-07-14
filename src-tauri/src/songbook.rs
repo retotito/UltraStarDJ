@@ -148,6 +148,96 @@ async fn get_index() -> Html<&'static str> {
     Html(GUEST_HTML)
 }
 
+/// Minimal YouTube IFrame proxy page served from http://localhost:8080/youtube
+/// YouTube allows embedding from http://localhost, so this avoids error 153
+/// that occurs when the embedding origin is tauri://localhost.
+/// The page communicates with the parent via postMessage.
+/// Query params: ?videoId=XXX&controls=1 (optional, for preview player)
+async fn get_youtube_proxy(Query(params): Query<std::collections::HashMap<String, String>>) -> impl IntoResponse {
+    let video_id = params.get("videoId").cloned().unwrap_or_default();
+    let controls = if params.get("controls").map(|v| v == "1").unwrap_or(false) { 1 } else { 0 };
+    let autoload = if video_id.is_empty() { "false" } else { "true" };
+    let html = format!(r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  html, body {{ width: 100%; height: 100%; background: #000; overflow: hidden; }}
+  #player {{ width: 100%; height: 100%; }}
+</style>
+</head>
+<body>
+<div id="player"></div>
+<script>
+  var ytPlayer = null;
+  var initialVideoId = '{video_id}';
+  var controls = {controls};
+  var autoload = {autoload};
+
+  function onYouTubeIframeAPIReady() {{
+    if (autoload && initialVideoId) loadVideo(initialVideoId);
+  }}
+
+  function loadVideo(videoId, startSeconds) {{
+    if (ytPlayer) {{
+      ytPlayer.loadVideoById({{ videoId: videoId, startSeconds: startSeconds || 0 }});
+      return;
+    }}
+    ytPlayer = new YT.Player('player', {{
+      videoId: videoId,
+      playerVars: {{
+        autoplay: 0, mute: 0, controls: controls,
+        disablekb: controls ? 0 : 1, fs: 0, rel: 0,
+        start: startSeconds || 0,
+      }},
+      events: {{
+        onReady: function() {{
+          ytPlayer.setPlaybackQuality('tiny');
+          parent.postMessage({{ type: 'yt-ready' }}, '*');
+        }},
+        onStateChange: function(e) {{
+          parent.postMessage({{ type: 'yt-state', data: e.data }}, '*');
+        }},
+        onError: function(e) {{
+          parent.postMessage({{ type: 'yt-error', data: e.data }}, '*');
+        }},
+      }},
+    }});
+  }}
+
+  window.addEventListener('message', function(e) {{
+    var msg = e.data;
+    if (!msg || !msg.cmd) return;
+    switch (msg.cmd) {{
+      case 'load':
+        loadVideo(msg.videoId, msg.start);
+        break;
+      case 'play':   if (ytPlayer) ytPlayer.playVideo(); break;
+      case 'pause':  if (ytPlayer) ytPlayer.pauseVideo(); break;
+      case 'stop':   if (ytPlayer) ytPlayer.stopVideo(); break;
+      case 'volume': if (ytPlayer) ytPlayer.setVolume(msg.value); break;
+      case 'getTime':
+        parent.postMessage({{ type: 'yt-time', t: ytPlayer ? ytPlayer.getCurrentTime() : 0 }}, '*');
+        break;
+    }}
+  }});
+
+  var tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+</script>
+</body>
+</html>"#, video_id = video_id, controls = controls, autoload = autoload);
+
+    axum::response::Response::builder()
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Access-Control-Allow-Origin", "*")
+        .body(axum::body::Body::from(html))
+        .unwrap()
+}
+
 // ── Start / Stop ─────────────────────────────────────────────────────────────
 
 pub fn start_server(state: SongbookState) {
@@ -156,6 +246,7 @@ pub fn start_server(state: SongbookState) {
 
     let app = Router::new()
         .route("/", get(get_index))
+        .route("/youtube", get(get_youtube_proxy))
         .route("/api/songs", get(get_songs))
         .route("/api/filters", get(get_filters))
         .route("/api/verify-pin", post(verify_pin))

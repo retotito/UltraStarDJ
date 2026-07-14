@@ -4,6 +4,7 @@
  */
 
 import { sendBeamerSettings } from '$lib/ipc/tauri'
+import { storageKey } from '$lib/stores/storageKey'
 
 function broadcastBeamerSettings(s: LayoutState) {
   sendBeamerSettings({
@@ -34,10 +35,10 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: 'artist',   label: 'Artist',   visible: true },
   { key: 'year',     label: 'Year',     visible: true },
   { key: 'language', label: 'Language', visible: true },
-  { key: 'bpm',      label: 'BPM',      visible: false },
-  { key: 'genre',    label: 'Genre',    visible: false },
+  { key: 'bpm',      label: 'BPM',      visible: true },
+  { key: 'genre',    label: 'Genre',    visible: true },
   { key: 'rating',   label: 'Rating',   visible: true },
-  { key: 'source',   label: 'Source',   visible: false },
+  { key: 'source',   label: 'Source',   visible: true },
 ]
 
 const DEFAULTS: LayoutState = {
@@ -49,7 +50,7 @@ const DEFAULTS: LayoutState = {
   columns: DEFAULT_COLUMNS
 }
 
-const STORAGE_KEY = 'ultrastardj:layout'
+const STORAGE_KEY = storageKey('ultrastardj:layout')
 
 function loadState(): LayoutState {
   try {

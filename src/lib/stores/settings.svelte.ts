@@ -3,6 +3,8 @@
  * Persisted to Tauri store plugin (or localStorage fallback).
  */
 
+import { storageKey } from '$lib/stores/storageKey'
+
 export type Difficulty = 'easy' | 'medium' | 'hard'
 
 /** Semitone tolerance per difficulty level (octave-invariant matching, matches TunePerfect / USDX) */
@@ -93,14 +95,14 @@ export const appSettings = {
   /** Load from localStorage (Tauri store plugin replaces this later) */
   load() {
     try {
-      const raw = localStorage.getItem('ultrastardj-settings')
+      const raw = localStorage.getItem(storageKey('ultrastardj-settings'))
       if (raw) Object.assign(settings, { ...DEFAULTS, ...JSON.parse(raw) })
       document.documentElement.classList.toggle('light', settings.theme === 'light')
     } catch {}
   },
   save() {
     try {
-      localStorage.setItem('ultrastardj-settings', JSON.stringify(settings))
+      localStorage.setItem(storageKey('ultrastardj-settings'), JSON.stringify(settings))
     } catch {}
   }
 }

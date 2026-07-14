@@ -80,8 +80,8 @@
       />
     {/if}
 
-    {#if selectedLanguage || selectedGenre || selectedQuality}
-      <button class="btn btn-text" onclick={() => { selectedLanguage = ''; selectedGenre = ''; selectedQuality = '' }}>
+    {#if selectedLanguage || selectedGenre || selectedQuality || selectedSource}
+      <button class="btn btn-text" onclick={() => { selectedLanguage = ''; selectedGenre = ''; selectedQuality = ''; selectedSource = '' }}>
         <span class="icon icon-sm">filter_list_off</span>
         Clear
       </button>

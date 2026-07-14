@@ -18,7 +18,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset"] }
+tauri = { version = "2", features = ["protocol-asset", "devtools"] }
+tauri-plugin-localhost = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
@@ -29,6 +30,7 @@ urlencoding = "2"
 cpal = "0.15"
 reqwest = { version = "0.12", features = ["cookies", "json"] }
 axum = "0.8"
+portpicker = "0.1"
 tokio = { version = "1", features = ["full"] }
 local-ip-address = "0.6"
 scraper = "0.22"

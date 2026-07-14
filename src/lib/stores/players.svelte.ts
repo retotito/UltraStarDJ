@@ -6,6 +6,7 @@
 
 import { displaysStore } from '$lib/stores/displays.svelte'
 import { setMicMixGain } from '$lib/ipc/tauri'
+import { storageKey } from '$lib/stores/storageKey'
 
 export type MicChannel = 'left' | 'right' | 'mono'
 
@@ -163,7 +164,7 @@ export const playersStore = {
 
   load() {
     try {
-      const raw = localStorage.getItem('ultrastardj-players')
+      const raw = localStorage.getItem(storageKey('ultrastardj-players'))
       if (raw) {
         const saved: PlayerConfig[] = JSON.parse(raw)
         // Merge saved data onto defaults so new fields survive upgrades
@@ -177,7 +178,7 @@ export const playersStore = {
 
   save() {
     try {
-      localStorage.setItem('ultrastardj-players', JSON.stringify(players))
+      localStorage.setItem(storageKey('ultrastardj-players'), JSON.stringify(players))
     } catch {}
   },
 }

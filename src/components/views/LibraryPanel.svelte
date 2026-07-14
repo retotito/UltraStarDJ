@@ -13,18 +13,27 @@
 
   const songs = $derived(songLibrary.songs)
 
-  // Only show sources that are enabled AND available (so filter resets on unplug/remove)
-  const sources = $derived(
+  // Only show local sources that are enabled AND available
+  const localSources = $derived(
     appSettings.sources.filter(s => s.enabled && s.type === 'local-folder' && s.available !== false)
   )
+
+  const usdbCount = $derived(songLibrary.countBySource['usdb'] ?? 0)
+
+  // All sources for the dropdown: local folders + USDB if it has songs
+  const sources = $derived([
+    ...localSources,
+    ...(usdbCount > 0 ? [{ id: 'usdb', label: 'USDB', type: 'usdb' as const, enabled: true, available: true }] : [])
+  ])
 
   // Source options with live counts
   const sourceOptions = $derived([
     { value: '', label: `All sources (${songs.length})` },
-    ...sources.map(s => ({
+    ...localSources.map(s => ({
       value: s.id,
       label: `${s.label} (${songLibrary.countBySource[s.id] ?? s.lastCount ?? 0})`
-    }))
+    })),
+    ...(usdbCount > 0 ? [{ value: 'usdb', label: `USDB (${usdbCount})` }] : [])
   ])
 
   // Reset source filter if the selected source is no longer available

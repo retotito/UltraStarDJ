@@ -7,9 +7,11 @@ import { usdbLogin, usdbFetchCatalog, type UsdbCatalogEntry } from '$lib/ipc/tau
 import { listen } from '@tauri-apps/api/event'
 import { load as storeLoad } from '@tauri-apps/plugin-store'
 
-const MTIME_KEY  = 'usdb_last_mtime'
-const IDS_KEY    = 'usdb_last_song_ids'
-const CREDS_KEY  = 'usdb_credentials'
+import { storageKey } from '$lib/stores/storageKey'
+
+const MTIME_KEY  = storageKey('usdb_last_mtime')
+const IDS_KEY    = storageKey('usdb_last_song_ids')
+const CREDS_KEY  = storageKey('usdb_credentials')
 
 // ── Credentials (persisted) ───────────────────────────────────────────────────
 

@@ -204,11 +204,15 @@ fn find_output_device(host: &Host, id: &str) -> Option<Device> {
 }
 
 /// Parse "DeviceName#2" → ("DeviceName", 2). Plain name → ("name", 1).
+/// Only treats a trailing `#N` as a dedup index if N ≤ 99 (single/double digit).
+/// This avoids misinterpreting serial numbers like "Wireless Mic #011069638".
 fn parse_device_id(id: &str) -> (&str, usize) {
     if let Some(pos) = id.rfind('#') {
         let suffix = &id[pos + 1..];
         if let Ok(n) = suffix.parse::<usize>() {
-            return (&id[..pos], n);
+            if n >= 2 && n <= 99 {
+                return (&id[..pos], n);
+            }
         }
     }
     (id, 1)

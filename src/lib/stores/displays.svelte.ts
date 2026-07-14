@@ -14,12 +14,13 @@ export interface DisplayConfig {
 }
 
 import { sendScreenConfig } from '$lib/ipc/tauri'
+import { storageKey } from '$lib/stores/storageKey'
 
-const STORAGE_KEY = 'ultrastardj-displays'
+const STORAGE_KEY = storageKey('ultrastardj-displays')
 
 function defaultDisplays(): DisplayConfig[] {
   return [
-    { id: 1, label: 'beamer',  playerIds: [1, 2, 3, 4], open: false },
+    { id: 1, label: 'beamer',  playerIds: [], open: false },
     { id: 2, label: 'beamer2', playerIds: [],            open: false },
   ]
 }

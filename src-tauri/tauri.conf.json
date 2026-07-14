@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "UltrastarDJ",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "identifier": "com.retokupfer.ultrastardj",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -10,20 +10,8 @@
     "frontendDist": "../build"
   },
   "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "UltrastarDJ",
-        "width": 1280,
-        "height": 800,
-        "maximized": true,
-        "minWidth": 900,
-        "minHeight": 600,
-        "acceptFirstMouse": true
-      }
-    ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; img-src 'self' asset: media: https: data: blob:; media-src 'self' asset: media: blob:; style-src 'self' 'unsafe-inline'",
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://www.youtube-nocookie.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com http://localhost:8080; img-src 'self' asset: media: https: data: blob:; media-src 'self' asset: media: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc://localhost http://ipc.localhost https://www.youtube.com https://www.youtube-nocookie.com https://noembed.com https://cdn.plyr.io https://i.ytimg.com https://s.ytimg.com http://localhost:*;",
       "assetProtocol": {
         "enable": true,
         "scope": ["$HOME/**", "/Volumes/**", "$TEMP/**"]
@@ -33,6 +21,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "macOS": {
+      "infoPlist": "Info.plist"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
