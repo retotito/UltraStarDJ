@@ -15,6 +15,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import { storageKey } from '$lib/stores/storageKey'
 
 export type ChannelName = 'game' | 'preview'
 
@@ -48,6 +49,29 @@ export class AudioChannel {
 
   constructor(name: ChannelName) {
     this.name = name
+    this._loadPersistedDevice()
+  }
+
+  /** Restore deviceId + channelOffset from localStorage. */
+  private _loadPersistedDevice() {
+    try {
+      const raw = localStorage.getItem(storageKey(`audio-channel:${this.name}:device`))
+      if (raw) {
+        const { deviceId, channelOffset } = JSON.parse(raw)
+        this.deviceId = deviceId ?? null
+        this.channelOffset = channelOffset ?? 0
+      }
+    } catch {}
+  }
+
+  /** Persist deviceId + channelOffset to localStorage. */
+  private _savePersistedDevice() {
+    try {
+      localStorage.setItem(
+        storageKey(`audio-channel:${this.name}:device`),
+        JSON.stringify({ deviceId: this.deviceId, channelOffset: this.channelOffset })
+      )
+    } catch {}
   }
 
   /** Connect an <audio> element to this channel. Call once on mount. */
@@ -148,11 +172,20 @@ export class AudioChannel {
     if (this.gainNode) this.gainNode.gain.value = this.gain
   }
 
+  /** Call after device list refresh — resets to system default if selected device is gone. */
+  async resetIfDeviceGone(availableDeviceIds: string[]): Promise<void> {
+    if (this.deviceId && !availableDeviceIds.includes(this.deviceId)) {
+      console.log(`[AudioChannel:${this.name}] device '${this.deviceId}' disconnected — resetting to system default`)
+      await this.setDevice(null, 0)
+    }
+  }
+
   /** Route to a specific output device (by ID from list_audio_output_devices). */
   async setDevice(deviceId: string | null, channelOffset = 0, el?: HTMLMediaElement): Promise<void> {
     console.log(`[AudioChannel:${this.name}] setDevice → ${deviceId ?? 'system default'} offset:${channelOffset} ctx=${!!this.ctx}`)
     this.deviceId = deviceId
     this.channelOffset = channelOffset
+    this._savePersistedDevice()
 
     if (SUPPORTS_SINK_ID && el) {
       await this._applySinkId(el, deviceId ?? '')

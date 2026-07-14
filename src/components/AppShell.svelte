@@ -8,6 +8,7 @@
   import { onMount, onDestroy } from 'svelte'
   import { onOutputDevicesChanged, onMicLevel, onMicDisconnected, onMicReconnected, onDevicesChanged, listAudioInputDevices, stopMicMonitor } from '$lib/ipc/tauri'
   import { loadAudioOutputDevices, audioOutputDevices } from '$lib/audio/devices.svelte'
+  import { previewChannel } from '$lib/audio/channels.svelte'
   import Sidebar from '$components/Sidebar.svelte'
   import LibraryPanel from '$components/views/LibraryPanel.svelte'
   import RightPanel from '$components/views/RightPanel.svelte'
@@ -46,6 +47,11 @@
       }
     }
 
+    // Validate persisted preview output device — reset to system default if not available
+    await loadAudioOutputDevices()
+    const availableOutputIds = audioOutputDevices.list.map(d => d.id)
+    await previewChannel.resetIfDeviceGone(availableOutputIds)
+
     // Global mic level listener — always active, independent of popup state
     unlistenMicLevel = await onMicLevel(e => {
       if (playersStore.monitoringIds.has(e.player_id)) {
@@ -75,8 +81,12 @@
       const before = audioOutputDevices.list.map(d => d.name)
       await loadAudioOutputDevices()
       const after = audioOutputDevices.list.map(d => d.name)
+      const availableIds = audioOutputDevices.list.map(d => d.id)
       const added = after.find(n => !before.includes(n))
       const removed = before.find(n => !after.includes(n))
+
+      // Reset preview channel to system default if its device was unplugged
+      await previewChannel.resetIfDeviceGone(availableIds)
       if (outputToastTimer) clearTimeout(outputToastTimer)
       if (added) {
         outputToast = { message: 'Output device connected', sub: added, type: 'connected' }
