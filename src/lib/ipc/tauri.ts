@@ -264,6 +264,14 @@ export async function pathExists(path: string): Promise<boolean> {
 }
 
 /**
+ * Extract a direct audio stream URL from a YouTube video via yt-dlp.
+ * Returns an HTTPS URL playable by an <audio> element (expires after a few hours).
+ */
+export async function getYoutubeAudioUrl(videoId: string): Promise<string> {
+  return invoke<string>('get_youtube_audio_url', { videoId })
+}
+
+/**
  * Convert an absolute local file path to a media:// URL served by the
  * custom Rust protocol handler. This uses AVFoundation's network stack,
  * enabling MPEG-2 and other formats that blob:/asset: URLs cannot play.

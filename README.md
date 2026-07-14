@@ -87,6 +87,9 @@ npm install
 zsh scripts/download-ffmpeg.sh        # macOS
 # scripts/download-ffmpeg.ps1         # Windows
 
+# Download the standalone yt-dlp binary into src-tauri/resources/ (required once)
+zsh scripts/download-ytdlp.sh         # macOS
+
 # Run in dev mode (Tauri + Vite)
 # In dev, FFmpeg falls back to any system `ffmpeg` on your PATH if the
 # bundled binary is not present. Install via Homebrew: brew install ffmpeg

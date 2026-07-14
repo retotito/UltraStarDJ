@@ -5,6 +5,7 @@ description = "Allows all UltrastarDJ application commands"
 [permission.commands]
 allow = [
   "greet",
+  "get_youtube_audio_url",
   "transcode_to_mp4",
   "delete_temp_file",
   "list_audio_input_devices",

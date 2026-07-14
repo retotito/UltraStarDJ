@@ -152,6 +152,48 @@ fn mime_for_ext(ext: &str) -> &'static str {
     }
 }
 
+/// Returns the path to the bundled yt-dlp binary.
+/// In dev mode falls back to the Homebrew/system yt-dlp on PATH.
+fn ytdlp_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
+    let candidate = resource_dir.join("resources").join("yt-dlp");
+    if candidate.exists() {
+        return Ok(candidate);
+    }
+    // Dev fallback: system yt-dlp
+    which_ffmpeg("yt-dlp")
+        .or_else(|| which_ffmpeg("yt_dlp"))
+        .ok_or_else(|| "yt-dlp not found. Run scripts/download-ytdlp.sh first, or install via: brew install yt-dlp".to_string())
+}
+
+/// Extract a direct audio stream URL from a YouTube video via yt-dlp.
+/// Returns a HTTPS URL that can be played by an <audio> element.
+/// The URL typically expires after a few hours.
+#[tauri::command]
+async fn get_youtube_audio_url(app: tauri::AppHandle, video_id: String) -> Result<String, String> {
+    let ytdlp = ytdlp_path(&app)?;
+    let result = std::process::Command::new(&ytdlp)
+        .args([
+            "-g",
+            "-f", "bestaudio[ext=m4a]/bestaudio/best",
+            "--no-playlist",
+            &format!("https://www.youtube.com/watch?v={}", video_id),
+        ])
+        .output()
+        .map_err(|e| format!("Failed to launch yt-dlp: {}", e))?;
+
+    if !result.status.success() {
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        return Err(format!("yt-dlp failed: {}", stderr.trim()));
+    }
+
+    let url = String::from_utf8_lossy(&result.stdout).trim().to_string();
+    if url.is_empty() || !url.starts_with("http") {
+        return Err("yt-dlp returned no URL".to_string());
+    }
+    Ok(url)
+}
+
 /// Returns the path to the bundled FFmpeg binary.
 /// In dev mode it falls back to a system `ffmpeg` on PATH.
 fn ffmpeg_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -340,6 +382,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
+            get_youtube_audio_url,
             transcode_to_mp4,
             delete_temp_file,
             audio::list_audio_input_devices,

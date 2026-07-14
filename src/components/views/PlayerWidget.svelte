@@ -6,7 +6,7 @@
   import { songQueue } from '$lib/stores/queue.svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { network } from '$lib/stores/network.svelte'
-  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, usdbGetSongTxt } from '$lib/ipc/tauri'
+  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, usdbGetSongTxt, getYoutubeAudioUrl } from '$lib/ipc/tauri'
   import { validateSong } from '$lib/ultrastar/validate_song'
   import { enrichUsdbSong, requiresInternet } from '$lib/ultrastar/usdb-load'
   import { tooltip } from '$lib/tooltip'
@@ -41,6 +41,11 @@
   let transcoding = $state(false)
   let transcodeError = $state<string | null>(null)
 
+  // yt-dlp audio stream URL for YouTube-only songs (routes through cpal)
+  let ytAudioUrl = $state<string | null>(null)
+  let ytAudioLoading = $state(false)
+  let ytAudioError = $state<string | null>(null)
+
   // Reset transcoding state before DOM update when song changes
   $effect.pre(() => {
     player.song
@@ -70,6 +75,31 @@
           transcoding = false
         })
     }
+  })
+
+  // Fetch yt-dlp audio URL when a YouTube-only song is loaded
+  $effect(() => {
+    const song = player.song
+    if (!song?.youtubeId || song.audioPath || song.videoPath) {
+      ytAudioUrl = null
+      ytAudioError = null
+      return
+    }
+    ytAudioUrl = null
+    ytAudioError = null
+    ytAudioLoading = true
+    getYoutubeAudioUrl(song.youtubeId)
+      .then(url => {
+        if (player.song !== song) return
+        ytAudioUrl = url
+        ytAudioLoading = false
+      })
+      .catch(e => {
+        if (player.song !== song) return
+        ytAudioError = String(e)
+        ytAudioLoading = false
+        console.warn('[PreviewPlayer] yt-dlp failed, falling back to Plyr YouTube:', e)
+      })
   })
 
   // Track the active YouTube Plyr instance so the fader can control its volume
@@ -229,12 +259,26 @@
         {/if}
 
       {:else if mediaType === 'youtube' && player.song.youtubeId}
-        <div
-          class="yt-embed"
-          data-plyr-provider="youtube"
-          data-plyr-embed-id={player.song.youtubeId}
-          use:plyrYoutubeAction={player.song.youtubeId}
-        ></div>
+        {#if ytAudioUrl}
+          <!-- yt-dlp stream: audio routes through cpal → selected output device -->
+          <div class="audio-backdrop">
+            <img class="cover-img" src={`https://img.youtube.com/vi/${player.song.youtubeId}/mqdefault.jpg`} alt="cover" />
+            <audio use:plyrAction={{ song: player.song, type: 'audio', src: ytAudioUrl }}></audio>
+          </div>
+        {:else if ytAudioLoading}
+          <div class="media-placeholder">
+            <img class="cover-img" src={coverSrc} alt="cover" />
+            <span class="text-muted text-sm">Loading audio stream…</span>
+          </div>
+        {:else}
+          <!-- Fallback: Plyr YouTube iframe (system default output only) -->
+          <div
+            class="yt-embed"
+            data-plyr-provider="youtube"
+            data-plyr-embed-id={player.song.youtubeId}
+            use:plyrYoutubeAction={player.song.youtubeId}
+          ></div>
+        {/if}
 
       {:else if mediaType === 'audio' && player.song.audioPath}
         <div class="audio-backdrop">
