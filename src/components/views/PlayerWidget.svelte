@@ -41,11 +41,6 @@
   let transcoding = $state(false)
   let transcodeError = $state<string | null>(null)
 
-  // yt-dlp audio stream URL for YouTube-only songs (routes through cpal)
-  let ytAudioUrl = $state<string | null>(null)
-  let ytAudioLoading = $state(false)
-  let ytAudioError = $state<string | null>(null)
-
   // Reset transcoding state before DOM update when song changes
   $effect.pre(() => {
     player.song
@@ -104,7 +99,46 @@
         console.log('[PreviewPlayer] yt-dlp file ready:', filePath)
         // Switch to audio element even if Plyr fallback is already showing
         ytAudioError = null
-        ytAudioUrl = toAssetUrl(filePath)  // serve via media:// protocol
+        ytAudioUrl = filePath  // already a media:// URL from Rust
+        ytAudioLoading = false
+      })
+      .catch(e => {
+        clearTimeout(timeout)
+        if (player.song !== song) return
+        ytAudioError = String(e)
+        ytAudioLoading = false
+        console.warn('[PreviewPlayer] yt-dlp failed, falling back to Plyr YouTube:', e)
+      })
+  })
+
+  // Fetch yt-dlp audio URL when a YouTube-only song is loaded
+  $effect(() => {
+    const song = player.song
+    if (!song?.youtubeId || song.audioPath || song.videoPath) {
+      ytAudioUrl = null
+      ytAudioError = null
+      ytAudioLoading = false
+      return
+    }
+    ytAudioError = null
+    ytAudioLoading = true
+    console.log('[PreviewPlayer] fetching yt-dlp audio URL for', song.youtubeId)
+    // 20-second timeout — fall back to Plyr YouTube if yt-dlp is too slow
+    const timeout = setTimeout(() => {
+      if (ytAudioLoading && !ytAudioUrl) {
+        console.warn('[PreviewPlayer] yt-dlp timeout — falling back to Plyr YouTube')
+        ytAudioError = 'timeout'
+        ytAudioLoading = false
+      }
+    }, 20000)
+    getYoutubeAudioUrl(song.youtubeId)
+      .then(filePath => {
+        clearTimeout(timeout)
+        if (player.song !== song) return
+        console.log('[PreviewPlayer] yt-dlp file ready:', filePath)
+        // Switch to audio element even if Plyr fallback is already showing
+        ytAudioError = null
+        ytAudioUrl = filePath  // already a media:// URL from Rust
         ytAudioLoading = false
       })
       .catch(e => {
@@ -279,27 +313,12 @@
         {/if}
 
       {:else if mediaType === 'youtube' && player.song.youtubeId}
-        {#if ytAudioUrl}
-          <!-- yt-dlp stream: audio routes through cpal → selected output device -->
-          <div class="audio-backdrop">
-            <img class="cover-img" src={`https://img.youtube.com/vi/${player.song.youtubeId}/mqdefault.jpg`} alt="cover" />
-            <audio use:plyrAction={{ song: player.song, type: 'audio', src: ytAudioUrl }}></audio>
-          </div>
-        {:else if ytAudioError}
-          <!-- yt-dlp failed: fall back to Plyr YouTube iframe (system default output only) -->
-          <div
-            class="yt-embed"
-            data-plyr-provider="youtube"
-            data-plyr-embed-id={player.song.youtubeId}
-            use:plyrYoutubeAction={player.song.youtubeId}
-          ></div>
-        {:else}
-          <!-- Loading yt-dlp stream (or initial render before effect fires) -->
-          <div class="media-placeholder">
-            <img class="cover-img" src={coverSrc} alt="cover" />
-            {#if ytAudioLoading}<span class="text-muted text-sm">Loading audio stream…</span>{/if}
-          </div>
-        {/if}
+        <div
+          class="yt-embed"
+          data-plyr-provider="youtube"
+          data-plyr-embed-id={player.song.youtubeId}
+          use:plyrYoutubeAction={player.song.youtubeId}
+        ></div>
 
       {:else if mediaType === 'audio' && player.song.audioPath}
         <div class="audio-backdrop">

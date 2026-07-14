@@ -175,12 +175,13 @@ fn ytdlp_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 ///
 /// Returns the temp file path — the JS side serves it via media:// protocol.
 #[tauri::command]
-async fn get_youtube_audio_url(app: tauri::AppHandle, video_id: String) -> Result<String, String> {
+async fn get_youtube_audio_url(app: tauri::AppHandle, state: tauri::State<'_, SongbookServerState>, video_id: String) -> Result<String, String> {
     let out_path = std::env::temp_dir().join(format!("ytpreview_{}.m4a", &video_id));
 
     // Return cached file if already downloaded
     if out_path.exists() && out_path.metadata().map(|m| m.len() > 10_000).unwrap_or(false) {
-        return Ok(out_path.to_string_lossy().into_owned());
+        state.0.youtube_files.lock().unwrap().insert(video_id.clone(), out_path.clone());
+        return Ok(format!("http://localhost:{}/ytaudio/{}", songbook::SONGBOOK_PORT, video_id));
     }
 
     // ── Strategy 1: Invidious API ─────────────────────────────────────────
@@ -222,7 +223,8 @@ async fn get_youtube_audio_url(app: tauri::AppHandle, video_id: String) -> Resul
                             if let Ok(bytes) = audio_resp.bytes().await {
                                 if bytes.len() > 10_000 {
                                     if std::fs::write(&out_path, &bytes).is_ok() {
-                                        return Ok(out_path.to_string_lossy().into_owned());
+                                        state.0.youtube_files.lock().unwrap().insert(video_id.clone(), out_path.clone());
+        return Ok(format!("http://localhost:{}/ytaudio/{}", songbook::SONGBOOK_PORT, video_id));
                                     }
                                 }
                             }
@@ -257,12 +259,23 @@ async fn get_youtube_audio_url(app: tauri::AppHandle, video_id: String) -> Resul
 
         if let Ok(out) = result {
             if out.status.success() && out_path.exists() {
-                return Ok(out_path.to_string_lossy().into_owned());
+                state.0.youtube_files.lock().unwrap().insert(video_id.clone(), out_path.clone());
+        return Ok(format!("http://localhost:{}/ytaudio/{}", songbook::SONGBOOK_PORT, video_id));
             }
         }
     }
 
     Err("Could not download YouTube audio. Try logging into YouTube in Safari (macOS) or Chrome (Windows).".to_string())
+}
+
+/// Convert a local file path to a media:// URL for the frontend.
+fn path_to_media_url(path: &std::path::Path) -> String {
+    let encoded = path.to_string_lossy()
+        .split('/')
+        .map(|s| urlencoding::encode(s).into_owned())
+        .collect::<Vec<_>>()
+        .join("/");
+    format!("media://localhost{}", encoded)
 }
 
 /// Returns the path to the bundled FFmpeg binary.

@@ -34,8 +34,9 @@ pub struct SongbookState {
     pub shutdown_tx: Arc<Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
     /// Optional 4-digit party PIN. If set, API calls require ?pin=XXXX.
     pub pin: Arc<Mutex<Option<String>>>,
-    /// Cache of videoId → direct googlevideo.com stream URL (set by get_youtube_audio_url)
     pub youtube_urls: Arc<Mutex<std::collections::HashMap<String, String>>>,
+    /// videoId → local temp file path (served via /ytaudio/:id)
+    pub youtube_files: Arc<Mutex<std::collections::HashMap<String, std::path::PathBuf>>>,
 }
 
 impl SongbookState {
@@ -45,6 +46,7 @@ impl SongbookState {
             shutdown_tx: Arc::new(Mutex::new(None)),
             pin: Arc::new(Mutex::new(None)),
             youtube_urls: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            youtube_files: Arc::new(Mutex::new(std::collections::HashMap::new())),
         }
     }
 }
@@ -287,6 +289,35 @@ async fn get_youtube_audio_proxy(
     }
 }
 
+/// Serve a downloaded YouTube audio temp file via HTTP.
+/// This avoids custom protocol issues in WKWebView — http://localhost:8080 always works.
+async fn get_ytaudio_file(
+    State(state): State<SongbookState>,
+    Path(video_id): Path<String>,
+) -> impl IntoResponse {
+    let path = state.youtube_files.lock().unwrap().get(&video_id).cloned();
+    let Some(path) = path else {
+        return axum::response::Response::builder()
+            .status(404)
+            .body(axum::body::Body::from(format!("No audio file for {}", video_id)))
+            .unwrap();
+    };
+    match std::fs::read(&path) {
+        Ok(bytes) => axum::response::Response::builder()
+            .status(200)
+            .header("Content-Type", "audio/mp4")
+            .header("Accept-Ranges", "bytes")
+            .header("Access-Control-Allow-Origin", "*")
+            .header("Content-Length", bytes.len().to_string())
+            .body(axum::body::Body::from(bytes))
+            .unwrap(),
+        Err(e) => axum::response::Response::builder()
+            .status(404)
+            .body(axum::body::Body::from(format!("File read error: {}", e)))
+            .unwrap(),
+    }
+}
+
 // ── Start / Stop ─────────────────────────────────────────────────────────────
 
 pub fn start_server(state: SongbookState) {
@@ -297,6 +328,7 @@ pub fn start_server(state: SongbookState) {
         .route("/", get(get_index))
         .route("/youtube", get(get_youtube_proxy))
         .route("/youtube-audio-proxy", get(get_youtube_audio_proxy))
+        .route("/ytaudio/:video_id", get(get_ytaudio_file))
         .route("/api/songs", get(get_songs))
         .route("/api/filters", get(get_filters))
         .route("/api/verify-pin", post(verify_pin))
