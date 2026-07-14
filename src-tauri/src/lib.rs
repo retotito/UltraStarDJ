@@ -166,32 +166,103 @@ fn ytdlp_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .ok_or_else(|| "yt-dlp not found. Run scripts/download-ytdlp.sh first, or install via: brew install yt-dlp".to_string())
 }
 
-/// Extract a direct audio stream URL from a YouTube video via yt-dlp.
-/// Returns a HTTPS URL that can be played by an <audio> element.
-/// The URL typically expires after a few hours.
+/// Download a YouTube song's audio to a temp file for preview playback.
+///
+/// Strategy:
+/// 1. Try Invidious API (fast, no auth, cross-platform) to get a direct stream URL
+/// 2. Download the stream via reqwest with browser headers
+/// 3. Fall back to yt-dlp (with Safari/Chrome cookies) if Invidious fails
+///
+/// Returns the temp file path — the JS side serves it via media:// protocol.
 #[tauri::command]
 async fn get_youtube_audio_url(app: tauri::AppHandle, video_id: String) -> Result<String, String> {
+    let out_path = std::env::temp_dir().join(format!("ytpreview_{}.m4a", &video_id));
+
+    // Return cached file if already downloaded
+    if out_path.exists() && out_path.metadata().map(|m| m.len() > 10_000).unwrap_or(false) {
+        return Ok(out_path.to_string_lossy().into_owned());
+    }
+
+    // ── Strategy 1: Invidious API ─────────────────────────────────────────
+    let invidious_instances = [
+        "https://invidious.kavin.rocks",
+        "https://inv.riverside.rocks",
+    ];
+
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .timeout(std::time::Duration::from_secs(3))  // short timeout — fall through fast if instance is down
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    for instance in &invidious_instances {
+        let api_url = format!("{}/api/v1/videos/{}", instance, video_id);
+        if let Ok(resp) = client.get(&api_url).send().await {
+            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                // Find the best audio-only stream (audio/mp4 preferred, then webm)
+                let audio_url = json["adaptiveFormats"].as_array()
+                    .and_then(|fmts| {
+                        // prefer audio/mp4 (m4a), fallback to any audio
+                        fmts.iter()
+                            .filter(|f| f["type"].as_str().map(|t| t.starts_with("audio/mp4")).unwrap_or(false))
+                            .max_by_key(|f| f["bitrate"].as_u64().unwrap_or(0))
+                            .or_else(|| fmts.iter()
+                                .filter(|f| f["type"].as_str().map(|t| t.starts_with("audio/")).unwrap_or(false))
+                                .max_by_key(|f| f["bitrate"].as_u64().unwrap_or(0)))
+                    })
+                    .and_then(|fmt| fmt["url"].as_str().map(String::from));
+
+                if let Some(stream_url) = audio_url {
+                    // Download the stream to a temp file
+                    if let Ok(audio_resp) = client.get(&stream_url)
+                        .header("Referer", "https://www.youtube.com/")
+                        .send().await
+                    {
+                        if audio_resp.status().is_success() {
+                            if let Ok(bytes) = audio_resp.bytes().await {
+                                if bytes.len() > 10_000 {
+                                    if std::fs::write(&out_path, &bytes).is_ok() {
+                                        return Ok(out_path.to_string_lossy().into_owned());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Strategy 2: yt-dlp with browser cookies ───────────────────────────
     let ytdlp = ytdlp_path(&app)?;
-    let result = std::process::Command::new(&ytdlp)
-        .args([
-            "-g",
-            "-f", "bestaudio[ext=m4a]/bestaudio/best",
-            "--no-playlist",
-            &format!("https://www.youtube.com/watch?v={}", video_id),
-        ])
-        .output()
-        .map_err(|e| format!("Failed to launch yt-dlp: {}", e))?;
 
-    if !result.status.success() {
-        let stderr = String::from_utf8_lossy(&result.stderr);
-        return Err(format!("yt-dlp failed: {}", stderr.trim()));
+    // Try cookies from different browsers cross-platform
+    #[cfg(target_os = "macos")]
+    let browsers = &["safari", "chrome", "firefox"][..];
+    #[cfg(target_os = "windows")]
+    let browsers = &["chrome", "edge", "firefox"][..];
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let browsers = &["chrome", "firefox"][..];
+
+    for browser in browsers {
+        let result = std::process::Command::new(&ytdlp)
+            .args([
+                "-f", "bestaudio[ext=m4a]/bestaudio/best",
+                "--no-playlist",
+                "--cookies-from-browser", browser,
+                "-o", out_path.to_str().unwrap_or(""),
+                &format!("https://www.youtube.com/watch?v={}", video_id),
+            ])
+            .output();
+
+        if let Ok(out) = result {
+            if out.status.success() && out_path.exists() {
+                return Ok(out_path.to_string_lossy().into_owned());
+            }
+        }
     }
 
-    let url = String::from_utf8_lossy(&result.stdout).trim().to_string();
-    if url.is_empty() || !url.starts_with("http") {
-        return Err("yt-dlp returned no URL".to_string());
-    }
-    Ok(url)
+    Err("Could not download YouTube audio. Try logging into YouTube in Safari (macOS) or Chrome (Windows).".to_string())
 }
 
 /// Returns the path to the bundled FFmpeg binary.

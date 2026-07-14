@@ -1,6 +1,6 @@
 use axum::{
-    extract::{Query, State},
-    http::StatusCode,
+    extract::{Path, Query, State},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -34,6 +34,8 @@ pub struct SongbookState {
     pub shutdown_tx: Arc<Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
     /// Optional 4-digit party PIN. If set, API calls require ?pin=XXXX.
     pub pin: Arc<Mutex<Option<String>>>,
+    /// Cache of videoId → direct googlevideo.com stream URL (set by get_youtube_audio_url)
+    pub youtube_urls: Arc<Mutex<std::collections::HashMap<String, String>>>,
 }
 
 impl SongbookState {
@@ -42,6 +44,7 @@ impl SongbookState {
             songs: Arc::new(Mutex::new(vec![])),
             shutdown_tx: Arc::new(Mutex::new(None)),
             pin: Arc::new(Mutex::new(None)),
+            youtube_urls: Arc::new(Mutex::new(std::collections::HashMap::new())),
         }
     }
 }
@@ -238,6 +241,52 @@ async fn get_youtube_proxy(Query(params): Query<std::collections::HashMap<String
         .unwrap()
 }
 
+/// Proxy a YouTube audio stream URL through our local server.
+/// The raw googlevideo.com URL is passed as a query parameter to avoid caching complexity.
+/// Re-fetches with proper browser headers, solving WKWebView's 404 issue.
+async fn get_youtube_audio_proxy(
+    Query(params): Query<std::collections::HashMap<String, String>>,
+    req_headers: HeaderMap,
+) -> impl IntoResponse {
+    let url = match params.get("url") {
+        Some(u) if u.starts_with("http") => u.clone(),
+        _ => return axum::response::Response::builder()
+            .status(400)
+            .body(axum::body::Body::from("Missing or invalid url parameter"))
+            .unwrap(),
+    };
+
+    let client = reqwest::Client::new();
+    let mut req = client.get(&url)
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .header("Referer", "https://www.youtube.com/");
+
+    // Forward Range header for seeking support
+    if let Some(range) = req_headers.get("range") {
+        req = req.header("Range", range);
+    }
+
+    match req.send().await {
+        Ok(resp) => {
+            let status = resp.status().as_u16();
+            let mut builder = axum::response::Response::builder().status(status);
+            // Forward content headers
+            for hdr in ["content-type", "content-length", "content-range", "accept-ranges"] {
+                if let Some(v) = resp.headers().get(hdr) {
+                    builder = builder.header(hdr, v);
+                }
+            }
+            builder = builder.header("Access-Control-Allow-Origin", "*");
+            let bytes = resp.bytes().await.unwrap_or_default();
+            builder.body(axum::body::Body::from(bytes)).unwrap()
+        }
+        Err(e) => axum::response::Response::builder()
+            .status(502)
+            .body(axum::body::Body::from(format!("Proxy error: {}", e)))
+            .unwrap(),
+    }
+}
+
 // ── Start / Stop ─────────────────────────────────────────────────────────────
 
 pub fn start_server(state: SongbookState) {
@@ -247,6 +296,7 @@ pub fn start_server(state: SongbookState) {
     let app = Router::new()
         .route("/", get(get_index))
         .route("/youtube", get(get_youtube_proxy))
+        .route("/youtube-audio-proxy", get(get_youtube_audio_proxy))
         .route("/api/songs", get(get_songs))
         .route("/api/filters", get(get_filters))
         .route("/api/verify-pin", post(verify_pin))

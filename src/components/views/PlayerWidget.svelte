@@ -83,18 +83,32 @@
     if (!song?.youtubeId || song.audioPath || song.videoPath) {
       ytAudioUrl = null
       ytAudioError = null
+      ytAudioLoading = false
       return
     }
-    ytAudioUrl = null
     ytAudioError = null
     ytAudioLoading = true
+    console.log('[PreviewPlayer] fetching yt-dlp audio URL for', song.youtubeId)
+    // 20-second timeout — fall back to Plyr YouTube if yt-dlp is too slow
+    const timeout = setTimeout(() => {
+      if (ytAudioLoading && !ytAudioUrl) {
+        console.warn('[PreviewPlayer] yt-dlp timeout — falling back to Plyr YouTube')
+        ytAudioError = 'timeout'
+        ytAudioLoading = false
+      }
+    }, 20000)
     getYoutubeAudioUrl(song.youtubeId)
-      .then(url => {
+      .then(filePath => {
+        clearTimeout(timeout)
         if (player.song !== song) return
-        ytAudioUrl = url
+        console.log('[PreviewPlayer] yt-dlp file ready:', filePath)
+        // Switch to audio element even if Plyr fallback is already showing
+        ytAudioError = null
+        ytAudioUrl = toAssetUrl(filePath)  // serve via media:// protocol
         ytAudioLoading = false
       })
       .catch(e => {
+        clearTimeout(timeout)
         if (player.song !== song) return
         ytAudioError = String(e)
         ytAudioLoading = false
@@ -171,11 +185,17 @@
       const media = instance.media as HTMLMediaElement | null
       const el = media ?? node
       const src = el.currentSrc || el.src
-      if (!src || src.includes('blank') || src.includes('cdn.plyr.io')) return
+      console.log(`[PreviewPlayer] ▶ playing — type:${params.type} src:${src?.slice(-40)} device:${previewChannel.deviceId ?? 'system'} offset:${previewChannel.channelOffset} ctxOk:${!!previewChannel['ctx']}`)
+      if (!src || src.includes('blank') || src.includes('cdn.plyr.io')) {
+        console.warn('[PreviewPlayer] play skipped — blank/cdn src')
+        return
+      }
       if (channelConnected) return
       channelConnected = true
       previewChannel.connectElement(el).catch(e => console.warn('[PlayerWidget] previewChannel connect failed', e))
     })
+    instance.on('pause', () => console.log('[PreviewPlayer] ⏸ paused'))
+    instance.on('ended', () => console.log('[PreviewPlayer] ⏹ ended'))
 
     return {
       update(p: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }) {
@@ -265,19 +285,20 @@
             <img class="cover-img" src={`https://img.youtube.com/vi/${player.song.youtubeId}/mqdefault.jpg`} alt="cover" />
             <audio use:plyrAction={{ song: player.song, type: 'audio', src: ytAudioUrl }}></audio>
           </div>
-        {:else if ytAudioLoading}
-          <div class="media-placeholder">
-            <img class="cover-img" src={coverSrc} alt="cover" />
-            <span class="text-muted text-sm">Loading audio stream…</span>
-          </div>
-        {:else}
-          <!-- Fallback: Plyr YouTube iframe (system default output only) -->
+        {:else if ytAudioError}
+          <!-- yt-dlp failed: fall back to Plyr YouTube iframe (system default output only) -->
           <div
             class="yt-embed"
             data-plyr-provider="youtube"
             data-plyr-embed-id={player.song.youtubeId}
             use:plyrYoutubeAction={player.song.youtubeId}
           ></div>
+        {:else}
+          <!-- Loading yt-dlp stream (or initial render before effect fires) -->
+          <div class="media-placeholder">
+            <img class="cover-img" src={coverSrc} alt="cover" />
+            {#if ytAudioLoading}<span class="text-muted text-sm">Loading audio stream…</span>{/if}
+          </div>
         {/if}
 
       {:else if mediaType === 'audio' && player.song.audioPath}

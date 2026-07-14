@@ -81,6 +81,16 @@ export class AudioChannel {
       console.error(`[AudioChannel:${this.name}] createMediaElementSource failed:`, err)
       return
     }
+
+    // WebKit/WKWebView known issue: even after createMediaElementSource the element
+    // still routes audio natively to the system default output in parallel.
+    // Setting el.volume=0 suppresses native output; the Web Audio graph is unaffected
+    // because MediaElementAudioSourceNode outputs raw decoded PCM (ignores el.volume).
+    if (this.deviceId) {
+      el.volume = 0
+      console.log(`[AudioChannel:${this.name}] suppressed native el.volume (cpal active)`)
+    }
+
     this.sourceNode.connect(this.gainNode)
     this.gainNode.connect(this.analyserNode)
 
@@ -153,12 +163,16 @@ export class AudioChannel {
     if (!this.ctx || !this.analyserNode) return
 
     if (deviceId) {
-      // Mute system output — cpal will play on the selected device
-      console.log(`[AudioChannel:${this.name}] muting system output, opening cpal on: ${deviceId}`)
-      this.systemGainNode?.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02)
+      // Hard-mute system output immediately — no exponential approach, no leakage
+      if (this.systemGainNode) {
+        this.systemGainNode.gain.value = 0
+        console.log(`[AudioChannel:${this.name}] systemGainNode hard-muted (gain=${this.systemGainNode.gain.value})`)
+      }
       await this._connectWorklet()
     } else {
-      // Back to system default — unmute system output, close cpal stream
+      // Back to system default — restore native volume, unmute system output, close cpal stream
+      const el = (this.sourceNode as MediaElementAudioSourceNode | null)?.mediaElement
+      if (el) el.volume = 1
       this.systemGainNode?.gain.setTargetAtTime(1, this.ctx.currentTime, 0.02)
       this.workletNode?.port.postMessage('stop')
       this.workletNode?.disconnect()

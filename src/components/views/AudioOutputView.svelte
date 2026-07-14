@@ -8,7 +8,10 @@
 
   let { onclose }: { onclose?: () => void } = $props()
 
-  onMount(() => { loadAudioOutputDevices() })
+  onMount(() => {
+    loadAudioOutputDevices()
+    console.log(`[AudioOutput] current preview device: ${previewChannel.deviceId ?? 'system default'} offset:${previewChannel.channelOffset}`)
+  })
 
   const devices = $derived(audioOutputDevices.list)
   const defaultName = $derived(audioOutputDevices.defaultName)
@@ -38,6 +41,7 @@
   const isYoutubeSong = $derived(!!playback.song?.youtubeId)
 
   async function setPreviewOutput(value: string) {
+    console.log('[AudioOutput] setPreviewOutput:', value || 'system default')
     if (!value) {
       await previewChannel.setDevice(null, 0)
       return
@@ -45,6 +49,7 @@
     const sep = value.lastIndexOf('|')
     const deviceId = sep === -1 ? value : value.slice(0, sep)
     const channelOffset = sep === -1 ? 0 : Number(value.slice(sep + 1))
+    console.log(`[AudioOutput] → device:'${deviceId}' ch-offset:${channelOffset} (ch${channelOffset+1}-${channelOffset+2})`)
     await previewChannel.setDevice(deviceId, channelOffset)
   }
 </script>
