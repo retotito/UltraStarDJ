@@ -54,13 +54,16 @@ export interface ScreenConfigPayload {
 }
 
 // ── Open / close display windows ───────────────────────────────
-async function openDisplayWindow(label: string, title: string, url: string): Promise<void> {
+async function openDisplayWindow(label: string, title: string, path: string): Promise<void> {
   const existing = await WebviewWindow.getByLabel(label)
   if (existing) {
     await existing.show()
     await existing.setFocus()
     return
   }
+  // Use the current window's origin so beamer also loads from http://localhost:PORT
+  // (rather than tauri://localhost), which is required for YouTube embeds.
+  const url = `${window.location.origin}${path}`
   new WebviewWindow(label, {
     url,
     title,
@@ -369,7 +372,15 @@ export const MIC_EVENTS = {
 } as const
 
 export async function listAudioInputDevices(): Promise<AudioInputDevice[]> {
-  return await invoke<AudioInputDevice[]>('list_audio_input_devices')
+  console.log('[ipc] listAudioInputDevices — origin:', window.location.origin)
+  try {
+    const result = await invoke<AudioInputDevice[]>('list_audio_input_devices')
+    console.log('[ipc] listAudioInputDevices ✓ count:', result.length)
+    return result
+  } catch (e) {
+    console.error('[ipc] listAudioInputDevices FAILED:', e)
+    throw e
+  }
 }
 
 /** Start streaming RMS level events for a player's mic. channel: 'left' | 'right' | 'mono' */

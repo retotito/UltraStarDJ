@@ -11,7 +11,7 @@
   },
   "app": {
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://www.youtube-nocookie.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com http://localhost:8080; img-src 'self' asset: media: https: data: blob:; media-src 'self' asset: media: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc://localhost http://ipc.localhost https://www.youtube.com https://www.youtube-nocookie.com https://noembed.com https://cdn.plyr.io https://i.ytimg.com https://s.ytimg.com http://localhost:*;",
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://www.youtube-nocookie.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com http://localhost:8080; img-src 'self' asset: media: https: data: blob:; media-src 'self' asset: media: blob:; style-src 'self' 'unsafe-inline' 'unsafe-hashes'; connect-src 'self' ipc://localhost http://ipc.localhost https://www.youtube.com https://www.youtube-nocookie.com https://noembed.com https://cdn.plyr.io https://i.ytimg.com https://s.ytimg.com http://localhost:*;",
       "assetProtocol": {
         "enable": true,
         "scope": ["$HOME/**", "/Volumes/**", "$TEMP/**"]

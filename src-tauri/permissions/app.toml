@@ -1,0 +1,31 @@
+[[permission]]
+identifier = "allow-app-commands"
+description = "Allows all UltrastarDJ application commands"
+
+[permission.commands]
+allow = [
+  "greet",
+  "transcode_to_mp4",
+  "delete_temp_file",
+  "list_audio_input_devices",
+  "start_mic_monitor",
+  "stop_mic_monitor",
+  "set_mic_mix_gain",
+  "set_mic_input_gain",
+  "set_mic_threshold",
+  "debug_open_streams",
+  "list_audio_output_devices",
+  "get_default_output_device_name",
+  "open_output_channel",
+  "push_audio_pcm",
+  "close_output_channel",
+  "usdb_login",
+  "usdb_fetch_catalog",
+  "usdb_get_song_txt",
+  "songbook_start",
+  "songbook_stop",
+  "songbook_update_songs",
+  "songbook_get_url",
+  "tunnel_start",
+  "tunnel_stop",
+]

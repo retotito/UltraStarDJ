@@ -72,6 +72,9 @@
     }
   })
 
+  // Track the active YouTube Plyr instance so the fader can control its volume
+  let ytPlyrInstance: any = null
+
   // Plyr action — YouTube embed (preview only)
   function plyrYoutubeAction(node: HTMLDivElement, youtubeId: string) {
     console.log('[PreviewPlayer] YouTube init — origin:', window.location.origin, 'videoId:', youtubeId)
@@ -79,15 +82,18 @@
       controls: ['play', 'progress', 'current-time', 'duration'],
       autoplay: false,
     })
+    ytPlyrInstance = instance
     instance.once('ready', () => {
       console.log('[PreviewPlayer] YouTube Plyr ready')
       try { (instance as any).getInternalPlayer()?.setPlaybackQuality?.('tiny') } catch {}
+      // Sync current fader gain to YouTube volume on ready
+      instance.volume = previewChannel.gain
     })
     instance.on('playing', () => console.log('[PreviewPlayer] YouTube playing'))
     instance.on('pause',   () => console.log('[PreviewPlayer] YouTube paused'))
     instance.on('ended',   () => console.log('[PreviewPlayer] YouTube ended'))
     instance.on('error',   (e: any) => console.error('[PreviewPlayer] YouTube error', e))
-    return { destroy() { try { instance.destroy() } catch {} } }
+    return { destroy() { ytPlyrInstance = null; try { instance.destroy() } catch {} } }
   }
 
   // Plyr action — audio/video files
@@ -255,7 +261,7 @@
     </div>
 
     <div class="preview-fader">
-      <SongFader label="Preview" level={previewChannel.level} gain={previewChannel.gain} ongainchange={(v) => previewChannel.setGain(v)} />
+      <SongFader label="Preview" level={previewChannel.level} gain={previewChannel.gain} ongainchange={(v) => { previewChannel.setGain(v); if (ytPlyrInstance) ytPlyrInstance.volume = v }} />
     </div>
 
     <div class="actions">

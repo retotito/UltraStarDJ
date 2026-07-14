@@ -4,6 +4,7 @@
   "description": "Capability for the main window",
   "windows": ["main", "beamer", "beamer2"],
   "permissions": [
+    "allow-app-commands",
     "core:default",
     "core:window:allow-create",
     "core:window:allow-close",

@@ -18,7 +18,11 @@
   let unlistenDevices: (() => void) | null = null
 
   onMount(async () => {
-    devices = await listAudioInputDevices()
+    try {
+      devices = await listAudioInputDevices()
+    } catch (e) {
+      console.error('[PlayersView] listAudioInputDevices failed:', e)
+    }
 
     unlistenDevices = await onDevicesChanged(updated => {
       devices = updated

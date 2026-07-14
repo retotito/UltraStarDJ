@@ -1,13 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "localhost-ipc",
-  "description": "Grants all IPC permissions to the app when served from http://localhost (tauri-plugin-localhost production mode)",
+  "description": "Grants IPC permissions when served from http://localhost:PORT via tauri-plugin-localhost. Uses http://*:* to match any http host on any port.",
   "remote": {
-    "urls": ["http://localhost:*"]
+    "urls": ["http://*:*"]
   },
-  "local": false,
   "windows": ["main", "beamer", "beamer2"],
   "permissions": [
+    "allow-app-commands",
     "core:default",
     "core:window:allow-create",
     "core:window:allow-close",

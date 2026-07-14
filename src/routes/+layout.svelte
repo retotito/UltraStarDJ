@@ -4,10 +4,8 @@
   let { children } = $props()
 
   onMount(() => {
-    // Disable right-click context menu and text selection in production Tauri builds.
-    // During testing/beta, this is intentionally left enabled so DevTools (right-click → Inspect) works.
-    // Re-enable for final release by changing the condition back to `isTauri && isProd`.
     const isTauri = '__TAURI_INTERNALS__' in window
+    console.log(`[app] startup — origin: ${window.location.origin} isTauri: ${isTauri}`)
     if (false && isTauri) {
       document.addEventListener('contextmenu', e => e.preventDefault())
       document.documentElement.style.userSelect = 'none'
