@@ -33,6 +33,7 @@ export class AudioChannel {
   private ctx: AudioContext | null = null
   private pendingClose: Promise<void> | null = null
   private gainNode: GainNode | null = null
+  private systemGainNode: GainNode | null = null  // muted when cpal device is active
   private analyserNode: AnalyserNode | null = null
   private workletNode: AudioWorkletNode | null = null
   private sourceNode: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null
@@ -43,6 +44,7 @@ export class AudioChannel {
   gain = $state(1.0)
   level = $state(0.0)
   deviceId = $state<string | null>(null)
+  channelOffset = $state(0)  // 0 = ch1-2, 2 = ch3-4, 4 = ch5-6, etc.
 
   constructor(name: ChannelName) {
     this.name = name
@@ -64,6 +66,11 @@ export class AudioChannel {
     this.analyserNode.fftSize = 256
     this.analyserData = new Uint8Array(this.analyserNode.frequencyBinCount)
 
+    // systemGainNode gates the ctx.destination path.
+    // Gain = 1 when using system default; gain = 0 when cpal routes to a specific device.
+    this.systemGainNode = this.ctx.createGain()
+    this.systemGainNode.gain.value = this.deviceId ? 0 : 1
+
     // Start silent to avoid the connection pop, ramp to target gain over 30ms
     this.gainNode.gain.setValueAtTime(0, this.ctx.currentTime)
     this.gainNode.gain.linearRampToValueAtTime(this.gain, this.ctx.currentTime + 0.03)
@@ -80,10 +87,12 @@ export class AudioChannel {
     this._startMeterLoop()
 
     if (SUPPORTS_SINK_ID) {
-      this.analyserNode.connect(this.ctx.destination)
+      this.analyserNode.connect(this.systemGainNode!)
+      this.systemGainNode!.connect(this.ctx.destination)
       if (this.deviceId) await this._applySinkId(el, this.deviceId)
     } else {
-      this.analyserNode.connect(this.ctx.destination)
+      this.analyserNode.connect(this.systemGainNode!)
+      this.systemGainNode!.connect(this.ctx.destination)
       if (this.deviceId) await this._connectWorklet()
     }
   }
@@ -94,6 +103,7 @@ export class AudioChannel {
     this.workletNode?.disconnect()
     this.workletNode = null
     this.analyserNode?.disconnect()
+    this.systemGainNode?.disconnect()
     this.gainNode?.disconnect()
     this.sourceNode?.disconnect()
     this.sourceNode = null
@@ -129,20 +139,27 @@ export class AudioChannel {
   }
 
   /** Route to a specific output device (by ID from list_audio_output_devices). */
-  async setDevice(deviceId: string | null, el?: HTMLMediaElement): Promise<void> {
+  async setDevice(deviceId: string | null, channelOffset = 0, el?: HTMLMediaElement): Promise<void> {
+    console.log(`[AudioChannel:${this.name}] setDevice → ${deviceId ?? 'system default'} offset:${channelOffset} ctx=${!!this.ctx}`)
     this.deviceId = deviceId
+    this.channelOffset = channelOffset
 
     if (SUPPORTS_SINK_ID && el) {
       await this._applySinkId(el, deviceId ?? '')
       return
     }
 
-    // macOS: open/close cpal channel based on whether a specific device is selected
+    // macOS: toggle system output and open/close cpal channel
     if (!this.ctx || !this.analyserNode) return
+
     if (deviceId) {
+      // Mute system output — cpal will play on the selected device
+      console.log(`[AudioChannel:${this.name}] muting system output, opening cpal on: ${deviceId}`)
+      this.systemGainNode?.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02)
       await this._connectWorklet()
     } else {
-      // Back to system default — disconnect worklet, use ctx.destination only
+      // Back to system default — unmute system output, close cpal stream
+      this.systemGainNode?.gain.setTargetAtTime(1, this.ctx.currentTime, 0.02)
       this.workletNode?.port.postMessage('stop')
       this.workletNode?.disconnect()
       this.workletNode = null
@@ -155,19 +172,32 @@ export class AudioChannel {
   private async _connectWorklet(): Promise<void> {
     if (!this.ctx || !this.analyserNode) return
 
+    // Disconnect any existing worklet before creating a new one
+    if (this.workletNode) {
+      this.workletNode.port.postMessage('stop')
+      this.workletNode.disconnect()
+      this.workletNode = null
+      invoke('close_output_channel', { channel: this.name }).catch(() => {})
+    }
+
     try {
       await this.ctx.audioWorklet.addModule('/pcm-capture-processor.js')
       this.workletNode = new AudioWorkletNode(this.ctx, 'pcm-capture-processor')
 
       const channelName = this.name
       const sampleRate = this.ctx.sampleRate
+      let pcmPushCount = 0
 
       // Open cpal stream on Rust side
-      await this._openCpalChannel(this.deviceId ?? '')
+      await this._openCpalChannel(this.deviceId ?? '', this.channelOffset)
 
       // Main-thread handler: receives PCM chunks from worklet and sends to Rust
       this.workletNode.port.onmessage = (e: MessageEvent) => {
         const samples: Float32Array = e.data.samples
+        pcmPushCount++
+        if (pcmPushCount <= 3) {
+          console.log(`[AudioChannel:${channelName}] push_audio_pcm #${pcmPushCount} samples:${samples.length}`)
+        }
         invoke('push_audio_pcm', {
           channel: channelName,
           samples: Array.from(samples),
@@ -183,14 +213,16 @@ export class AudioChannel {
     }
   }
 
-  private async _openCpalChannel(deviceId: string): Promise<void> {
+  private async _openCpalChannel(deviceId: string, channelOffset = 0): Promise<void> {
     if (!this.ctx) return
     try {
+      console.log(`[AudioChannel:${this.name}] open_output_channel → deviceId:'${deviceId}' offset:${channelOffset} sampleRate:${this.ctx.sampleRate}`)
       await invoke('open_output_channel', {
         channel: this.name,
         deviceId,
         jsSampleRate: this.ctx.sampleRate,
         jsChannels: 2,
+        channelOffset,
       })
     } catch (err) {
       console.warn(`[AudioChannel:${this.name}] open_output_channel failed`, err)

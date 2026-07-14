@@ -13,6 +13,8 @@ import { invoke } from '@tauri-apps/api/core'
 export interface AudioOutputDevice {
   id: string
   name: string
+  channels: number
+  maxChannels: number
 }
 
 // Device name substrings to hide — virtual capture/loopback devices that are
@@ -41,6 +43,7 @@ export const audioOutputDevices = {
 export async function loadAudioOutputDevices(): Promise<void> {
   try {
     const all = await invoke<AudioOutputDevice[]>('list_audio_output_devices')
+    console.log('[audioOutputDevices] raw list:', all.map(d => `[${d.channels}ch/max${d.maxChannels}ch] ${d.name}`).join(' | '))
     _devices = all.filter(d => !isHidden(d.name))
     _defaultName = await invoke<string | null>('get_default_output_device_name')
   } catch (err) {

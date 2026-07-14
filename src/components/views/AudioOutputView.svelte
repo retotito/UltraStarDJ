@@ -14,15 +14,38 @@
   const defaultName = $derived(audioOutputDevices.defaultName)
   const hasSecondDevice = $derived(devices.length > 0)
 
+  // Flat options list — multi-channel devices are expanded into one option per stereo pair.
+  // Value format: "deviceId|channelOffset" (e.g. "MOTU Audio Express|2") or "" for system default.
   const previewDeviceOptions = $derived([
     { value: '', label: defaultName ? `System default (${defaultName})` : 'System default' },
-    ...devices.map(d => ({ value: d.id, label: d.name })),
+    ...devices.flatMap(d => {
+      if (d.maxChannels <= 2) return [{ value: d.id, label: d.name }]
+      const pairs = []
+      for (let i = 0; i + 1 < d.maxChannels; i += 2) {
+        pairs.push({ value: `${d.id}|${i}`, label: `${d.name} — Ch ${i + 1}–${i + 2}` })
+      }
+      return pairs
+    }),
   ])
+
+  // Current select value encoding both deviceId and channelOffset
+  const previewSelectValue = $derived(
+    previewChannel.deviceId
+      ? `${previewChannel.deviceId}|${previewChannel.channelOffset}`
+      : ''
+  )
 
   const isYoutubeSong = $derived(!!playback.song?.youtubeId)
 
-  async function setPreviewDevice(id: string) {
-    await previewChannel.setDevice(id || null)
+  async function setPreviewOutput(value: string) {
+    if (!value) {
+      await previewChannel.setDevice(null, 0)
+      return
+    }
+    const sep = value.lastIndexOf('|')
+    const deviceId = sep === -1 ? value : value.slice(0, sep)
+    const channelOffset = sep === -1 ? 0 : Number(value.slice(sep + 1))
+    await previewChannel.setDevice(deviceId, channelOffset)
   }
 </script>
 
@@ -85,9 +108,9 @@
         </div>
         {#if hasSecondDevice}
           <Select
-            value={previewChannel.deviceId ?? ''}
+            value={previewSelectValue}
             options={previewDeviceOptions}
-            onchange={(v) => setPreviewDevice(v)}
+            onchange={(v) => setPreviewOutput(v)}
           />
         {:else}
           <div class="device-fixed device-fixed--warn">

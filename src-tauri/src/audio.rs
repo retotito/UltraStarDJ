@@ -19,6 +19,9 @@ pub struct AudioInputDevice {
 pub struct AudioOutputDevice {
     pub id: String,
     pub name: String,
+    pub channels: u16,
+    #[serde(rename = "maxChannels")]
+    pub max_channels: u16,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -398,8 +401,11 @@ pub fn list_audio_output_devices() -> Vec<AudioOutputDevice> {
     enumerate_output_devices(&host)
         .into_iter()
         .filter_map(|(id, d)| {
-            d.default_output_config().ok()?; // only include usable devices
-            Some(AudioOutputDevice { name: id.clone(), id })
+            let config = d.default_output_config().ok()?;
+            let max_channels = d.supported_output_configs().ok()
+                .map(|cfgs| cfgs.map(|c| c.channels()).max().unwrap_or(config.channels()))
+                .unwrap_or(config.channels());
+            Some(AudioOutputDevice { name: id.clone(), id, channels: config.channels(), max_channels })
         })
         .collect()
 }
@@ -415,6 +421,7 @@ pub fn get_default_output_device_name() -> Option<String> {
 /// device_id: device unique ID from list_audio_output_devices, or "" for system default.
 /// js_sample_rate: the AudioContext sample rate on the JS side (typically 44100 or 48000).
 /// js_channels: number of channels the JS side will send (1 or 2).
+/// channel_offset: first output channel index (0 = ch1-2, 2 = ch3-4, etc.).
 #[tauri::command]
 pub fn open_output_channel(
     state: tauri::State<Arc<AudioState>>,
@@ -422,7 +429,9 @@ pub fn open_output_channel(
     device_id: String,
     js_sample_rate: u32,
     js_channels: u16,
+    channel_offset: Option<u16>,
 ) -> Result<(), String> {
+    let channel_offset = channel_offset.unwrap_or(0) as usize;
     let host = host();
 
     let device = if device_id.is_empty() {
@@ -434,10 +443,12 @@ pub fn open_output_channel(
     };
 
     let default_config = device.default_output_config().map_err(|e| e.to_string())?;
-    let out_channels = default_config.channels();
 
-    // Use the device's native sample rate to avoid resampling.
-    // JS side is responsible for matching or resampling to this rate.
+    // If a channel offset is requested, open the stream with enough channels to reach that offset.
+    // E.g. offset=2 → need at least 4 channels (ch3-4). Use default sample rate.
+    let needed_channels = if channel_offset > 0 { (channel_offset + 2) as u16 } else { default_config.channels() };
+    let out_channels = needed_channels.max(default_config.channels());
+
     let config = StreamConfig {
         channels: out_channels,
         sample_rate: default_config.sample_rate(),
@@ -467,10 +478,13 @@ pub fn open_output_channel(
                         mic_r += pbuf.pop_front().unwrap_or(0.0);
                     }
                     let out_frame = &mut output[frame_idx * out_ch..(frame_idx + 1) * out_ch];
-                    for (ch_i, sample) in out_frame.iter_mut().enumerate() {
-                        let main = main_buf.pop_front().unwrap_or(0.0);
-                        let mic = if ch_i == 0 { mic_l } else if ch_i == 1 { mic_r } else { 0.0 };
-                        *sample = (main + mic).clamp(-1.0, 1.0);
+                    // Zero all channels, then write to the selected offset pair
+                    out_frame.fill(0.0);
+                    let main_l = main_buf.pop_front().unwrap_or(0.0);
+                    let main_r = main_buf.pop_front().unwrap_or(main_l);
+                    if channel_offset + 1 < out_ch {
+                        out_frame[channel_offset]     = (main_l + mic_l).clamp(-1.0, 1.0);
+                        out_frame[channel_offset + 1] = (main_r + mic_r).clamp(-1.0, 1.0);
                     }
                 }
             },

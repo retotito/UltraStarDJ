@@ -98,6 +98,7 @@
 
   // Plyr action — audio/video files
   function plyrAction(
+    node: HTMLAudioElement | HTMLVideoElement,
     params: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }
   ) {
     const instance = new Plyr(node, {
