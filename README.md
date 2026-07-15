@@ -70,7 +70,6 @@
 ## Known limitations
 
 - **YouTube-only songs**: preview audio always plays through the system default output. Routing to a second audio output (e.g. audio interface) is not supported for YouTube previews — only songs with a local audio or video file support custom output routing.
-- USDB catalog sync requires a free account at [usdb.animux.de](https://usdb.animux.de)
 
 ---
 
