@@ -17,16 +17,16 @@
   import SongFader from '$components/ui/SongFader.svelte'
   import { previewChannel } from '$lib/audio/channels.svelte'
 
-  type MediaType = 'video' | 'youtube' | 'audio' | 'none'
+  type MediaType = 'video' | 'video+audio' | 'youtube' | 'audio' | 'none'
 
   const mediaType = $derived.by((): MediaType => {
     const s = player.song
     if (!s) return 'none'
-    // audioPath (#MP3/#AUDIO) is always the primary audio source in UltraStar.
-    // videoPath (#VIDEO) is a silent background — only use it for preview when
-    // there is no separate audio file (rare: video-only song with embedded audio).
+    // #VIDEO is a silent background; #MP3/#AUDIO is always the audio source.
+    // When both exist, show the video visually (muted) and play the audio file.
+    if (s.videoPath && s.audioPath) return 'video+audio'
     if (s.audioPath) return 'audio'
-    if (s.videoPath) return 'video'
+    if (s.videoPath) return 'video'          // video-only (embedded audio)
     if (s.youtubeId && network.isOnline) return 'youtube'
     return 'none'
   })
@@ -74,6 +74,10 @@
         })
     }
   })
+
+  // Ref to the muted background video element (video+audio case).
+  // plyrAction syncs play/pause to this element.
+  let bgVideoEl: HTMLVideoElement | null = null
 
   // Track the active YouTube Plyr instance so the fader can control its volume
   let ytPlyrInstance: any = null
@@ -149,16 +153,19 @@
         console.warn('[PreviewPlayer] play skipped — blank/cdn src')
         return
       }
+      // Sync background video (video+audio case)
+      bgVideoEl?.play().catch(() => {})
       if (channelConnected) return
       channelConnected = true
       previewChannel.connectElement(el).catch(e => console.warn('[PlayerWidget] previewChannel connect failed', e))
     })
-    instance.on('pause', () => console.log('[PreviewPlayer] ⏸ paused'))
-    instance.on('ended', () => console.log('[PreviewPlayer] ⏹ ended'))
+    instance.on('pause', () => { console.log('[PreviewPlayer] ⏸ paused'); bgVideoEl?.pause() })
+    instance.on('ended', () => { console.log('[PreviewPlayer] ⏹ ended'); bgVideoEl?.pause() })
 
     return {
       update(p: { song: Song; type: 'audio' | 'video'; src?: string; poster?: string | null }) {
         channelConnected = false  // reset so reconnect happens on next play after song change
+        bgVideoEl = null           // clear bg video ref on song change
         load(p)
       },
       destroy() {
@@ -216,7 +223,35 @@
   {#if player.song}
     <div class="media-area">
       {#key player.song}
-      {#if mediaType === 'video' && player.song.videoPath}
+      {#if mediaType === 'video+audio' && player.song.videoPath && player.song.audioPath}
+        <!-- Case 2/3: silent background video + separate audio file -->
+        <div class="video-audio-wrap">
+          {#if needsTranscode(player.song.videoPath)}
+            {#if transcoding}
+              <div class="transcode-overlay">
+                <span class="transcode-spinner"></span>
+                <span class="transcode-label">Converting video…</span>
+              </div>
+            {:else if transcodeError}
+              <div class="transcode-overlay transcode-error">
+                <span>⚠ {transcodeError}</span>
+              </div>
+            {:else if transcodedPath}
+              <!-- svelte-ignore a11y_media_has_caption -->
+              <video class="bg-video" src={toAssetUrl(transcodedPath)} muted playsinline
+                bind:this={bgVideoEl}></video>
+            {/if}
+          {:else}
+            <!-- svelte-ignore a11y_media_has_caption -->
+            <video class="bg-video" src={toAssetUrl(player.song.videoPath)} muted playsinline
+              bind:this={bgVideoEl}></video>
+          {/if}
+          <!-- Audio drives Plyr controls; video above plays muted in sync -->
+          <audio class="audio-under-video"
+            use:plyrAction={{ song: player.song, type: 'audio' }}></audio>
+        </div>
+
+      {:else if mediaType === 'video' && player.song.videoPath}
         {#if needsTranscode(player.song.videoPath)}
           {#if transcoding}
             <!-- Converting MPEG-2/AVI → MP4, usually takes 1-3 seconds -->
@@ -354,6 +389,34 @@
     width: 100% !important;
     height: 100% !important;
     object-fit: contain;
+  }
+
+  /* Case 2/3: muted background video + audio Plyr controls at bottom */
+  .video-audio-wrap {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  .bg-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .audio-under-video {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+  }
+
+  .video-audio-wrap :global(.plyr--audio) {
+    width: 100%;
   }
 
   .audio-backdrop {
