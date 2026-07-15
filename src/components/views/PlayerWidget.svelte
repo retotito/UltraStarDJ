@@ -22,9 +22,12 @@
   const mediaType = $derived.by((): MediaType => {
     const s = player.song
     if (!s) return 'none'
-    if (s.videoPath) return 'video'          // show video if available (preview player prefers visual)
+    // audioPath (#MP3/#AUDIO) is always the primary audio source in UltraStar.
+    // videoPath (#VIDEO) is a silent background — only use it for preview when
+    // there is no separate audio file (rare: video-only song with embedded audio).
+    if (s.audioPath) return 'audio'
+    if (s.videoPath) return 'video'
     if (s.youtubeId && network.isOnline) return 'youtube'
-    if (s.audioPath) return 'audio'          // audio-only fallback
     return 'none'
   })
 
