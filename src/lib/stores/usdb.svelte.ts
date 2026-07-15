@@ -229,7 +229,7 @@ export const usdbStore = {
       const unlisten = _syncIsFullSync
         ? await listen<{ fetched: number; total: number }>('usdb:progress', e => {
             _syncFetched = e.payload.fetched
-            console.log('[usdb] progress:', e.payload.fetched, '/', e.payload.total)
+            // progress fires per page (~100 entries) — too noisy to log every tick
           })
         : null
 
