@@ -246,7 +246,10 @@
       } else {
         const sungRow = pitchToRow(data.rowPitch, avg, rowCount)
         const last    = wrong[wrong.length - 1]
-        if (last && last.startBeat + last.beatCount >= beat - 2) {
+        // Only bridge within the same note — never across a note boundary
+        const lastCell = last ? cells.find(c => last.startBeat >= c.note.startBeat && last.startBeat < c.note.startBeat + c.note.lengthBeats) : null
+        const sameNote = lastCell?.note.startBeat === cell.note.startBeat
+        if (last && sameNote && last.startBeat + last.beatCount >= beat - 2) {
           last.beatCount = beat - last.startBeat + 1  // extend + bridge; row stays fixed (no jitter)
         } else {
           wrong.push({ startBeat: beat, beatCount: 1, row: sungRow, isCorrect: false, isGolden: false })
