@@ -34,7 +34,6 @@ export const songbookStore = {
   get tunnelLoading() { return _tunnelLoading },
 
   async start() {
-    if (_active) return
     _loading = true
     try {
       const url = await songbookStart(toEntries())
@@ -81,8 +80,7 @@ export const songbookStore = {
       _tunnelUrl = info.url
       _tunnelPin = info.pin
       _tunnelActive = true
-      // Songbook server is auto-started by the Rust command
-      _active = true
+      // Note: songbook server is started by Rust internally — don't set _active here
     } catch (e) {
       console.error('[tunnel] start failed:', e)
     } finally {

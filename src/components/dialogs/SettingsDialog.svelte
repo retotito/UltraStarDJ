@@ -9,7 +9,7 @@
   <section class="section">
     <h3 class="section-title">Appearance</h3>
     <div class="setting-row">
-      <span>Theme</span>
+      <span style="margin-right: var(--space-2);">Theme</span>
       <Select
         value={appSettings.theme}
         options={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]}

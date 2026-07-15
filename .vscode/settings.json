@@ -1,6 +1,7 @@
 {
   "svelte.enable-ts-plugin": true,
   "chat.tools.terminal.autoApprove": {
-    "git init": true
+    "git init": true,
+    "cargo check": true
   }
 }

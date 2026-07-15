@@ -23,7 +23,10 @@ struct TunnelServerState {
 async fn songbook_start(state: tauri::State<'_, SongbookServerState>, songs: Vec<songbook::SongEntry>) -> Result<String, String> {
     let sb = &state.0;
     *sb.songs.lock().unwrap() = songs;
-    songbook::start_server(sb.clone());
+    // Only start the server if it isn't already running (e.g. started by tunnel)
+    if sb.shutdown_tx.lock().unwrap().is_none() {
+        songbook::start_server(sb.clone());
+    }
     let ip = local_ip_address::local_ip()
         .map(|ip| ip.to_string())
         .unwrap_or_else(|_| "localhost".to_string());

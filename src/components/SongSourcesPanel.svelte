@@ -122,7 +122,7 @@
   </div>
 
   {#if appSettings.sources.length === 0}
-    <p class="empty-hint">No sources added yet.</p>
+    <p style="padding-left: 16px;" class="empty-hint">No sources added yet.</p>
   {:else}
     <ul class="source-list">
       {#each appSettings.sources as source (source.id)}
