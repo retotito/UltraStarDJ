@@ -3,8 +3,8 @@
 > A DJ-style karaoke app — queue songs, score live performances, and run up to 2 singer displays simultaneously.
 
 <p align="center">
-  <a href="https://github.com/retotito/UltraStarDJ/releases/tag/v0.1.0-beta.1">
-    <img src="https://img.shields.io/badge/Download-v0.1.0--beta.1-blue?style=for-the-badge&logo=apple" alt="Download latest release">
+  <a href="https://github.com/retotito/UltraStarDJ/releases/tag/v0.1.1-beta.1">
+    <img src="https://img.shields.io/badge/Download-v0.1.1--beta.1-blue?style=for-the-badge&logo=apple" alt="Download latest release">
   </a>
 </p>
 
