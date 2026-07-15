@@ -175,7 +175,6 @@
       // Backfill note.startBeat if we arrived late (first tick for this note skipped the start)
       const isFirstForNote = !_beatHistory.has(note.startBeat)
       if (isFirstForNote && intBeat > note.startBeat) {
-        console.log(`[fill] note start=${note.startBeat} len=${note.lengthBeats} — backfilling start (arrived at ${intBeat})`)
         _beatHistory.set(note.startBeat, beatData)
       }
 
@@ -184,7 +183,6 @@
       // Backfill note's last beat if we're 1 beat before the end (tick will skip it)
       const noteLastBeat = note.startBeat + note.lengthBeats - 1
       if (intBeat === noteLastBeat - 1 && !_beatHistory.has(noteLastBeat)) {
-        console.log(`[fill] note start=${note.startBeat} len=${note.lengthBeats} — backfilling end (at ${intBeat}, last=${noteLastBeat})`)
         _beatHistory.set(noteLastBeat, beatData)
       }
 
