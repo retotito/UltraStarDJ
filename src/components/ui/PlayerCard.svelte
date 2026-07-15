@@ -149,6 +149,7 @@
     <div class="test-row">
       <button
         class="btn btn-lg"
+        style="margin-right: var(--space-2); --accent: {accent}"
         class:is-active={isMonitoring}
         class:btn-danger={isMonitoring}
         disabled={!player.mic}

@@ -304,13 +304,22 @@ fn ffmpeg_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 
 fn which_ffmpeg(name: &str) -> Option<PathBuf> {
-    std::process::Command::new("which")
+    #[cfg(target_os = "windows")]
+    let cmd = "where";
+    #[cfg(not(target_os = "windows"))]
+    let cmd = "which";
+
+    std::process::Command::new(cmd)
         .arg(name)
         .output()
         .ok()
         .and_then(|o| {
             if o.status.success() {
-                let p = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                let p = String::from_utf8_lossy(&o.stdout)
+                    .lines()
+                    .next()?
+                    .trim()
+                    .to_string();
                 if !p.is_empty() { Some(PathBuf::from(p)) } else { None }
             } else {
                 None

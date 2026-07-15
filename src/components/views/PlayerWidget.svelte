@@ -6,7 +6,7 @@
   import { songQueue } from '$lib/stores/queue.svelte'
   import { playback } from '$lib/stores/playback.svelte'
   import { network } from '$lib/stores/network.svelte'
-  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, usdbGetSongTxt, getYoutubeAudioUrl } from '$lib/ipc/tauri'
+  import { toAssetUrl, needsTranscode, transcodeToMp4, deleteTempFile, usdbGetSongTxt } from '$lib/ipc/tauri'
   import { validateSong } from '$lib/ultrastar/validate_song'
   import { enrichUsdbSong, requiresInternet } from '$lib/ultrastar/usdb-load'
   import { tooltip } from '$lib/tooltip'
@@ -70,84 +70,6 @@
           transcoding = false
         })
     }
-  })
-
-  // Fetch yt-dlp audio URL when a YouTube-only song is loaded
-  $effect(() => {
-    const song = player.song
-    if (!song?.youtubeId || song.audioPath || song.videoPath) {
-      ytAudioUrl = null
-      ytAudioError = null
-      ytAudioLoading = false
-      return
-    }
-    ytAudioError = null
-    ytAudioLoading = true
-    console.log('[PreviewPlayer] fetching yt-dlp audio URL for', song.youtubeId)
-    // 20-second timeout — fall back to Plyr YouTube if yt-dlp is too slow
-    const timeout = setTimeout(() => {
-      if (ytAudioLoading && !ytAudioUrl) {
-        console.warn('[PreviewPlayer] yt-dlp timeout — falling back to Plyr YouTube')
-        ytAudioError = 'timeout'
-        ytAudioLoading = false
-      }
-    }, 20000)
-    getYoutubeAudioUrl(song.youtubeId)
-      .then(filePath => {
-        clearTimeout(timeout)
-        if (player.song !== song) return
-        console.log('[PreviewPlayer] yt-dlp file ready:', filePath)
-        // Switch to audio element even if Plyr fallback is already showing
-        ytAudioError = null
-        ytAudioUrl = filePath  // already a media:// URL from Rust
-        ytAudioLoading = false
-      })
-      .catch(e => {
-        clearTimeout(timeout)
-        if (player.song !== song) return
-        ytAudioError = String(e)
-        ytAudioLoading = false
-        console.warn('[PreviewPlayer] yt-dlp failed, falling back to Plyr YouTube:', e)
-      })
-  })
-
-  // Fetch yt-dlp audio URL when a YouTube-only song is loaded
-  $effect(() => {
-    const song = player.song
-    if (!song?.youtubeId || song.audioPath || song.videoPath) {
-      ytAudioUrl = null
-      ytAudioError = null
-      ytAudioLoading = false
-      return
-    }
-    ytAudioError = null
-    ytAudioLoading = true
-    console.log('[PreviewPlayer] fetching yt-dlp audio URL for', song.youtubeId)
-    // 20-second timeout — fall back to Plyr YouTube if yt-dlp is too slow
-    const timeout = setTimeout(() => {
-      if (ytAudioLoading && !ytAudioUrl) {
-        console.warn('[PreviewPlayer] yt-dlp timeout — falling back to Plyr YouTube')
-        ytAudioError = 'timeout'
-        ytAudioLoading = false
-      }
-    }, 20000)
-    getYoutubeAudioUrl(song.youtubeId)
-      .then(filePath => {
-        clearTimeout(timeout)
-        if (player.song !== song) return
-        console.log('[PreviewPlayer] yt-dlp file ready:', filePath)
-        // Switch to audio element even if Plyr fallback is already showing
-        ytAudioError = null
-        ytAudioUrl = filePath  // already a media:// URL from Rust
-        ytAudioLoading = false
-      })
-      .catch(e => {
-        clearTimeout(timeout)
-        if (player.song !== song) return
-        ytAudioError = String(e)
-        ytAudioLoading = false
-        console.warn('[PreviewPlayer] yt-dlp failed, falling back to Plyr YouTube:', e)
-      })
   })
 
   // Track the active YouTube Plyr instance so the fader can control its volume

@@ -4,7 +4,7 @@
 
 <!-- Hero mockup — replace with actual screenshot -->
 <p align="center">
-  <img src="docs/screenshots/UltrastarDJ%20mockup.png" alt="UltrastarDJ — game view" width="100%">
+  <img src="docs/screenshots/UltraStarDJ_mockup.jpg" alt="UltrastarDJ — game view" width="100%">
 </p>
 
 ---
