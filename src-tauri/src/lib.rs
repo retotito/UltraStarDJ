@@ -376,11 +376,12 @@ pub fn run() {
         handle: std::sync::Arc::new(std::sync::Mutex::new(None)),
     };
 
-    // In production, pick a free port so the app serves from http://localhost:PORT
-    // instead of tauri://localhost — this makes YouTube embeds work.
-    // The localhost-ipc capability file grants IPC access to http://localhost:**.
+    // In production, serve from a fixed port so localStorage persists across restarts.
+    // (A random port changes the origin each launch, wiping all localStorage.)
+    // Port 14420 is app-specific and unlikely to conflict with other services.
+    // The localhost-ipc capability grants IPC access to http://localhost:**.
     #[cfg(not(dev))]
-    let port: u16 = portpicker::pick_unused_port().expect("failed to find unused port");
+    let port: u16 = 14420;
 
     // Build the plugin chain. tauri-plugin-localhost is only registered in
     // production — in dev the Vite dev server handles asset serving.
